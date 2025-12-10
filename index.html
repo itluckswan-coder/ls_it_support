@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+  <meta charset="UTF-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบแจ้งปัญหา IT</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .animate-fadeIn {
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    .animate-slideIn {
+      animation: slideIn 0.4s ease-out;
+    }
+
+
+
+    .card-shadow {
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+
+<body class=" from-blue-50 to-indigo-100 min-h-screen overflow-x-hidden">
+
+  <div class="container mx-auto px-4 py-8 max-w-5xl">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 space-y-6 md:space-y-0">
+
+      <!-- ฟอร์มแจ้งปัญหา -->
+      <div class="bg-white rounded-2xl p-6 card-shadow animate-slideIn">
+        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200">
+          <div class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <span class="text-2xl">📝</span>
+          </div>
+          <h2 class="text-xl font-bold text-gray-800">แจ้งปัญหาใหม่</h2>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              <span class="text-red-500">*</span> ชื่อผู้แจ้ง
+            </label>
+            <input id="name" type="text" placeholder="ระบุชื่อของคุณ"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition" />
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              <span class="text-red-500">*</span> แผนก
+            </label>
+            <select id="dept"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+              <option value="">-- เลือกแผนก --</option>
+              <option>บัญชี</option>
+              <option>คลังสินค้า</option>
+              <option>ขาย</option>
+              <option>ผลิต</option>
+              <option>HR</option>
+              <option>IT</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              <span class="text-red-500">*</span> อุปกรณ์/ระบบที่มีปัญหา
+            </label>
+            <select id="device"
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+              <option value="">-- เลือกประเภท --</option>
+              <option>Printer</option>
+              <option>Network/Internet</option>
+              <option>PC/Notebook</option>
+              <option>NAS/Synology</option>
+              <option>Camera/CCTV</option>
+              <option>ระบบบัญชี</option>
+              <option>ระบบขาย</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              <span class="text-red-500">*</span> รายละเอียดปัญหา
+            </label>
+            <textarea id="issue" rows="4" placeholder="อธิบายปัญหาที่พบโดยละเอียด..."
+              class="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition resize-none"></textarea>
+          </div>
+
+          <button onclick="submitForm()"
+            class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3.5 rounded-lg shadow-lg hover:shadow-xl hover:from-indigo-700 hover:to-purple-700 transition-all transform hover:scale-[1.02] active:scale-95">
+            <span class="flex items-center justify-center gap-2">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
+              ส่งแจ้งปัญหา
+            </span>
+          </button>
+
+          <div id="formMsg" class="text-sm text-center min-h-[24px]"></div>
+        </div>
+      </div>
+
+      <!-- ตรวจสอบสถานะ -->
+      <div class="bg-white rounded-2xl p-6 card-shadow animate-slideIn" style="animation-delay: 0.1s;">
+        <div class="flex items-center gap-3 mb-6 pb-4 border-b border-gray-200">
+          <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+            <span class="text-2xl">🔍</span>
+          </div>
+          <h2 class="text-xl font-bold text-gray-800">ตรวจสอบสถานะ</h2>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">
+              ค้นหาด้วยชื่อผู้แจ้ง
+            </label>
+            <div class="flex flex-col md:flex-row gap-2">
+              <input id="searchQuery" type="text" placeholder="พิมพ์ชื่อเพื่อค้นหา"
+                class="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                onkeypress="if(event.key==='Enter') searchStatus()" />
+              <button onclick="searchStatus()"
+                class="px-6 py-2.5 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition shadow hover:shadow-lg">
+                ค้นหา
+              </button>
+            </div>
+          </div>
+
+          <div id="statusResult" class="space-y-3 max-h-96 overflow-y-auto">
+            <div class="text-center text-gray-400 py-8">
+              <svg class="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p class="text-sm">กรอกข้อมูลเพื่อค้นหา</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- คำแนะนำ -->
+    <div class="mt-6 bg-white rounded-2xl p-6 card-shadow animate-fadeIn" style="animation-delay: 0.2s;">
+      <h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+        <span class="text-xl">💡</span> คำแนะนำในการใช้งาน
+      </h3>
+      <ul class="text-sm text-gray-600 space-y-2">
+        <li class="flex items-start gap-2">
+          <span class="text-indigo-600 font-bold">•</span>
+          <span>กรอกข้อมูลให้ครบถ้วนเพื่อให้ทีม IT สามารถดำเนินการได้รวดเร็ว</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="text-indigo-600 font-bold">•</span>
+          <span>ค้นหาประวัติด้วยชื่อผู้แจ้ง (แสดงสูงสุด 5 รายการล่าสุด)</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="text-indigo-600 font-bold">•</span>
+          <span>ทีม IT จะดำเนินการภายใน 24 ชั่วโมง (วันทำการ)</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // ฟังก์ชันส่งฟอร์ม
+    function submitForm() {
+      const fields = ['name', 'dept', 'device', 'issue'];
+      const msgBox = document.getElementById('formMsg');
+
+      const payload = {};
+      let hasEmpty = false;
+      fields.forEach(id => {
+        const val = document.getElementById(id).value.trim();
+        payload[id] = val;
+        if (!val) hasEmpty = true;
+      });
+
+      if (hasEmpty) {
+        msgBox.innerHTML = '<span class="text-red-600 font-medium flex items-center justify-center gap-1"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg> กรุณากรอกข้อมูลให้ครบทุกช่อง</span>';
+        return;
+      }
+
+      fields.forEach(id => document.getElementById(id).disabled = true);
+
+      msgBox.innerHTML = '<span class="text-blue-600 font-medium animate-pulse flex items-center justify-center gap-2"><svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> กำลังส่งข้อมูล...</span>';
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.ok) {
+            msgBox.innerHTML = `<div class="bg-green-50 border border-green-200 rounded-lg p-3 text-green-800"><div class="flex items-center gap-2 font-medium"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg> ส่งเรื่องสำเร็จ!</div><div class="text-sm mt-1">รหัส Ticket: <span class="font-bold">${res.ticketId}</span></div></div>`;
+            fields.forEach(id => document.getElementById(id).value = '');
+          } else {
+            msgBox.innerHTML = '<span class="text-red-600 font-medium flex items-center justify-center gap-1">เกิดข้อผิดพลาด กรุณาลองใหม่</span>';
+          }
+          fields.forEach(id => document.getElementById(id).disabled = false);
+        })
+        .withFailureHandler(err => {
+          msgBox.innerHTML = '<span class="text-red-600 font-medium text-xs">❌ ส่งไม่สำเร็จ: ' + err.message + '</span>';
+          fields.forEach(id => document.getElementById(id).disabled = false);
+        })
+        .submitIssue(payload);
+    }
+
+    // ฟังก์ชันค้นหาสถานะ
+    function searchStatus() {
+      const query = document.getElementById('searchQuery').value.trim();
+      const resultBox = document.getElementById('statusResult');
+
+      if (!query) {
+        resultBox.innerHTML = '<div class="text-center text-gray-400 py-8"><svg class="w-16 h-16 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><p class="text-sm">พิมพ์ชื่อเพื่อค้นหาประวัติ (สูงสุด 5 รายการ)</p></div>';
+        return;
+      }
+
+      resultBox.innerHTML = '<div class="text-center text-gray-400 py-8 animate-pulse"><svg class="animate-spin h-8 w-8 mx-auto mb-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><p class="text-sm">กำลังค้นหา...</p></div>';
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.ok && res.items.length > 0) {
+            const html = res.items.map(item => {
+              const statusColor = item.status === 'เสร็จสิ้น' ? 'bg-green-100 text-green-800' :
+                item.status === 'กำลังดำเนินการ' ? 'bg-blue-100 text-blue-800' :
+                  item.status === 'รอดำเนินการ' ? 'bg-yellow-100 text-yellow-800' :
+                    item.status === 'รับเรื่องแล้ว' ? 'bg-purple-100 text-purple-800' :
+                      'bg-gray-100 text-gray-800';
+
+              const regex = new RegExp(`(${query})`, 'gi');
+              const nameHighlighted = item.name.replace(regex, '<span class="bg-yellow-200">$1</span>');
+              const issueHighlighted = item.issue.replace(regex, '<span class="bg-yellow-200">$1</span>');
+
+              return `
+                <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                  <div class="flex items-start justify-between mb-2">
+                    <div>
+                      <div class="font-bold text-gray-800">${item.ticketId}</div>
+                      <div class="text-sm text-gray-600">${nameHighlighted}</div>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-semibold ${statusColor}">${item.status}</span>
+                  </div>
+                  <div class="text-sm text-gray-600 space-y-1">${issueHighlighted}</div>
+                  <div class="text-xs text-gray-400 mt-2">${item.date}</div>
+                </div>`;
+            }).join('');
+            resultBox.innerHTML = html;
+          } else {
+            resultBox.innerHTML = '<div class="text-center text-gray-400 py-8">ไม่พบข้อมูล</div>';
+          }
+        })
+        .withFailureHandler(err => {
+          resultBox.innerHTML = `<div class="text-center text-red-600 py-8">❌ เกิดข้อผิดพลาด: ${err.message}</div>`;
+        })
+        .searchTickets(query);
+    }
+  </script>
+
+</body>
+
+</html>
