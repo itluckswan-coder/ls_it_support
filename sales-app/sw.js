@@ -1,0 +1,65 @@
+/* Luck Swan Sales — offline cache */
+const CACHE = 'ls-sales-v1';
+const ASSETS = [
+  'css/app.css',
+  'fonts.css',
+  'fonts/BaiJamjuree-500-latin.woff2',
+  'fonts/BaiJamjuree-500-thai.woff2',
+  'fonts/BaiJamjuree-600-latin.woff2',
+  'fonts/BaiJamjuree-600-thai.woff2',
+  'fonts/BaiJamjuree-700-latin.woff2',
+  'fonts/BaiJamjuree-700-thai.woff2',
+  'fonts/IBMPlexSansThai-400-latin.woff2',
+  'fonts/IBMPlexSansThai-400-thai.woff2',
+  'fonts/IBMPlexSansThai-500-latin.woff2',
+  'fonts/IBMPlexSansThai-500-thai.woff2',
+  'fonts/IBMPlexSansThai-600-latin.woff2',
+  'fonts/IBMPlexSansThai-600-thai.woff2',
+  'icons/apple-touch-icon.png',
+  'icons/favicon-32.png',
+  'icons/icon-192.png',
+  'icons/icon-512.png',
+  'icons/maskable-192.png',
+  'icons/maskable-512.png',
+  'img/food1-0.jpg',
+  'img/food2-0.jpg',
+  'img/food2-1.jpg',
+  'img/logo-wide-sm.png',
+  'img/logo-wide.png',
+  'img/meet-kinnaree.jpg',
+  'img/meet-prayamengrai.jpg',
+  'img/meet-ruenhong.jpg',
+  'img/meet-thikhampon.jpg',
+  'img/room-deluxe.jpg',
+  'img/room-grand-deluxe.jpg',
+  'img/room-junior-suite.jpg',
+  'img/room-superior.jpg',
+  'index.html',
+  'js/app.js',
+  'js/data.js',
+  'js/util.js',
+  'js/v-catalog.js',
+  'js/v-ops.js',
+  'js/v-quote.js',
+  'manifest.webmanifest',
+  './'
+];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  // network first for the page shell so updates arrive, cache first for static files
+  if (req.mode === 'navigate') {
+    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return r; }).catch(() => caches.match(req).then(r => r || caches.match('index.html'))));
+    return;
+  }
+  e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
+    if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+    return r;
+  })));
+});

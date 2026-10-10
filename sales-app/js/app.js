@@ -1,0 +1,433 @@
+/* Luck Swan Sales — core: router, shell, login, home, shared helpers */
+(function (g) {
+  'use strict';
+  const U = g.U, D = g.DATA, Store = g.Store;
+  const H = U.esc;
+
+  const ICON = {
+    arrow: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+    menu: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+    search: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 11 12 4l9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
+    doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/></svg>',
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+    sheet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+    more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
+    check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+    x: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    trash: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+    left: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 6-6 6 6 6"/></svg>',
+    right: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>'
+  };
+
+  const NAV = [
+    ['home', 'ภาพรวม', '#/home'], ['quote', 'ใบเสนอราคา', '#/quotes'], ['food', 'จัดเลี้ยง', '#/food'], ['meet', 'ห้องประชุม', '#/meet'], ['room', 'ห้องพัก', '#/rooms'],
+    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users']
+  ];
+
+  const App = {
+    ICON, NAV, V: {}, ACT: {}, CHG: {}, INP: {},
+    state: { route: 'home', params: [], ui: {} },
+    deferredInstall: null,
+
+    /* ---------- session ---------- */
+    me() { const id = App.state.uid; return id ? Store.db.users.find(u => u.id === id) : null; },
+    can(p) { const m = App.me(); return !!(m && m.perms && m.perms[p]); },
+    firstName(u) { return (u && u.name || '').split(' ')[0]; },
+    restoreSession() {
+      let id = null;
+      try { id = localStorage.getItem('lsSales.session') || sessionStorage.getItem('lsSales.session'); } catch (e) { /* ignore */ }
+      if (id && Store.db.users.some(u => u.id === id && u.status !== 'disabled')) App.state.uid = id;
+    },
+    async login(ident, pw, remember) {
+      ident = String(ident || '').trim().toLowerCase();
+      const u = Store.db.users.find(x => x.email.toLowerCase() === ident || x.email.split('@')[0].toLowerCase() === ident || x.id.toLowerCase() === ident);
+      if (!u) return 'ไม่พบผู้ใช้นี้ในระบบ';
+      if (u.status === 'disabled') return 'บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแลระบบ';
+      const ok = u.pw ? (await g.hashPw(pw)) === u.pw : pw === D.DEFAULT_PW;
+      if (!ok) return 'รหัสผ่านไม่ถูกต้อง';
+      if (u.status === 'invited') u.status = 'active';
+      u.lastLogin = new Date().toISOString().slice(0, 19);
+      u.lastDevice = App.deviceName();
+      Store.save();
+      App.state.uid = u.id;
+      try {
+        (remember ? localStorage : sessionStorage).setItem('lsSales.session', u.id);
+        (remember ? sessionStorage : localStorage).removeItem('lsSales.session');
+      } catch (e) { /* ignore */ }
+      return null;
+    },
+    logout() {
+      try { localStorage.removeItem('lsSales.session'); sessionStorage.removeItem('lsSales.session'); } catch (e) { /* ignore */ }
+      App.state.uid = null; App.go('#/login');
+    },
+    deviceName() {
+      const ua = navigator.userAgent;
+      const b = /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : /Firefox\//.test(ua) ? 'Firefox' : 'Browser';
+      const d = /iPad/.test(ua) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : '';
+      return b + (d ? ' · ' + d : '');
+    },
+
+    /* ---------- routing ---------- */
+    go(h) { if (location.hash === h) App.render(); else location.hash = h; },
+    parse() {
+      const h = (location.hash || '#/home').replace(/^#\/?/, '');
+      const [route, ...params] = h.split('/').map(decodeURIComponent);
+      return { route: route || 'home', params };
+    },
+    render() {
+      const { route, params } = App.parse();
+      if (!App.state.uid && route !== 'login') { location.replace('#/login'); return; }
+      if (App.state.uid && route === 'login') { location.replace('#/home'); return; }
+      App.state.route = route; App.state.params = params;
+      const view = App.V[route] || App.V.home;
+      const root = document.getElementById('app');
+      const keepScroll = App.state._sameRoute === location.hash;
+      const y = window.scrollY;
+      let body;
+      try { body = view.render(params); } catch (e) { console.error(e); body = '<div class="empty">เกิดข้อผิดพลาด: ' + H(e.message) + '</div>'; }
+      if (view.bare) root.innerHTML = body;
+      else root.innerHTML = App.shell(view.nav || route, body, view);
+      document.title = (view.title ? (typeof view.title === 'function' ? view.title(params) : view.title) + ' · ' : '') + 'Luck Swan Sales';
+      if (view.after) try { view.after(params); } catch (e) { console.error(e); }
+      if (keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
+      App.state._sameRoute = location.hash;
+    },
+    rerender() { App.render(); },
+
+    /* ---------- shell ---------- */
+    shell(active, body, view) {
+      const me = App.me();
+      const nav = NAV.filter(n => n[0] !== 'users' || App.can('users') || App.can('view_beo'));
+      const tabs = [['home', 'ภาพรวม', '#/home', ICON.home], ['quote', 'ใบเสนอ', '#/quotes', ICON.doc], ['cal', 'ปฏิทิน', '#/cal', ICON.cal], ['beo', 'ใบฟังก์ชัน', '#/beo', ICON.sheet]];
+      return `
+<header class="topbar">
+  <button class="menu-btn" data-act="drawer" aria-label="เมนู">${ICON.menu}</button>
+  <a class="brand" href="#/home"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort"><span class="sep"></span><span class="t">ลักษวรรณ รีสอร์ต<small>ฝ่ายขาย</small></span></a>
+  <nav class="nav">${nav.map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}">${n[1]}</a>`).join('')}</nav>
+  <div class="tb-right">
+    <button class="search-btn" data-act="toggleSearch" aria-label="ค้นหา">${ICON.search}</button>
+    <div class="search" id="searchBox"><input type="search" placeholder="ค้นหาลูกค้า, ใบเสนอราคา…" data-input="search" aria-label="ค้นหา" autocomplete="off"><div class="search-res hidden" id="searchRes"></div></div>
+    <button class="avatar" data-act="userMenu" aria-label="บัญชีผู้ใช้">${H(U.initials(me && me.name))}</button>
+  </div>
+</header>
+<main class="${view && view.bleed ? 'bleed' : ''}">${body}</main>
+<nav class="tabbar">${tabs.map(t => `<a href="${t[2]}" class="${t[0] === active ? 'on' : ''}">${t[3]}<span>${t[1]}</span></a>`).join('')}<a href="#" data-act="drawer" class="${['food', 'meet', 'room', 'staff', 'users'].includes(active) ? 'on' : ''}">${ICON.more}<span>เพิ่มเติม</span></a></nav>`;
+    },
+
+    /* ---------- ui helpers ---------- */
+    toast(msg) {
+      const old = document.querySelector('.toast'); if (old) old.remove();
+      const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t);
+      setTimeout(() => t.remove(), 2600);
+    },
+    modal(html, after) {
+      App.closeModal();
+      const bg = document.createElement('div'); bg.className = 'modal-bg'; bg.id = 'modalBg';
+      bg.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${html}</div>`;
+      bg.addEventListener('mousedown', e => { if (e.target === bg) App.closeModal(); });
+      document.body.appendChild(bg);
+      const f = bg.querySelector('input:not([type=checkbox]),select,textarea'); if (f && window.innerWidth > 760) f.focus();
+      if (after) after(bg);
+      return bg;
+    },
+    closeModal() { const m = document.getElementById('modalBg'); if (m) m.remove(); },
+    confirm(msg, yes, label = 'ยืนยัน') {
+      App.modal(`<h2>${H(msg)}</h2><div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="cfYes">${H(label)}</button></div>`,
+        bg => bg.querySelector('#cfYes').onclick = () => { App.closeModal(); yes(); });
+    },
+    formData(root) {
+      const o = {};
+      root.querySelectorAll('[name]').forEach(el => { o[el.name] = el.type === 'checkbox' ? el.checked : el.value; });
+      return o;
+    },
+    statusBadge(s) { return `<span class="badge st-${s}">${H(D.STATUS[s] || s)}</span>`; },
+    save() { Store.save(); },
+    sw(name, on, attrs = '') { return `<label class="switch"><input type="checkbox" ${on ? 'checked' : ''} ${attrs} aria-label="${H(name)}"><span></span></label>`; },
+
+    /* ---------- domain helpers ---------- */
+    calc(q) { return U.calc(q, Store.db.settings); },
+    holding(q) { return q.status === 'tentative' || q.status === 'confirmed'; },
+    // meeting room bookings on a date (other quotes)
+    meetBooking(roomId, date, excludeId) {
+      return Store.db.quotes.find(q => q.id !== excludeId && App.holding(q) && date >= q.start && date <= q.end &&
+        q.items.some(it => it.sec === 'meet' && it.ref === roomId));
+    },
+    roomTypeBooked(typeId, date, excludeId) {
+      let n = 0;
+      for (const q of Store.db.quotes) {
+        if (q.id === excludeId || !App.holding(q)) continue;
+        for (const it of q.items) {
+          if (it.sec !== 'room' || it.free) continue;
+          const nights = Number(it.q2) || 1, ci = q.start, co = U.addDays(ci, nights);
+          if (!(date >= ci && date < co)) continue;
+          if (it.block && it.block[typeId]) n += it.block[typeId];
+          else if (it.ref === typeId) n += Number(it.q1) || 0;
+        }
+      }
+      return n;
+    },
+    roomsLeft(date, excludeId) {
+      const total = D.ROOM_TYPES.reduce((a, t) => a + t.total, 0);
+      const used = D.ROOM_TYPES.reduce((a, t) => a + App.roomTypeBooked(t.id, date, excludeId), 0);
+      return { total, used, left: total - used };
+    },
+    qtyLabel(it) {
+      if (it.q2 == null || it.q2 === '') return `${U.n(it.q1)} ${it.u1 || ''}`.trim();
+      return `${U.n(it.q1)}${it.u1 && it.sec !== 'food' ? ' ' + it.u1 : ''} × ${U.n(it.q2)} ${it.u2 || ''}`.trim();
+    },
+    // which quote catalog pages add to
+    ctxQuote() {
+      const db = Store.db;
+      let id = App.state.ctx || (function () { try { return sessionStorage.getItem('lsSales.ctx'); } catch (e) { return null; } })();
+      let q = id && db.quotes.find(x => x.id === id && x.status !== 'cancelled');
+      if (!q) q = db.quotes.filter(x => x.status === 'draft' || x.status === 'sent' || x.status === 'tentative').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
+      return q || null;
+    },
+    setCtx(id) { App.state.ctx = id; try { sessionStorage.setItem('lsSales.ctx', id); } catch (e) { /* ignore */ } },
+    touch(q, note) {
+      q.updatedAt = new Date().toISOString().slice(0, 19);
+      if (note) q.history.unshift({ at: q.updatedAt, t: note, by: App.me() && App.me().name });
+      Store.save();
+    },
+    pickQuoteModal(title, cb, filter) {
+      const qs = Store.db.quotes.filter(filter || (q => q.status !== 'cancelled')).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+      App.modal(`<h2>${H(title)}</h2>
+        <div>${qs.map(q => `<button class="pick" data-id="${H(q.id)}"><span><b>${H(q.client)}</b><br><span class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</span></span>${App.statusBadge(q.status)}</button>`).join('') || '<div class="empty">ไม่มีใบเสนอราคา</div>'}</div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button><a class="btn red" href="#/new" data-act="closeModal">+ ใบเสนอราคาใหม่</a></div>`,
+      bg => bg.querySelectorAll('.pick').forEach(b => b.onclick = () => { App.closeModal(); cb(b.dataset.id); }));
+    },
+    ctxBar(q, what) {
+      if (!q) return `<div class="row wrap"><span class="muted">ยังไม่ได้เลือกใบเสนอราคา</span><button class="link" data-act="pickCtx">เลือกใบเสนอ</button></div>`;
+      return `<div class="row wrap" style="gap:6px"><span class="muted">${what || 'กำลังเพิ่มให้'}</span><b>${H(q.id)} · ${U.n(q.pax)} ท่าน</b><span class="muted small">(${H(q.client)})</span><button class="link" data-act="pickCtx">เปลี่ยน</button></div>`;
+    },
+    dock(q) {
+      if (!q) return '';
+      const c = App.calc(q);
+      return `<div class="dock no-print"><span class="lbl small">${H(q.id)} · ${q.items.length} รายการ</span><span class="v num">฿${U.n(Math.round(c.net))}</span><a class="btn red sm" href="#/quote/${encodeURIComponent(q.id)}">กลับไปใบเสนอ</a></div>`;
+    },
+    tel(p) { return 'tel:' + String(p || '').replace(/[^\d+]/g, ''); }
+  };
+
+  /* ---------- event delegation ---------- */
+  document.addEventListener('click', e => {
+    const el = e.target.closest('[data-act]');
+    if (!el) {
+      if (!e.target.closest('.pop') && !e.target.closest('[data-act="userMenu"]')) { const p = document.querySelector('.pop'); if (p) p.remove(); }
+      if (!e.target.closest('#searchBox')) { const r = document.getElementById('searchRes'); if (r) r.classList.add('hidden'); }
+      return;
+    }
+    const fn = App.ACT[el.dataset.act];
+    if (fn) { if (el.tagName === 'A' && el.getAttribute('href') === '#') e.preventDefault(); fn(el, e); }
+  });
+  document.addEventListener('change', e => { const el = e.target.closest('[data-change]'); if (el && App.CHG[el.dataset.change]) App.CHG[el.dataset.change](el, e); });
+  document.addEventListener('input', e => { const el = e.target.closest('[data-input]'); if (el && App.INP[el.dataset.input]) App.INP[el.dataset.input](el, e); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') { App.closeModal(); const d = document.querySelector('.drawer'); if (d) App.ACT.closeDrawer(); } });
+
+  Object.assign(App.ACT, {
+    closeModal() { App.closeModal(); },
+    drawer() {
+      const active = App.state.route === 'quote' || App.state.route === 'quotes' || App.state.route === 'new' || App.state.route === 'doc' ? 'quote' : (App.V[App.state.route] || {}).nav || App.state.route;
+      const bg = document.createElement('div'); bg.className = 'drawer-bg'; bg.dataset.act = 'closeDrawer';
+      const d = document.createElement('nav'); d.className = 'drawer';
+      d.innerHTML = `<div style="padding:4px 10px 16px"><img src="img/logo-wide-sm.png" alt="" style="width:120px"></div>` + NAV.map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}" data-act="closeDrawer">${n[1]}</a>`).join('');
+      document.body.append(bg, d);
+    },
+    closeDrawer() { document.querySelectorAll('.drawer,.drawer-bg').forEach(x => x.remove()); },
+    toggleSearch() { const s = document.getElementById('searchBox'); s.classList.toggle('open'); if (s.classList.contains('open')) s.querySelector('input').focus(); },
+    userMenu(el) {
+      const old = document.querySelector('.pop'); if (old) { old.remove(); return; }
+      const me = App.me();
+      const p = document.createElement('div'); p.className = 'pop';
+      p.innerHTML = `<div class="hd"><b>${H(me.name)}</b><div class="small muted">${H(me.email)}</div><div class="small muted">${H((D.ROLES.find(r => r.id === me.role) || {}).name || '')}</div></div>
+        <button data-act="changePw">เปลี่ยนรหัสผ่าน</button>
+        ${App.deferredInstall ? '<button data-act="install">ติดตั้งแอปบนเครื่องนี้</button>' : ''}
+        <button data-act="howInstall">วิธีติดตั้งบนมือถือ / แท็บเล็ต</button>
+        <button data-act="exportData">สำรองข้อมูล (ดาวน์โหลด)</button>
+        <button data-act="importData">นำเข้าข้อมูลสำรอง</button>
+        ${me.role === 'admin' ? '<button data-act="resetData">รีเซ็ตเป็นข้อมูลตัวอย่าง</button>' : ''}
+        <button data-act="logout" style="color:var(--red)">ออกจากระบบ</button>`;
+      document.body.appendChild(p);
+    },
+    logout() { document.querySelector('.pop')?.remove(); App.logout(); },
+    install() { document.querySelector('.pop')?.remove(); const p = App.deferredInstall; if (p) { p.prompt(); p.userChoice.finally(() => { App.deferredInstall = null; }); } },
+    howInstall() {
+      document.querySelector('.pop')?.remove();
+      App.modal(`<h2>ติดตั้งแอปบนอุปกรณ์</h2>
+        <div class="stack">
+          <div><b>iPhone / iPad (Safari)</b><div class="muted">แตะปุ่มแชร์ <b>⬆︎</b> → เลือก “เพิ่มไปยังหน้าจอโฮม” (Add to Home Screen)</div></div>
+          <div><b>Android (Chrome)</b><div class="muted">แตะเมนู <b>⋮</b> → “ติดตั้งแอป” หรือ “เพิ่มลงในหน้าจอหลัก”</div></div>
+          <div><b>คอมพิวเตอร์ (Chrome / Edge)</b><div class="muted">คลิกไอคอนติดตั้ง <b>⊕</b> ที่แถบที่อยู่ หรือเมนู → “ติดตั้ง Luck Swan Sales”</div></div>
+          <div class="note">ใช้งานแบบออฟไลน์ได้หลังเปิดครั้งแรก ข้อมูลถูกเก็บในเครื่องนี้ — ใช้ “สำรองข้อมูล” เพื่อย้ายไปเครื่องอื่น</div>
+        </div><div class="acts"><button class="btn dark" data-act="closeModal">เข้าใจแล้ว</button></div>`);
+    },
+    exportData() { document.querySelector('.pop')?.remove(); U.download('luckswan-sales-backup-' + U.today() + '.json', Store.exportJSON()); App.toast('ดาวน์โหลดไฟล์สำรองแล้ว'); },
+    importData() {
+      document.querySelector('.pop')?.remove();
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+      inp.onchange = () => {
+        const f = inp.files[0]; if (!f) return;
+        f.text().then(t => { try { Store.importJSON(t); App.toast('นำเข้าข้อมูลเรียบร้อย'); App.restoreSession(); App.render(); } catch (e) { App.toast('นำเข้าไม่สำเร็จ: ' + e.message); } });
+      };
+      inp.click();
+    },
+    resetData() {
+      document.querySelector('.pop')?.remove();
+      App.confirm('รีเซ็ตข้อมูลทั้งหมดกลับเป็นข้อมูลตัวอย่าง?', () => { const uid = App.state.uid; Store.reset(); App.state.uid = Store.db.users.some(u => u.id === uid) ? uid : null; App.render(); App.toast('รีเซ็ตแล้ว'); }, 'รีเซ็ต');
+    },
+    changePw() {
+      document.querySelector('.pop')?.remove();
+      App.modal(`<h2>เปลี่ยนรหัสผ่าน</h2>
+        <div class="field"><label class="f">รหัสผ่านปัจจุบัน</label><input class="input" type="password" name="cur" autocomplete="current-password"></div>
+        <div class="field"><label class="f">รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)</label><input class="input" type="password" name="nw" autocomplete="new-password"></div>
+        <div class="field"><label class="f">ยืนยันรหัสผ่านใหม่</label><input class="input" type="password" name="nw2" autocomplete="new-password"></div>
+        <div class="small red" id="pwErr"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="pwOk">บันทึก</button></div>`, bg => {
+        bg.querySelector('#pwOk').onclick = async () => {
+          const f = App.formData(bg), me = App.me(), err = bg.querySelector('#pwErr');
+          const ok = me.pw ? (await g.hashPw(f.cur)) === me.pw : f.cur === D.DEFAULT_PW;
+          if (!ok) { err.textContent = 'รหัสผ่านปัจจุบันไม่ถูกต้อง'; return; }
+          if (f.nw.length < 6) { err.textContent = 'รหัสผ่านใหม่สั้นเกินไป'; return; }
+          if (f.nw !== f.nw2) { err.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน'; return; }
+          me.pw = await g.hashPw(f.nw); Store.save(); App.closeModal(); App.toast('เปลี่ยนรหัสผ่านแล้ว');
+        };
+      });
+    },
+    pickCtx() { App.pickQuoteModal('เลือกใบเสนอราคาที่จะเพิ่มรายการ', id => { App.setCtx(id); App.render(); }, q => q.status !== 'cancelled'); }
+  });
+
+  /* ---------- global search ---------- */
+  App.INP.search = U.debounce(el => {
+    const v = el.value.trim().toLowerCase(), box = document.getElementById('searchRes');
+    if (!v) { box.classList.add('hidden'); return; }
+    const qs = Store.db.quotes.filter(q => [q.id, q.client, q.title, q.contact, q.email].join(' ').toLowerCase().includes(v)).slice(0, 8);
+    const bs = Store.db.beos.filter(b => b.id.toLowerCase().includes(v)).slice(0, 3);
+    box.innerHTML = qs.map(q => `<a href="#/quote/${encodeURIComponent(q.id)}"><b>${H(q.client)}</b> ${App.statusBadge(q.status)}<div class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</div></a>`).join('') +
+      bs.map(b => `<a href="#/beo/${encodeURIComponent(b.id)}"><b>${H(b.id)}</b><div class="small muted">ใบฟังก์ชัน</div></a>`).join('') || '<div class="empty small">ไม่พบผลลัพธ์</div>';
+    box.classList.remove('hidden');
+  }, 120);
+
+  /* =====================================================================
+     LOGIN (1a)
+     ===================================================================== */
+  App.V.login = {
+    bare: true, title: 'เข้าสู่ระบบ',
+    render() {
+      return `<div class="login">
+  <div class="login-hero" style="background-image:url(img/meet-kinnaree.jpg)">
+    <div class="tags"><span><i class="dot" style="background:var(--red)"></i>จัดเลี้ยง</span><span><i class="dot" style="background:var(--teal)"></i>ห้องประชุม</span><span><i class="dot" style="background:var(--yellow)"></i>ห้องพัก</span></div>
+    <h2>ทำใบเสนอราคาสัมมนา<br>ครบในที่เดียว</h2>
+    <p style="margin:0;opacity:.9">เลือกห้อง เมนู และห้องพัก ระบบรวมยอดพร้อมค่าบริการและ VAT ให้ทันที</p>
+  </div>
+  <div class="login-side"><form class="login-box" id="loginForm" autocomplete="on">
+    <div class="brand"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort" style="width:116px;height:48px"><span class="sep" style="display:block"></span><span class="t" style="display:block">ลักษวรรณ รีสอร์ต<small>ฝ่ายขาย</small></span></div>
+    <h1>เข้าสู่ระบบ</h1>
+    <div class="muted" style="margin-bottom:22px">สำหรับพนักงานฝ่ายขายและการตลาด</div>
+    <div class="card pad">
+      <div class="field"><label class="f" for="lgU">อีเมลหรือรหัสพนักงาน</label><input class="input" id="lgU" name="u" type="text" autocomplete="username" required placeholder="name@luckswangroup.com"></div>
+      <div class="field"><label class="f" for="lgP">รหัสผ่าน</label><div class="pw-wrap"><input class="input fill" id="lgP" name="p" type="password" autocomplete="current-password" required placeholder="อย่างน้อย 6 ตัวอักษร"><button type="button" data-act="togglePw">แสดง</button></div></div>
+      <div class="between" style="margin:16px 0"><label class="row small" style="cursor:pointer">${App.sw('จำฉันไว้ในเครื่องนี้', true, 'name="r"')}จำฉันไว้ในเครื่องนี้</label><button type="button" class="link" data-act="forgotPw">ลืมรหัสผ่าน?</button></div>
+      <div class="small red" id="lgErr" style="min-height:20px;margin-bottom:6px" role="alert"></div>
+      <button class="btn red block" type="submit">เข้าสู่ระบบ ${ICON.arrow}</button>
+    </div>
+    <p class="small muted" style="text-align:center;margin-top:20px">ติดปัญหาเข้าสู่ระบบ ติดต่อผู้ดูแลระบบ โทร 053-750-855<br>ข้อมูลลูกค้าและราคาเป็นความลับของ บจก. ลักษวรรณ</p>
+  </form></div></div>`;
+    },
+    after() {
+      const f = document.getElementById('loginForm');
+      f.onsubmit = async e => {
+        e.preventDefault();
+        const d = App.formData(f);
+        const err = await App.login(d.u, d.p, d.r);
+        if (err) { document.getElementById('lgErr').textContent = err; return; }
+        App.go('#/home');
+      };
+    }
+  };
+  App.ACT.togglePw = el => { const i = document.getElementById('lgP'); i.type = i.type === 'password' ? 'text' : 'password'; el.textContent = i.type === 'password' ? 'แสดง' : 'ซ่อน'; };
+  App.ACT.forgotPw = () => App.modal(`<h2>ลืมรหัสผ่าน</h2><p class="muted">กรุณาติดต่อผู้ดูแลระบบหรือผู้จัดการฝ่ายขาย เพื่อรีเซ็ตรหัสผ่านจากหน้า “ผู้ใช้งาน”<br>โทร 053-750-855</p><div class="acts"><button class="btn dark" data-act="closeModal">ตกลง</button></div>`);
+
+  /* =====================================================================
+     HOME (1e)
+     ===================================================================== */
+  App.V.home = {
+    title: 'ภาพรวม',
+    render() {
+      const db = Store.db, me = App.me(), now = new Date(), today = U.today();
+      const hr = now.getHours();
+      const greet = hr < 12 ? 'สวัสดีตอนเช้า' : hr < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
+      const quotes = db.quotes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+      const ym = today.slice(0, 7);
+      const closed = db.quotes.filter(q => q.status === 'confirmed' && q.start.slice(0, 7) === ym).reduce((a, q) => a + App.calc(q).net, 0);
+      const target = db.settings.target || 1;
+      const pct = Math.round(closed / target * 100);
+      const pkgFrom = Math.min(...D.FOOD.filter(f => f.cat === 'package').map(f => f.price));
+      const fu = App.V.home.followUps();
+      return `
+<div class="page-hd"><div><div class="eyebrow">${U.DL[now.getDay()]} ${U.fmtD(today)}</div><h1>${greet} คุณ${H(App.firstName(me))}</h1></div>
+  <a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
+<div class="tiles">
+  <a class="tile red" href="#/food"><span class="k">${D.FOOD.filter(f => f.cat === 'package').length} แพ็กเกจสัมมนา</span><h3>จัดเลี้ยง<br>และอาหาร</h3><span class="go">${ICON.arrow}</span></a>
+  <a class="tile teal" href="#/meet"><span class="k">${D.MEETING_ROOMS.length - 1} ห้อง + สระว่ายน้ำ · สูงสุด ${Math.max(...D.MEETING_ROOMS.map(r => Math.max(r.cap.cocktail[1], r.cap.theatre[1])))} ท่าน</span><h3>ห้องประชุม<br>และจัดงาน</h3><span class="go">${ICON.arrow}</span></a>
+  <a class="tile yellow" href="#/rooms"><span class="k">${D.ROOM_TYPES.length} ประเภท · ${D.ROOM_TYPES.reduce((a, t) => a + t.total, 0)} ห้อง</span><h3>ห้องพัก<br>กลุ่ม</h3><span class="go">${ICON.arrow}</span></a>
+  <a class="tile dark" href="#/food"><span class="k">เริ่มเร็วที่สุด</span><h3>แพ็กเกจสัมมนา<br>พร้อมห้องพัก</h3><span class="small" style="opacity:.8">Basic · Standard · Premium เริ่ม ${U.n(pkgFrom)} ฿ Net/ท่าน</span></a>
+</div>
+<div class="split">
+  <section class="card" style="overflow:hidden">
+    <div class="card-hd"><h2>ใบเสนอราคาล่าสุด</h2><a class="link" href="#/quotes">ดูทั้งหมด</a></div>
+    <table class="tbl resp"><thead><tr><th>เลขที่</th><th>ลูกค้า / งาน</th><th>วันงาน</th><th>ท่าน</th><th class="r">ยอด (฿)</th><th class="r">สถานะ</th></tr></thead><tbody>
+    ${quotes.slice(0, 6).map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}">
+      <td class="mono small muted hide-m">${H(q.id)}</td>
+      <td><b style="font-weight:500">${H(q.client)}</b><div class="sub">${H(q.title)}<span class="mono" style="display:none"> · ${H(q.id)}</span></div></td>
+      <td class="hide-m">${U.fmtRange(q.start, q.end, { year: false })}</td><td class="hide-m num">${U.n(q.pax)}</td>
+      <td class="r num b">${U.n(Math.round(App.calc(q).net))}<div class="sub show-m" style="font-weight:400">${U.fmtRange(q.start, q.end, { year: false })}</div></td>
+      <td class="r">${App.statusBadge(q.status)}</td></tr>`).join('')}
+    </tbody></table>
+  </section>
+  <aside class="stack">
+    <section class="card pad">
+      <div class="between"><h2>เป้าเดือน${U.ML[now.getMonth()]}</h2><span class="small muted">ปิดได้ ${pct}%</span></div>
+      <div style="margin:12px 0 14px"><span style="font:700 30px var(--fh)">฿${U.short(closed)}</span> <span class="muted">/ ${U.short(target)}</span></div>
+      <div class="bar"><i style="width:${U.clamp(pct, 0, 100)}%"></i></div>
+    </section>
+    <section class="card pad">
+      <h2 style="margin-bottom:14px">ต้องติดตามวันนี้</h2>
+      ${fu.length ? fu.slice(0, 5).map(f => `<div class="fu"><i class="dot" style="background:${f.color}"></i><div style="flex:1"><b style="font-weight:600;font-size:13.5px">${H(f.title)}</b><div class="small muted">${H(f.sub)}</div></div>${f.action}</div>`).join('') : '<div class="muted small">ไม่มีงานค้าง 🎉</div>'}
+    </section>
+  </aside>
+</div>`;
+    },
+    followUps() {
+      const out = [], today = U.today();
+      for (const q of Store.db.quotes) {
+        const open = `<a class="link" href="#/quote/${encodeURIComponent(q.id)}">`;
+        if (q.status === 'sent' && q.views > 0)
+          out.push({ p: 1, color: 'var(--red)', title: `${q.client} เปิดอ่านใบเสนอ ${q.views} ครั้ง`, sub: 'ยังไม่ตอบ' + (q.holdUntil ? ' · ห้องกันไว้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''), action: q.phone ? `<a class="link" href="${App.tel(q.phone)}">โทร</a>` : open + 'เปิด</a>' });
+        if (q.followUp && q.status !== 'confirmed' && q.status !== 'cancelled')
+          out.push({ p: 2, color: 'var(--yellow)', title: `${q.client}`, sub: q.followUp, action: open + 'แก้ใบเสนอ</a>' });
+        if (q.status === 'tentative' && q.holdUntil && U.diffDays(today, q.holdUntil) <= 7 && U.diffDays(today, q.holdUntil) >= 0 && !q.followUp)
+          out.push({ p: 2, color: 'var(--red)', title: `${q.client} จองชั่วคราวใกล้หมดอายุ`, sub: 'หมดอายุ ' + U.fmtD(q.holdUntil), action: open + 'ติดตาม</a>' });
+        if (q.status === 'draft') {
+          const age = U.diffDays((q.updatedAt || today).slice(0, 10), today);
+          if (age >= 2) out.push({ p: 3, color: 'var(--muted2)', title: q.client, sub: `ร่างค้างไว้ ${age} วัน`, action: open + 'ทำต่อ</a>' });
+        }
+      }
+      return out.sort((a, b) => a.p - b.p);
+    }
+  };
+  App.ACT.openQuote = el => App.go('#/quote/' + encodeURIComponent(el.dataset.id));
+
+  /* ---------- boot ---------- */
+  function boot() {
+    Store.load();
+    App.restoreSession();
+    window.addEventListener('hashchange', App.render);
+    window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); App.deferredInstall = e; });
+    if (!location.hash) location.replace(App.state.uid ? '#/home' : '#/login');
+    App.render();
+    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
+  }
+  g.App = App;
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot)); else setTimeout(boot);
+})(window);
