@@ -377,18 +377,25 @@
   const KEY = 'lsSales.v1';
   const Store = {
     db: null,
+    KEY,
     load() {
-      try { const raw = localStorage.getItem(KEY); if (raw) { this.db = JSON.parse(raw); if (this.db && this.db.v === 1) return this.db; } } catch (e) { /* ignore */ }
-      this.db = seed(); this.save(); return this.db;
+      try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
+      this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    save() { try { localStorage.setItem(KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
-    reset() { this.db = seed(); this.save(); },
+    loaded() { if (g.API) g.API.rememberBeos(); },
+    write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
+    save() { this.write(); },
+    reset() { this.db = seed(); this.write(); this.loaded(); },
+    seedData: seed,
     exportJSON() { return JSON.stringify(this.db, null, 2); },
-    importJSON(text) { const d = JSON.parse(text); if (!d || d.v !== 1 || !Array.isArray(d.quotes)) throw new Error('ไฟล์ไม่ถูกต้อง'); this.db = d; this.save(); },
+    importJSON(text) { const d = JSON.parse(text); if (!d || d.v !== 1 || !Array.isArray(d.quotes)) throw new Error('ไฟล์ไม่ถูกต้อง'); this.db = d; this.write(); this.loaded(); },
     quote(id) { return this.db.quotes.find(q => q.id === id); },
     nextId(prefix) {
       const now = new Date(); const yy = String(now.getFullYear()).slice(-2); const mm = String(now.getMonth() + 1).padStart(2, '0');
-      this.db.seq[prefix] = (this.db.seq[prefix] || 0) + 1;
+      // continue after the highest number already used (also by other people when data is shared)
+      const list = prefix === 'QT' ? this.db.quotes : prefix === 'FS' ? this.db.beos : [];
+      const used = list.map(x => parseInt(String(x.id).split('-')[2], 10) || 0);
+      this.db.seq[prefix] = Math.max((this.db.seq[prefix] || 0), ...used, 0) + 1;
       return prefix + '-' + yy + mm + '-' + String(this.db.seq[prefix]).padStart(3, '0');
     }
   };

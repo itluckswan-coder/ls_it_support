@@ -60,7 +60,7 @@
           <div class="between xs"><span class="mono muted">${H(b.id)}</span><span class="muted">${U.fmtRange(q.start, q.end, { year: false })}</span></div>
           <div class="b" style="margin:4px 0 0">${H(q.title)}</div><div class="small muted" style="margin-bottom:6px">${H(q.client)}</div>
           <div class="between small"><span class="muted">${H(((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || '')} · ${q.pax} ท่าน</span>
-          ${b.status === 'draft' ? '<span class="badge st-draft">ร่าง</span>' : ackN(b) === depN(b) ? '<span class="badge st-confirmed">ครบทุกแผนก</span>' : `<span class="badge st-sent">รอรับทราบ ${depN(b) - ackN(b)}</span>`}</div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
+          ${apprBadge(b) || (b.status === 'draft' ? '<span class="badge st-draft">ร่าง</span>' : ackN(b) === depN(b) ? '<span class="badge st-confirmed">ครบทุกแผนก</span>' : `<span class="badge st-sent">รอรับทราบ ${depN(b) - ackN(b)}</span>`)}</div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
       </aside>`;
       if (!sel) return `<div class="split left">${left}<div class="empty">ยังไม่มีใบฟังก์ชัน — สร้างจากใบเสนอราคาที่ยืนยันแล้ว</div></div>`;
       const { b, q } = sel, days = U.daysOf(q.start, q.end);
@@ -73,7 +73,8 @@
     <div class="page-hd" style="align-items:flex-start;margin-bottom:16px"><div>
       <div class="row wrap small" style="gap:8px"><span class="mono muted">${H(b.id)}</span><a class="link" href="#/quote/${encodeURIComponent(q.id)}">อ้างอิง ${H(q.id)}</a>${b.rev ? `<span class="badge st-tentative">แก้ไขครั้งที่ ${b.rev}${b.revNote ? ' · ' + H(b.revNote) : ''}</span>` : ''}</div>
       <h1 style="margin-top:6px">${H(q.title)} · ${H(q.client)}</h1></div>
-      <div class="row"><button class="btn ghost" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red" data-act="beoSend">${b.status === 'draft' ? 'ส่งให้ ' + Object.keys(D.DEPTS).length + ' แผนก' : 'ส่งฉบับแก้ไข'}</button></div></div>
+      <div class="row"><button class="btn ghost" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red" data-act="beoSend" ${g.Approval.state(b) === 'approved' ? '' : 'disabled title="ต้องได้รับอนุมัติก่อน"'}>${b.status === 'draft' ? 'ส่งให้ ' + Object.keys(D.DEPTS).length + ' แผนก' : 'ส่งฉบับแก้ไข'}</button></div></div>
+    ${apprBanner(b)}
     <section class="card facts" style="margin-bottom:16px">
       <div><div class="k">วันงาน</div><div class="v">${U.fmtRange(q.start, q.end)}</div></div>
       <div><div class="k">ยืนยันจำนวน</div><div class="v" data-act="beoEditF" data-f="confirmPax" style="cursor:pointer">${H(b.confirmPax)}</div></div>
@@ -100,6 +101,79 @@
     }
   };
   const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]) || Store.db.beos[0];
+
+  /* ---------- approval ---------- */
+  const fmtAt = iso => iso ? U.fmtD(iso.slice(0, 10), { year: false }) + ' ' + iso.slice(11, 16) : '';
+  function apprBadge(b) {
+    const st = g.Approval.state(b);
+    if (st === 'pending') return '<span class="badge st-sent">รออนุมัติ</span>';
+    if (st === 'rejected') return '<span class="badge st-tentative">ถูกตีกลับ</span>';
+    return '';
+  }
+  function apprBanner(b) {
+    const a = b.approval || {}, st = g.Approval.state(b), me = App.me();
+    if (st === 'pending') {
+      const mine = g.Approval.canDecide(b, me);
+      return `<div class="note" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b>รออนุมัติ</b> — แก้ไขโดย ${H(a.requestedByName || '-')} ${fmtAt(a.requestedAt)}<div class="xs">${mine ? 'คุณเป็นผู้อนุมัติได้ — ตรวจการเปลี่ยนแปลงแล้วกดอนุมัติหรือตีกลับ' : 'ส่งให้แผนกได้หลังผู้มีตำแหน่งสูงกว่าอนุมัติ'}</div></div>
+        <button class="btn ghost sm" data-act="beoDiff">ดูการเปลี่ยนแปลง</button>${mine ? '<button class="btn ghost sm" data-act="beoReject" style="color:var(--red)">ตีกลับ</button><button class="btn teal sm" data-act="beoApprove">อนุมัติ</button>' : ''}</div>`;
+    }
+    if (st === 'rejected') return `<div class="note red" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b>ถูกตีกลับ</b> โดย ${H(a.byName || '-')} ${fmtAt(a.at)}${a.comment ? ' — “' + H(a.comment) + '”' : ''}<div class="xs">แก้ไขข้อมูลแล้วระบบจะส่งขออนุมัติใหม่อัตโนมัติ</div></div><button class="btn ghost sm" data-act="beoDiff">ดูการเปลี่ยนแปลง</button></div>`;
+    if (a.by && !a.imported) return `<div class="small teal" style="margin:-6px 0 12px">${ICON.check} อนุมัติแล้วโดย ${H(a.byName || '-')} ${fmtAt(a.at)}${a.comment ? ' — “' + H(a.comment) + '”' : ''}</div>`;
+    return '';
+  }
+  function beoDiff(base, cur) {
+    const rows = [], add = (t, cls) => rows.push(`<li class="${cls}">${t}</li>`);
+    if (!base) return '<p class="muted">ใบฟังก์ชันใหม่ ยังไม่เคยได้รับอนุมัติ — ตรวจข้อมูลทั้งหมดในหน้านี้</p>';
+    for (const [k, label] of [['confirmPax', 'ยืนยันจำนวน'], ['payment', 'การชำระเงิน'], ['note', 'หมายเหตุพิเศษ']])
+      if ((base[k] || '') !== (cur[k] || '')) add(`${label}: <s>${H(base[k] || '—')}</s> → <b>${H(cur[k] || '—')}</b>`, 'chg');
+    const days = new Set([...Object.keys(base.schedule || {}), ...Object.keys(cur.schedule || {})]);
+    const key = r => [r.time, r.task, r.place, r.dept].join('|');
+    for (const d of [...days].sort()) {
+      const A = (base.schedule || {})[d] || [], B = (cur.schedule || {})[d] || [];
+      const ka = new Set(A.map(key)), kb = new Set(B.map(key));
+      B.filter(r => !ka.has(key(r))).forEach(r => add(`วันที่ ${d} · เพิ่ม ${H(r.time)} ${H(r.task)} (${H(dept(r.dept).short)}${r.place ? ' · ' + H(r.place) : ''})`, 'plus'));
+      A.filter(r => !kb.has(key(r))).forEach(r => add(`วันที่ ${d} · ลบ ${H(r.time)} ${H(r.task)} (${H(dept(r.dept).short)})`, 'minus'));
+    }
+    for (const dp of D.DEPTS) {
+      const A = (base.depts || {})[dp.id] || { items: [], owner: '' }, B = (cur.depts || {})[dp.id] || { items: [], owner: '' };
+      B.items.filter(x => !A.items.includes(x)).forEach(x => add(`${H(dp.short)} · เพิ่ม “${H(x)}”`, 'plus'));
+      A.items.filter(x => !B.items.includes(x)).forEach(x => add(`${H(dp.short)} · ลบ “${H(x)}”`, 'minus'));
+      if ((A.owner || '') !== (B.owner || '')) add(`${H(dp.short)} · ผู้รับผิดชอบ <s>${H(A.owner || '—')}</s> → <b>${H(B.owner || '—')}</b>`, 'chg');
+    }
+    return rows.length ? `<ul class="diff">${rows.join('')}</ul>` : '<p class="muted">ไม่มีความแตกต่างจากฉบับที่อนุมัติล่าสุด</p>';
+  }
+  async function decide(b, decision, comment) {
+    const me = App.me();
+    if (g.API && g.API.online) {
+      try { const j = await g.API.req('POST', 'beo/' + encodeURIComponent(b.id) + '/' + decision, { comment }); g.API.applyDoc(j.doc); Store.write(); }
+      catch (e) { App.toast(e.message); return; }
+    } else {
+      const a = b.approval || {}, at = new Date().toISOString().slice(0, 19);
+      b.approval = decision === 'approve' ? { state: 'approved', by: me.id, byName: me.name, at, comment, requestedBy: a.requestedBy, requestedByName: a.requestedByName }
+        : Object.assign({}, a, { state: 'rejected', by: me.id, byName: me.name, at, comment });
+      g.API.beoPrev[b.id] = JSON.stringify(b); Store.save();
+    }
+    App.closeModal(); App.render(); App.toast(decision === 'approve' ? 'อนุมัติแล้ว — ส่งให้แผนกได้' : 'ตีกลับแล้ว');
+  }
+  Object.assign(App.ACT, {
+    beoDiff() {
+      const b = curB(), a = b.approval || {};
+      App.modal(`<h2>การเปลี่ยนแปลงที่รออนุมัติ</h2><div class="small muted" style="margin-bottom:12px">${H(b.id)} · เทียบกับฉบับที่อนุมัติล่าสุด</div>${beoDiff(a.base, g.Approval.content(b))}
+        <div class="acts">${g.Approval.canDecide(b, App.me()) ? '<button class="btn ghost" data-act="beoReject" style="color:var(--red)">ตีกลับ</button><button class="btn teal" data-act="beoApprove">อนุมัติ</button>' : '<button class="btn dark" data-act="closeModal">ปิด</button>'}</div>`);
+    },
+    beoApprove() {
+      const b = curB();
+      App.modal(`<h2>อนุมัติใบฟังก์ชัน ${H(b.id)}</h2><label class="f">ความเห็น (ไม่บังคับ)</label><textarea class="input" name="c" rows="3"></textarea>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn teal" id="ok">อนุมัติ</button></div>`, bg => bg.querySelector('#ok').onclick = () => decide(b, 'approve', App.formData(bg).c.trim()));
+    },
+    beoReject() {
+      const b = curB();
+      App.modal(`<h2>ตีกลับใบฟังก์ชัน ${H(b.id)}</h2><label class="f">เหตุผล / สิ่งที่ต้องแก้ *</label><textarea class="input" name="c" rows="3"></textarea><div class="small red" id="rjErr"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">ตีกลับ</button></div>`, bg => bg.querySelector('#ok').onclick = () => {
+        const c = App.formData(bg).c.trim(); if (!c) { bg.querySelector('#rjErr').textContent = 'กรุณาระบุเหตุผล'; return; } decide(b, 'reject', c);
+      });
+    }
+  });
 
   /* ---------- import schedule from .xlsx / .csv ---------- */
   const DEPT_WORDS = [
@@ -248,6 +322,7 @@
     },
     beoSend() {
       const b = curB(), q = Store.quote(b.quoteId);
+      if (g.Approval.state(b) !== 'approved') { App.toast('ใบฟังก์ชันนี้ต้องได้รับอนุมัติก่อนส่งให้แผนก'); return; }
       if (b.status !== 'draft') { b.rev = (b.rev || 0) + 1; b.revNote = ''; }
       b.status = 'sent'; Object.values(b.depts).forEach(d => d.ack = false);
       Store.save(); App.render();
@@ -660,7 +735,8 @@
       const u = Store.db.users.find(x => x.id === UU().sel);
       const tmp = 'ls' + Math.random().toString(36).slice(2, 8);
       App.confirm('รีเซ็ตรหัสผ่านของ ' + u.name + '?', async () => {
-        u.pw = await g.hashPw(tmp); Store.save();
+        if (g.API && g.API.online) { try { await g.API.req('POST', 'users/' + encodeURIComponent(u.id) + '/password', { password: tmp }); } catch (e) { App.toast(e.message); return; } }
+        else { u.pw = await g.hashPw(tmp); Store.save(); }
         App.modal(`<h2>รหัสผ่านชั่วคราว</h2><p class="muted">แจ้งรหัสนี้ให้ ${H(u.name)} และให้เปลี่ยนรหัสหลังเข้าสู่ระบบ</p><input class="input mono" value="${H(tmp)}" readonly onclick="this.select()" style="font-size:20px;text-align:center"><div class="acts"><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
       }, 'รีเซ็ต');
     },
