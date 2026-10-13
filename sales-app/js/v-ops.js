@@ -168,7 +168,6 @@
       const stat = s => { const l = inMonth.filter(q => q.status === s); return [l.length, l.reduce((a, q) => a + App.calc(q).net, 0)]; };
       const evOn = d => qs.filter(q => d >= q.start && d <= q.end);
       const evBtn = q => { const c = ST_COLOR[q.status] || ST_COLOR.draft; return `<button class="e" style="background:${c[0]};color:${c[1]}" data-act="openQuote" data-id="${H(q.id)}" title="${H(q.client + ' · ' + q.title)}">${H(q.title.length > 14 ? q.client.replace(/^(บจก\.|บมจ\.|คุณ)\s*/, '') + ' ' + q.title.split(' ')[0] : q.title)} · ${H(((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || '')}</button>`; };
-      const rl = App.roomsLeft(ui.sel);
       const areas = [['all', 'ทั้งหมด']].concat(D.MEETING_ROOMS.map(r => [r.id, r.id === 'pool' ? 'สระว่ายน้ำ' : r.name]));
       let main = '';
       if (ui.view === 'month') {
@@ -192,11 +191,6 @@
     ${['draft', 'sent', 'tentative', 'confirmed'].map(s => { const [n, v] = stat(s); return `<div class="stat-row"><span class="sq" style="border-color:${ST_COLOR[s][2]};background:${ST_COLOR[s][0]}"></span><span style="flex:1">${D.STATUS[s]}</span><b style="font:600 18px var(--fh);width:36px;text-align:center">${n}</b><span class="xs muted" style="width:44px;text-align:right">${U.short(v)}</span></div>`; }).join('')}
     <div class="small muted" style="margin:18px 0 8px">พื้นที่</div>
     <div class="row wrap" style="gap:6px">${areas.map(([k, l]) => `<button class="chip ${ui.area === k ? 'on' : ''}" data-act="calArea" data-v="${k}">${H(l)}</button>`).join('')}</div>
-    <div style="background:var(--dark);color:#fff;border-radius:16px;padding:18px;margin-top:18px">
-      <div class="small b" style="color:var(--yellow)">ห้องพักคงเหลือ ${U.fmtD(ui.sel, { year: false })}</div>
-      <div style="font:700 32px var(--fh);margin:4px 0" class="num">${rl.left} / ${rl.total}</div>
-      <div class="xs" style="opacity:.75">${rl.used ? 'หลังรวม room block ' + rl.used + ' ห้อง (ยืนยัน+จองชั่วคราว)' : 'ยังไม่มี room block'}</div>
-    </div>
     ${selEv.length ? `<div class="card pad" style="margin-top:14px"><b>${U.fmtD(ui.sel, { dow: true })}</b>${selEv.map(q => `<a class="row" style="padding:8px 0;color:inherit;border-top:1px solid var(--line);margin-top:8px" href="#/quote/${encodeURIComponent(q.id)}"><i class="dot" style="background:${(ST_COLOR[q.status] || ST_COLOR.draft)[2]}"></i><span class="small" style="flex:1">${H(q.client)} · ${H(q.title)}</span></a>`).join('')}</div>` : ''}
   </aside>
   <section class="card" style="overflow:hidden;min-width:0">
