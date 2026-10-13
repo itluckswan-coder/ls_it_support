@@ -13,6 +13,7 @@
 
   App.V.food = {
     title: 'จัดเลี้ยง',
+    after() { bindGalleries(); },
     render() {
       const ui = App.state.ui.food || (App.state.ui.food = { cat: 'all', lo: PMIN, hi: PMAX, tags: [], sort: 'rec' });
       const q = App.ctxQuote();
@@ -45,11 +46,36 @@
 </div>${App.dock(q)}`;
     }
   };
+  // photo carousel: swipe the image, or tap the small dots under it
+  function gallery(f) {
+    const slides = f.gallery || [{ img: f.img || null, cap: f.name }];
+    const tag = f.best ? '<span class="tag">ขายดี</span>' : '';
+    return `<div class="gal" data-gal>
+      <div class="gal-track" tabindex="0" aria-label="ภาพเมนู ${H(f.name)}">${slides.map((sl, i) => `<figure class="gal-slide" aria-label="ภาพที่ ${i + 1} จาก ${slides.length}">
+        ${sl.img ? `<img src="${H(sl.img)}" alt="${H(sl.cap)}" loading="lazy" draggable="false">` : `<div class="gal-ph"><span aria-hidden="true">🍽</span><b>${H(sl.cap)}</b><small>รอรูปเมนู</small></div>`}
+        ${sl.img ? `<figcaption class="gal-cap">${H(sl.cap)}</figcaption>` : ''}</figure>`).join('')}</div>${tag}</div>
+      ${slides.length > 1 ? `<div class="gal-dots" role="tablist">${slides.map((sl, i) => `<button role="tab" class="${i ? '' : 'on'}" data-act="galGo" data-i="${i}" aria-label="ดูภาพ ${H(sl.cap)}" aria-selected="${!i}"></button>`).join('')}</div>` : ''}`;
+  }
+  App.ACT.galGo = el => {
+    const track = el.closest('.pcard').querySelector('.gal-track');
+    track.scrollTo({ left: Number(el.dataset.i) * track.clientWidth, behavior: 'smooth' });
+  };
+  function bindGalleries() {
+    document.querySelectorAll('.pcard .gal-track').forEach(track => {
+      const dots = track.closest('.pcard').querySelectorAll('.gal-dots button');
+      if (!dots.length) return;
+      track.addEventListener('scroll', () => {
+        const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+        dots.forEach((d, k) => { d.classList.toggle('on', k === i); d.setAttribute('aria-selected', String(k === i)); });
+      }, { passive: true });
+    });
+  }
+
   function card(f, q) {
     const inQ = q && q.items.find(i => i.ref === f.id);
     const pkg = f.cat === 'package';
     return `<article class="card pcard">
-      <div class="ph" style="${f.img ? `background-image:url(${f.img})` : ''}">${f.best ? '<span class="tag">ขายดี</span>' : ''}</div>
+      ${gallery(f)}
       <div class="bd">
         <div class="small b red">${H(f.sub || (D.FOOD_CATS.find(c => c.id === f.cat) || {}).name)}</div>
         <h3 style="font-size:19px;margin:4px 0 0">${H(f.name)}</h3>

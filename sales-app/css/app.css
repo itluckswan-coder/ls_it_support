@@ -267,7 +267,23 @@ textarea.input{height:auto;min-height:96px;padding:12px 14px;line-height:1.6;res
 .pcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
 .pcard{display:flex;flex-direction:column;overflow:hidden}
 .pcard .ph{height:168px;background:repeating-linear-gradient(135deg,#efede6 0 10px,#e7e4db 10px 20px) center/cover;position:relative}
-.pcard .ph .tag{position:absolute;left:12px;top:12px;background:var(--yellow);color:var(--ink);font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+.pcard .tag{position:absolute;left:12px;top:12px;background:var(--yellow);color:var(--ink);font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+.gal{position:relative;height:168px;background:#efede6}
+.gal-track{display:flex;height:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+.gal-track::-webkit-scrollbar{display:none}
+.gal-track:focus-visible{outline:2px solid var(--teal);outline-offset:-2px}
+.gal-slide{flex:0 0 100%;height:100%;margin:0;scroll-snap-align:start;scroll-snap-stop:always;position:relative}
+.gal-slide img{width:100%;height:100%;object-fit:cover;user-select:none}
+.gal-cap{position:absolute;left:10px;bottom:10px;max-width:calc(100% - 20px);background:rgba(23,33,31,.72);color:#fff;font-size:12px;padding:3px 10px;border-radius:999px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gal-ph{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:0 16px;background:repeating-linear-gradient(135deg,#efede6 0 10px,#e7e4db 10px 20px);color:var(--ink2)}
+.gal-ph span{font-size:28px}
+.gal-ph b{font:600 14px var(--fh)}
+.gal-ph small{font-size:11px;color:var(--muted)}
+.gal-dots{display:flex;justify-content:center;gap:2px;padding:6px 0 0}
+.gal-dots button{width:22px;height:22px;display:grid;place-items:center;border-radius:50%}
+.gal-dots button::after{content:"";width:7px;height:7px;border-radius:999px;background:#d5d2c9;transition:width .2s,background .2s}
+.gal-dots button.on::after{width:18px;background:var(--red)}
+.gal-dots button:focus-visible{outline:2px solid var(--teal)}
 .pcard .bd{padding:18px;display:flex;flex-direction:column;flex:1}
 .pcard ul{list-style:none;padding:0;margin:8px 0 14px;font-size:13px;color:var(--ink2)}
 .pcard li{padding:2px 0 2px 20px;position:relative}

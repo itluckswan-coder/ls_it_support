@@ -49,12 +49,22 @@
     { id: 'wedding', name: 'งานแต่งงาน' }
   ];
 
+  // slides shown in the catering photo carousel (img: null = placeholder until a real photo is added to img/)
+  const PIC = {
+    coffee: { img: 'img/food1-0.jpg', cap: 'Coffee break (ชา กาแฟ พร้อมขนม)' },
+    lunch: { img: 'img/food2-0.jpg', cap: 'Thai Lunch เมนู 7 รายการ' },
+    dinner: { img: 'img/food2-1.jpg', cap: 'Thai Dinner เมนู 7 รายการ' },
+    room: { img: 'img/room-deluxe.jpg', cap: 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า' },
+    meeting: { img: 'img/meet-thikhampon.jpg', cap: 'ห้องจัดประชุม 8 ชั่วโมง/วัน' },
+    softdrink: { img: null, cap: 'Soft drink และสิทธิพิเศษเพิ่มเติม' }
+  };
+
   const FOOD = [
-    { id: 'pkg-basic', cat: 'package', name: 'Basic Package', sub: '1 วัน 1 คืน', price: 790, unit: 'ท่าน', img: 'img/food1-0.jpg', min: 30, rec: 2, tags: ['halal'],
+    { id: 'pkg-basic', cat: 'package', gallery: [PIC.coffee, PIC.lunch, PIC.room, PIC.meeting], name: 'Basic Package', sub: '1 วัน 1 คืน', price: 790, unit: 'ท่าน', img: 'img/food1-0.jpg', min: 30, rec: 2, tags: ['halal'],
       feat: ['Coffee break 2 มื้อ (ชา กาแฟ พร้อมขนม)', 'Thai Lunch 1 มื้อ เมนู 7 รายการ', 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า', 'ห้องจัดประชุม 8 ชั่วโมง/วัน'] },
-    { id: 'pkg-standard', cat: 'package', name: 'Standard Package', sub: '2 วัน 1 คืน', price: 1390, unit: 'ท่าน', img: 'img/food2-0.jpg', min: 30, rec: 1, best: true, tags: ['halal'],
+    { id: 'pkg-standard', cat: 'package', gallery: [PIC.coffee, PIC.lunch, PIC.dinner, PIC.room, PIC.meeting], name: 'Standard Package', sub: '2 วัน 1 คืน', price: 1390, unit: 'ท่าน', img: 'img/food2-0.jpg', min: 30, rec: 1, best: true, tags: ['halal'],
       feat: ['Coffee break 4 มื้อ (ชา กาแฟ พร้อมขนม)', 'Thai Lunch 2 มื้อ เมนู 7 รายการ', 'Thai Dinner 1 มื้อ เมนู 7 รายการ', 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า', 'ห้องจัดประชุม 8 ชั่วโมง/วัน'] },
-    { id: 'pkg-premium', cat: 'package', name: 'Premium Package', sub: '2 วัน 1 คืน', price: 1520, unit: 'ท่าน', img: 'img/food2-1.jpg', min: 30, rec: 3, tags: ['halal'],
+    { id: 'pkg-premium', cat: 'package', gallery: [PIC.coffee, PIC.lunch, PIC.dinner, PIC.softdrink, PIC.room], name: 'Premium Package', sub: '2 วัน 1 คืน', price: 1520, unit: 'ท่าน', img: 'img/food2-1.jpg', min: 30, rec: 3, tags: ['halal'],
       feat: ['Coffee break 4 มื้อ (ชา กาแฟ พร้อมขนม)', 'Thai Lunch 2 มื้อ เมนู 7 รายการ', 'Thai Dinner 1 มื้อ', 'Soft drink และสิทธิพิเศษเพิ่มเติม', 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า'] },
 
     { id: 'cb-morning', cat: 'coffee', name: 'Morning Bright', price: 180, unit: 'ท่าน/รอบ', tags: ['halal', 'veg'], feat: ['ชา กาแฟ น้ำผลไม้', 'ขนมไทย 2 อย่าง', 'เบเกอรี่ 1 อย่าง'] },
