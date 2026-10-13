@@ -8,6 +8,7 @@
     "db:migrate:local": "wrangler d1 migrations apply luckswan-sales --local",
     "db:migrate:remote": "wrangler d1 migrations apply luckswan-sales --remote"
   },
+  "engines": { "node": ">=22" },
   "devDependencies": {
     "wrangler": "^4.40.0"
   }

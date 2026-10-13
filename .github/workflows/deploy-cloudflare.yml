@@ -40,7 +40,7 @@ jobs:
       - uses: actions/setup-node@v4
         if: steps.secrets.outputs.ready == 'true'
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Install
         if: steps.secrets.outputs.ready == 'true'
