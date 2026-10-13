@@ -41,6 +41,10 @@
       if (id && Store.db.users.some(u => u.id === id && u.status !== 'disabled')) App.state.uid = id;
     },
     async login(ident, pw, remember) {
+      if (g.API && g.API.online) {
+        try { const u = await g.API.login(ident, pw, remember); App.state.uid = u.id; localStorage.setItem('lsSales.cloudUid', u.id); return null; }
+        catch (e) { return e.message; }
+      }
       ident = String(ident || '').trim().toLowerCase();
       const u = Store.db.users.find(x => x.email.toLowerCase() === ident || x.email.split('@')[0].toLowerCase() === ident || x.id.toLowerCase() === ident);
       if (!u) return 'ไม่พบผู้ใช้นี้ในระบบ';
@@ -59,7 +63,8 @@
       return null;
     },
     logout() {
-      try { localStorage.removeItem('lsSales.session'); sessionStorage.removeItem('lsSales.session'); } catch (e) { /* ignore */ }
+      if (g.API && g.API.online) g.API.logout();
+      try { localStorage.removeItem('lsSales.session'); sessionStorage.removeItem('lsSales.session'); localStorage.removeItem('lsSales.cloudUid'); } catch (e) { /* ignore */ }
       App.state.uid = null; App.go('#/login');
     },
     deviceName() {
@@ -78,7 +83,10 @@
     },
     render() {
       const { route, params } = App.parse();
-      if (!App.state.uid && route !== 'login') { location.replace('#/login'); return; }
+      const cloud = g.API && g.API.online;
+      if (cloud && g.API.setup && route !== 'setup') { location.replace('#/setup'); return; }
+      if (route === 'setup' && !(cloud && g.API.setup)) { location.replace(App.state.uid ? '#/home' : '#/login'); return; }
+      if (!App.state.uid && route !== 'login' && route !== 'setup') { location.replace('#/login'); return; }
       if (App.state.uid && route === 'login') { location.replace('#/home'); return; }
       App.state.route = route; App.state.params = params;
       const view = App.V[route] || App.V.home;
@@ -95,6 +103,12 @@
       App.state._sameRoute = location.hash;
     },
     rerender() { App.render(); },
+    // re-render after background changes, but never under an open dialog or while someone is typing
+    softRender() {
+      const a = document.activeElement;
+      if (document.getElementById('modalBg') || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) { App._pendingRender = true; return; }
+      App._pendingRender = false; App.render();
+    },
 
     /* ---------- shell ---------- */
     shell(active, body, view) {
@@ -132,7 +146,7 @@
       if (after) after(bg);
       return bg;
     },
-    closeModal() { const m = document.getElementById('modalBg'); if (m) m.remove(); },
+    closeModal() { const m = document.getElementById('modalBg'); if (m) m.remove(); if (App._pendingRender) setTimeout(() => App.softRender()); },
     confirm(msg, yes, label = 'ยืนยัน') {
       App.modal(`<h2>${H(msg)}</h2><div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="cfYes">${H(label)}</button></div>`,
         bg => bg.querySelector('#cfYes').onclick = () => { App.closeModal(); yes(); });
@@ -238,15 +252,16 @@
     toggleSearch() { const s = document.getElementById('searchBox'); s.classList.toggle('open'); if (s.classList.contains('open')) s.querySelector('input').focus(); },
     userMenu(el) {
       const old = document.querySelector('.pop'); if (old) { old.remove(); return; }
-      const me = App.me();
+      const me = App.me(), cloud = g.API && g.API.online;
       const p = document.createElement('div'); p.className = 'pop';
-      p.innerHTML = `<div class="hd"><b>${H(me.name)}</b><div class="small muted">${H(me.email)}</div><div class="small muted">${H((D.ROLES.find(r => r.id === me.role) || {}).name || '')}</div></div>
+      p.innerHTML = `<div class="hd"><b>${H(me.name)}</b><div class="small muted">${H(me.email)}</div><div class="small muted">${H((D.ROLES.find(r => r.id === me.role) || {}).name || '')}</div>
+        <div class="xs" style="margin-top:6px;color:${cloud ? (g.API.offline ? 'var(--red)' : 'var(--teal-d)') : 'var(--muted)'}">${cloud ? (g.API.offline ? '● ออฟไลน์ — รอส่งข้อมูล' : '● เชื่อมต่อฐานข้อมูลกลางแล้ว') : '● ข้อมูลเก็บในเครื่องนี้'}</div></div>
         <button data-act="changePw">เปลี่ยนรหัสผ่าน</button>
         ${App.deferredInstall ? '<button data-act="install">ติดตั้งแอปบนเครื่องนี้</button>' : ''}
         <button data-act="howInstall">วิธีติดตั้งบนมือถือ / แท็บเล็ต</button>
         <button data-act="exportData">สำรองข้อมูล (ดาวน์โหลด)</button>
-        <button data-act="importData">นำเข้าข้อมูลสำรอง</button>
-        ${me.role === 'admin' ? '<button data-act="resetData">รีเซ็ตเป็นข้อมูลตัวอย่าง</button>' : ''}
+        ${!cloud || me.role === 'admin' ? `<button data-act="importData">${cloud ? 'นำเข้าข้อมูลสำรองขึ้นคลาวด์' : 'นำเข้าข้อมูลสำรอง'}</button>` : ''}
+        ${me.role === 'admin' && !cloud ? '<button data-act="resetData">รีเซ็ตเป็นข้อมูลตัวอย่าง</button>' : ''}
         <button data-act="logout" style="color:var(--red)">ออกจากระบบ</button>`;
       document.body.appendChild(p);
     },
@@ -259,7 +274,7 @@
           <div><b>iPhone / iPad (Safari)</b><div class="muted">แตะปุ่มแชร์ <b>⬆︎</b> → เลือก “เพิ่มไปยังหน้าจอโฮม” (Add to Home Screen)</div></div>
           <div><b>Android (Chrome)</b><div class="muted">แตะเมนู <b>⋮</b> → “ติดตั้งแอป” หรือ “เพิ่มลงในหน้าจอหลัก”</div></div>
           <div><b>คอมพิวเตอร์ (Chrome / Edge)</b><div class="muted">คลิกไอคอนติดตั้ง <b>⊕</b> ที่แถบที่อยู่ หรือเมนู → “ติดตั้ง Luck Swan Sales”</div></div>
-          <div class="note">ใช้งานแบบออฟไลน์ได้หลังเปิดครั้งแรก ข้อมูลถูกเก็บในเครื่องนี้ — ใช้ “สำรองข้อมูล” เพื่อย้ายไปเครื่องอื่น</div>
+          <div class="note">${g.API && g.API.online ? 'ข้อมูลเก็บในฐานข้อมูลกลาง ทุกเครื่องเห็นข้อมูลเดียวกัน — ถ้าออฟไลน์จะดูข้อมูลล่าสุดได้ และส่งการแก้ไขเมื่อกลับมาออนไลน์' : 'ใช้งานแบบออฟไลน์ได้หลังเปิดครั้งแรก ข้อมูลถูกเก็บในเครื่องนี้ — ใช้ “สำรองข้อมูล” เพื่อย้ายไปเครื่องอื่น'}</div>
         </div><div class="acts"><button class="btn dark" data-act="closeModal">เข้าใจแล้ว</button></div>`);
     },
     exportData() { document.querySelector('.pop')?.remove(); U.download('luckswan-sales-backup-' + U.today() + '.json', Store.exportJSON()); App.toast('ดาวน์โหลดไฟล์สำรองแล้ว'); },
@@ -268,7 +283,16 @@
       const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
       inp.onchange = () => {
         const f = inp.files[0]; if (!f) return;
-        f.text().then(t => { try { Store.importJSON(t); App.toast('นำเข้าข้อมูลเรียบร้อย'); App.restoreSession(); App.render(); } catch (e) { App.toast('นำเข้าไม่สำเร็จ: ' + e.message); } });
+        f.text().then(async t => {
+          try {
+            if (g.API && g.API.online) {
+              const d = JSON.parse(t);
+              await g.API.req('POST', 'import', { data: d, users: true });
+              await g.API.loadState(); App.toast('นำเข้าข้อมูลขึ้นฐานข้อมูลกลางแล้ว (ผู้ใช้ใหม่ใช้รหัสผ่านเริ่มต้น)'); App.render(); return;
+            }
+            Store.importJSON(t); App.toast('นำเข้าข้อมูลเรียบร้อย'); App.restoreSession(); App.render();
+          } catch (e) { App.toast('นำเข้าไม่สำเร็จ: ' + e.message); }
+        });
       };
       inp.click();
     },
@@ -286,6 +310,12 @@
         <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="pwOk">บันทึก</button></div>`, bg => {
         bg.querySelector('#pwOk').onclick = async () => {
           const f = App.formData(bg), me = App.me(), err = bg.querySelector('#pwErr');
+          if (g.API && g.API.online) {
+            if (f.nw.length < 6) { err.textContent = 'รหัสผ่านใหม่สั้นเกินไป'; return; }
+            if (f.nw !== f.nw2) { err.textContent = 'รหัสผ่านใหม่ไม่ตรงกัน'; return; }
+            try { await g.API.req('POST', 'me/password', { current: f.cur, next: f.nw }); App.closeModal(); App.toast('เปลี่ยนรหัสผ่านแล้ว'); } catch (e) { err.textContent = e.message; }
+            return;
+          }
           const ok = me.pw ? (await g.hashPw(f.cur)) === me.pw : f.cur === D.DEFAULT_PW;
           if (!ok) { err.textContent = 'รหัสผ่านปัจจุบันไม่ถูกต้อง'; return; }
           if (f.nw.length < 6) { err.textContent = 'รหัสผ่านใหม่สั้นเกินไป'; return; }
@@ -345,6 +375,42 @@
       };
     }
   };
+  /* first run on the shared database: create the administrator */
+  App.V.setup = {
+    bare: true, title: 'ตั้งค่าครั้งแรก',
+    render() {
+      return `<div class="login"><div class="login-hero" style="background-image:url(img/meet-kinnaree.jpg)"><h2>ตั้งค่าระบบ<br>ฐานข้อมูลกลาง</h2><p style="margin:0;opacity:.9">สร้างบัญชีผู้ดูแลระบบคนแรก แล้วเชิญพนักงานคนอื่นจากหน้า “ผู้ใช้งาน”</p></div>
+  <div class="login-side"><form class="login-box" id="setupForm">
+    <div class="brand"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort" style="width:116px;height:48px"></div>
+    <h1>ตั้งค่าครั้งแรก</h1><div class="muted" style="margin-bottom:22px">ทำครั้งเดียว — หลังจากนี้หน้านี้จะไม่แสดงอีก</div>
+    <div class="card pad">
+      <div class="field"><label class="f" for="suN">ชื่อ-นามสกุล ผู้ดูแลระบบ</label><input class="input" id="suN" name="name" required></div>
+      <div class="field"><label class="f" for="suE">อีเมล</label><input class="input" id="suE" name="email" type="email" required autocomplete="username" placeholder="name@luckswangroup.com"></div>
+      <div class="field"><label class="f" for="suP">รหัสผ่าน (อย่างน้อย 8 ตัวอักษร)</label><input class="input" id="suP" name="password" type="password" required minlength="8" autocomplete="new-password"></div>
+      <div class="field"><label class="f" for="suP2">ยืนยันรหัสผ่าน</label><input class="input" id="suP2" name="password2" type="password" required autocomplete="new-password"></div>
+      <label class="row small" style="margin:16px 0">${App.sw('ข้อมูลตัวอย่าง', true, 'name="sample"')} ใส่ข้อมูลตัวอย่าง (ใบเสนอ ใบฟังก์ชัน พนักงาน) — ลบหรือแก้ทีหลังได้</label>
+      <div class="small red" id="suErr" style="min-height:20px" role="alert"></div>
+      <button class="btn red block" type="submit">สร้างผู้ดูแลระบบ ${ICON.arrow}</button>
+    </div></form></div></div>`;
+    },
+    after() {
+      const f = document.getElementById('setupForm');
+      f.onsubmit = async e => {
+        e.preventDefault();
+        const d = App.formData(f), err = document.getElementById('suErr');
+        if (d.password.length < 8) { err.textContent = 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร'; return; }
+        if (d.password !== d.password2) { err.textContent = 'รหัสผ่านไม่ตรงกัน'; return; }
+        let sample = null;
+        if (d.sample) { const s = Store.seedData(); sample = { quotes: s.quotes, beos: s.beos, staff: s.staff, employees: s.employees, settings: s.settings }; }
+        try {
+          const u = await g.API.setupAdmin(d, sample);
+          App.state.uid = u.id; localStorage.setItem('lsSales.cloudUid', u.id);
+          App.go('#/home'); App.toast('ตั้งค่าเรียบร้อย — เชิญพนักงานได้ที่หน้า “ผู้ใช้งาน”');
+        } catch (x) { err.textContent = x.message; }
+      };
+    }
+  };
+
   App.ACT.togglePw = el => { const i = document.getElementById('lgP'); i.type = i.type === 'password' ? 'text' : 'password'; el.textContent = i.type === 'password' ? 'แสดง' : 'ซ่อน'; };
   App.ACT.forgotPw = () => App.modal(`<h2>ลืมรหัสผ่าน</h2><p class="muted">กรุณาติดต่อผู้ดูแลระบบหรือผู้จัดการฝ่ายขาย เพื่อรีเซ็ตรหัสผ่านจากหน้า “ผู้ใช้งาน”<br>โทร 053-750-855</p><div class="acts"><button class="btn dark" data-act="closeModal">ตกลง</button></div>`);
 
@@ -399,7 +465,14 @@
 </div>`;
     },
     followUps() {
-      const out = [], today = U.today();
+      const out = [], today = U.today(), me = App.me();
+      for (const b of Store.db.beos) {
+        const st = g.Approval ? g.Approval.state(b) : 'approved', q = Store.quote(b.quoteId), lnk = `<a class="link" href="#/beo/${encodeURIComponent(b.id)}">`;
+        if (st === 'pending' && g.Approval.canDecide(b, me))
+          out.push({ p: 0, color: 'var(--yellow)', title: `ใบฟังก์ชัน ${b.id} รออนุมัติ`, sub: `${q ? q.title + ' · ' : ''}แก้ไขโดย ${b.approval.requestedByName || '-'}`, action: lnk + 'ตรวจ</a>' });
+        if (st === 'rejected' && b.approval.requestedBy === App.state.uid)
+          out.push({ p: 0, color: 'var(--red)', title: `ใบฟังก์ชัน ${b.id} ถูกตีกลับ`, sub: b.approval.comment || '', action: lnk + 'แก้ไข</a>' });
+      }
       for (const q of Store.db.quotes) {
         const open = `<a class="link" href="#/quote/${encodeURIComponent(q.id)}">`;
         if (q.status === 'sent' && q.views > 0)
@@ -419,9 +492,19 @@
   App.ACT.openQuote = el => App.go('#/quote/' + encodeURIComponent(el.dataset.id));
 
   /* ---------- boot ---------- */
-  function boot() {
-    Store.load();
-    App.restoreSession();
+  async function boot() {
+    const root = document.getElementById('app');
+    if (root) root.innerHTML = '<div class="empty" style="padding-top:30vh">กำลังโหลด…</div>';
+    const cloud = g.API ? await g.API.detect() : false;
+    if (cloud) {
+      try { const raw = localStorage.getItem(Store.KEY); Store.db = raw ? JSON.parse(raw) : null; } catch (e) { Store.db = null; }
+      if (!Store.db) Store.db = { v: 1, settings: Store.seedData().settings, users: [], quotes: [], beos: [], employees: [], staff: {}, seq: {} };
+      g.API.rememberBeos();
+      if (g.API.token && !g.API.setup) {
+        try { App.state.uid = await g.API.loadState(); }
+        catch (e) { if (e.network && Store.db.users.length) App.state.uid = localStorage.getItem('lsSales.cloudUid'); else g.API.clearToken(); }
+      }
+    } else { Store.load(); App.restoreSession(); }
     window.addEventListener('hashchange', App.render);
     window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); App.deferredInstall = e; });
     if (!location.hash) location.replace(App.state.uid ? '#/home' : '#/login');

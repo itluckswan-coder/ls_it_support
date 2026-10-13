@@ -1,0 +1,19 @@
+# Luck Swan Sales — Cloudflare Worker (API + web app)
+name = "luckswan-sales"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# the web app in ../sales-app is served from the same address; /api/* goes to the worker
+[assets]
+directory = "../sales-app"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "luckswan-sales"
+database_id = "00000000-0000-0000-0000-000000000000" # set automatically by the deploy workflow
+migrations_dir = "migrations"
+
+[vars]
+DEFAULT_PASSWORD = "luckswan"
