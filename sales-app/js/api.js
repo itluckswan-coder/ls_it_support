@@ -40,7 +40,8 @@
     beo: db.beos.map(b => [b.id, b]),
     staff: Object.entries(db.staff || {}),
     employees: [['all', { list: db.employees || [] }]],
-    settings: [['main', db.settings || {}]]
+    settings: [['main', db.settings || {}]],
+    catalog: db.catalog && Array.isArray(db.catalog.food) ? [['food', { list: db.catalog.food }]] : []
   });
   const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {} });
 
@@ -111,6 +112,7 @@
       const db = { v: 1, settings: seed.settings, users: [], quotes: [], beos: [], employees: [], staff: {}, seq: {} };
       this.ver = {}; this.snap = {}; this.userSnap = {};
       Store.db = db;
+      g.DATA.applyCatalog(null); // built-in menu unless the shared database has an edited one
       for (const d of j.docs) this.applyDoc(d, true);
       for (const u of j.users) this.applyUser(u);
       this.serverTime = j.serverTime;
@@ -136,8 +138,9 @@
       else if (d.kind === 'staff') db.staff[d.id] = data;
       else if (d.kind === 'employees') db.employees = data.list || [];
       else if (d.kind === 'settings') db.settings = Object.assign({}, Store.seedData().settings, data);
+      else if (d.kind === 'catalog' && d.id === 'food') { db.catalog = { food: data.list || [] }; g.DATA.applyCatalog(db.catalog.food); }
       this.ver[key] = d.version;
-      this.snap[key] = JSON.stringify(d.kind === 'employees' ? { list: db.employees } : d.kind === 'settings' ? db.settings : data);
+      this.snap[key] = JSON.stringify(d.kind === 'employees' ? { list: db.employees } : d.kind === 'settings' ? db.settings : d.kind === 'catalog' ? { list: db.catalog.food } : data);
     },
     applyUser(u) {
       const db = Store.db, i = db.users.findIndex(x => x.id === u.id);
@@ -158,7 +161,7 @@
         const s = JSON.stringify(data);
         if (s !== this.snap[key]) out.push({ kind, id, data, key });
       }
-      for (const key of Object.keys(this.snap)) if (!seen.has(key)) { const [kind, ...rest] = key.split(':'); out.push({ kind, id: rest.join(':'), del: true, key }); }
+      for (const key of Object.keys(this.snap)) if (!seen.has(key) && !/^(catalog|employees|settings):/.test(key)) { const [kind, ...rest] = key.split(':'); out.push({ kind, id: rest.join(':'), del: true, key }); }
       const users = Store.db.users.filter(u => userView(u) !== this.userSnap[u.id]);
       return { docs: out, users };
     },

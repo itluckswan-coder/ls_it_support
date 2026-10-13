@@ -49,13 +49,17 @@
     { id: 'wedding', name: 'งานแต่งงาน' }
   ];
 
+  // photos used by the package item lists (img: null shows a "รอรูปเมนู" placeholder in the carousel)
+  const PH = { coffee: 'img/food1-0.jpg', lunch: 'img/food2-0.jpg', dinner: 'img/food2-1.jpg', room: 'img/room-deluxe.jpg', meeting: 'img/meet-thikhampon.jpg' };
+  const it = (name, qty, unit, detail, img) => ({ name, qty: qty || '', unit: unit || '', detail: detail || '', img: img || null });
+
   const FOOD = [
-    { id: 'pkg-basic', cat: 'package', name: 'Basic Package', sub: '1 วัน 1 คืน', price: 790, unit: 'ท่าน', img: 'img/food1-0.jpg', min: 30, rec: 2, tags: ['halal'],
-      feat: ['Coffee break 2 มื้อ (ชา กาแฟ พร้อมขนม)', 'Thai Lunch 1 มื้อ เมนู 7 รายการ', 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า', 'ห้องจัดประชุม 8 ชั่วโมง/วัน'] },
-    { id: 'pkg-standard', cat: 'package', name: 'Standard Package', sub: '2 วัน 1 คืน', price: 1390, unit: 'ท่าน', img: 'img/food2-0.jpg', min: 30, rec: 1, best: true, tags: ['halal'],
-      feat: ['Coffee break 4 มื้อ (ชา กาแฟ พร้อมขนม)', 'Thai Lunch 2 มื้อ เมนู 7 รายการ', 'Thai Dinner 1 มื้อ เมนู 7 รายการ', 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า', 'ห้องจัดประชุม 8 ชั่วโมง/วัน'] },
-    { id: 'pkg-premium', cat: 'package', name: 'Premium Package', sub: '2 วัน 1 คืน', price: 1520, unit: 'ท่าน', img: 'img/food2-1.jpg', min: 30, rec: 3, tags: ['halal'],
-      feat: ['Coffee break 4 มื้อ (ชา กาแฟ พร้อมขนม)', 'Thai Lunch 2 มื้อ เมนู 7 รายการ', 'Thai Dinner 1 มื้อ', 'Soft drink และสิทธิพิเศษเพิ่มเติม', 'ห้องพัก Deluxe เตียงคู่ พร้อมอาหารเช้า'] },
+    { id: 'pkg-basic', cat: 'package', name: 'Basic Package', sub: '1 วัน 1 คืน', price: 790, unit: 'ท่าน', min: 30, rec: 2, tags: ['halal'], photos: [],
+      items: [it('Coffee break', 2, 'มื้อ', '(ชา กาแฟ พร้อมขนม)', PH.coffee), it('Thai Lunch', 1, 'มื้อ', 'เมนู 7 รายการ', PH.lunch), it('ห้องพัก Deluxe เตียงคู่', '', '', 'พร้อมอาหารเช้า', PH.room), it('ห้องจัดประชุม', 8, 'ชั่วโมง/วัน', '', PH.meeting)] },
+    { id: 'pkg-standard', cat: 'package', name: 'Standard Package', sub: '2 วัน 1 คืน', price: 1390, unit: 'ท่าน', min: 30, rec: 1, best: true, tags: ['halal'], photos: [],
+      items: [it('Coffee break', 4, 'มื้อ', '(ชา กาแฟ พร้อมขนม)', PH.coffee), it('Thai Lunch', 2, 'มื้อ', 'เมนู 7 รายการ', PH.lunch), it('Thai Dinner', 1, 'มื้อ', 'เมนู 7 รายการ', PH.dinner), it('ห้องพัก Deluxe เตียงคู่', '', '', 'พร้อมอาหารเช้า', PH.room), it('ห้องจัดประชุม', 8, 'ชั่วโมง/วัน', '', PH.meeting)] },
+    { id: 'pkg-premium', cat: 'package', name: 'Premium Package', sub: '2 วัน 1 คืน', price: 1520, unit: 'ท่าน', min: 30, rec: 3, tags: ['halal'], photos: [],
+      items: [it('Coffee break', 4, 'มื้อ', '(ชา กาแฟ พร้อมขนม)', PH.coffee), it('Thai Lunch', 2, 'มื้อ', 'เมนู 7 รายการ', PH.lunch), it('Thai Dinner', 1, 'มื้อ', '', PH.dinner), it('Soft drink และสิทธิพิเศษเพิ่มเติม'), it('ห้องพัก Deluxe เตียงคู่', '', '', 'พร้อมอาหารเช้า', PH.room)] },
 
     { id: 'cb-morning', cat: 'coffee', name: 'Morning Bright', price: 180, unit: 'ท่าน/รอบ', tags: ['halal', 'veg'], feat: ['ชา กาแฟ น้ำผลไม้', 'ขนมไทย 2 อย่าง', 'เบเกอรี่ 1 อย่าง'] },
     { id: 'cb-thaisweet', cat: 'coffee', name: 'Thai Sweet Break', price: 220, unit: 'ท่าน/รอบ', tags: ['halal', 'veg'], feat: ['ชา กาแฟ ชาสมุนไพร', 'ขนมไทยล้านนา 3 อย่าง'] },
@@ -140,7 +144,32 @@
     draft: 'ร่าง', sent: 'ส่งแล้ว', tentative: 'จองชั่วคราว', confirmed: 'ยืนยันแล้ว', cancelled: 'ยกเลิก'
   };
 
-  /* ---------------- seed builders ---------------- */
+  /* ---------------- catalog helpers (menus can be edited in the app) ---------------- */
+  const itemText = x => [x.name, x.qty !== '' && x.qty != null ? x.qty + (x.unit ? ' ' + x.unit : '') : '', x.detail].filter(v => v !== '' && v != null).join(' ').trim();
+  function normFood(f) {
+    if (!Array.isArray(f.items)) f.items = (f.feat || []).map(t => it(t));
+    if (!Array.isArray(f.photos)) f.photos = f.img ? [f.img] : [];
+    f.tags = f.tags || [];
+    delete f.feat; delete f.img; delete f.gallery;
+    return f;
+  }
+  FOOD.forEach(normFood);
+  const FOOD_DEFAULT = JSON.parse(JSON.stringify(FOOD));
+  const foodFeat = f => (f.items || []).map(itemText).filter(Boolean);
+  // carousel slides: main photos first, then a slide per item (packages also show placeholders for items without a photo)
+  const foodSlides = f => {
+    const out = (f.photos || []).map(img => ({ img, cap: f.name }));
+    for (const x of f.items || []) if (x.img || f.cat === 'package') out.push({ img: x.img || null, cap: itemText(x) });
+    return out.length ? out : [{ img: null, cap: f.name }];
+  };
+  // replace the menu list in place (every page holds a reference to FOOD)
+  function applyCatalog(list) {
+    const src = Array.isArray(list) && list.length ? list : FOOD_DEFAULT;
+    FOOD.length = 0;
+    for (const f of JSON.parse(JSON.stringify(src))) FOOD.push(normFood(f));
+  }
+
+
   const meetItem = (roomId, days, layout, extra = {}) => {
     const r = MEETING_ROOMS.find(x => x.id === roomId);
     return Object.assign({ id: U.uid('i'), sec: 'meet', ref: roomId, name: r.name + ' — ' + (LAYOUTS.find(l => l.id === layout) || {}).name + (extra.pax ? ' ' + extra.pax + ' ท่าน' : ''),
@@ -152,7 +181,7 @@
     return { id: U.uid('i'), sec: 'meet', ref: 'svc:' + sid, name: s.name, desc: s.desc, price: s.price, q1: days, u1: s.unit, q2: null, u2: '', sched: sched || [] };
   };
   const foodItem = (fid, pax, times, desc, sched) => {
-    const f = FOOD.find(x => x.id === fid);
+    const f = FOOD.find(x => x.id === fid) || FOOD_DEFAULT.find(x => x.id === fid) || { id: fid, cat: 'lunch', name: fid, price: 0, unit: 'ท่าน' };
     const per = /โต๊ะ|งาน/.test(f.unit);
     return { id: U.uid('i'), sec: 'food', ref: fid, name: (f.cat === 'coffee' ? 'Coffee break · ' : '') + f.name, desc: desc || f.place || '', price: f.price,
       q1: pax, u1: per ? f.unit : 'ท่าน', q2: per || times == null ? null : times, u2: per || times == null ? '' : (f.cat === 'coffee' ? 'รอบ' : 'มื้อ'), sched: sched || [] };
@@ -382,7 +411,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (g.API) g.API.rememberBeos(); },
+    loaded() { applyCatalog(this.db && this.db.catalog && this.db.catalog.food); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },
@@ -407,7 +436,8 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, FOOD_CATS, FOOD, SERVICES, DEPTS, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan' };
+  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, FOOD_CATS, FOOD, SERVICES, DEPTS, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+    itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;
 })(window);

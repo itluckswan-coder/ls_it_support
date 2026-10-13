@@ -458,6 +458,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     }
     for (const sl of SLOTS) {
       const v = s.slots[sl.k]; if (!v || !v.on) continue;
+      if (!D.FOOD.some(x => x.id === v.ref)) { const alt = D.FOOD.find(x => x.cat === sl.cat); if (!alt) continue; v.ref = alt.id; }
       const dl = sl.when === 'all' ? days.map((d, i) => i + 1) : sl.when === 'first' ? [1] : [n];
       const sched = dl.map(dd => ({ day: dd, start: sl.time, end: sl.end, place: '' }));
       const f = D.FOOD.find(x => x.id === v.ref);

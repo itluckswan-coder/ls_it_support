@@ -499,6 +499,7 @@
     if (cloud) {
       try { const raw = localStorage.getItem(Store.KEY); Store.db = raw ? JSON.parse(raw) : null; } catch (e) { Store.db = null; }
       if (!Store.db) Store.db = { v: 1, settings: Store.seedData().settings, users: [], quotes: [], beos: [], employees: [], staff: {}, seq: {} };
+      g.DATA.applyCatalog(Store.db.catalog && Store.db.catalog.food);
       g.API.rememberBeos();
       if (g.API.token && !g.API.setup) {
         try { App.state.uid = await g.API.loadState(); }
