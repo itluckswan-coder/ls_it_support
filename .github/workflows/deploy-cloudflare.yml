@@ -33,7 +33,18 @@ jobs:
           fi
           # tolerate stray spaces/quotes/newlines pasted into the secrets
           acct=$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]"' | tr 'A-F' 'a-f')
-          token=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]"')
+          # accept the token itself, or the "curl … Authorization: Bearer <token>" test command Cloudflare shows after creating it
+          token=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '"'"'"'\r')
+          if printf '%s' "$token" | grep -q 'Bearer'; then token=$(printf '%s' "$token" | sed -E 's/.*Bearer[[:space:]]+([A-Za-z0-9_-]+).*/\1/'); fi
+          token=$(printf '%s' "$token" | tr -d '[:space:]')
+          if printf '%s' "$token" | grep -Eq '^[0-9a-f]{37}$'; then
+            echo "::error::CLOUDFLARE_API_TOKEN looks like the Global API Key. Create an API Token instead: My Profile → API Tokens → Create Token → template \"Edit Cloudflare Workers\" + Account · D1 · Edit."
+            exit 1
+          fi
+          if ! printf '%s' "$token" | grep -Eq '^[A-Za-z0-9_-]{30,}$'; then
+            echo "::error::CLOUDFLARE_API_TOKEN is not an API token (expected one long code of letters, digits, - or _, shown only once right after creating the token). Do not paste the Token ID or name. Create a new token if you no longer have it."
+            exit 1
+          fi
           if ! printf '%s' "$acct" | grep -Eq '^[0-9a-f]{32}$'; then
             echo "::error::CLOUDFLARE_ACCOUNT_ID is not a Cloudflare Account ID (expected 32 hex characters, e.g. 1a2b…). Copy it from dash.cloudflare.com → Workers & Pages → Account details → Account ID (not the Zone ID, account name or email)."
             exit 1
