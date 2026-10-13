@@ -537,10 +537,9 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         body = `<h1>ห้องพัก</h1><div class="muted" style="margin:4px 0 16px">ราคากรุ๊ป · เช็กอิน ${U.fmtD(q.start)}</div>
           <div class="slot"><span style="flex:1"><b>จำนวนคืน</b></span><span class="stepper"><button class="minus" data-act="wizNights" data-v="-1">−</button><input value="${w.sel.nights}" readonly aria-label="จำนวนคืน"><button class="plus" data-act="wizNights" data-v="1">+</button></span></div>
           ${D.ROOM_TYPES.map(t => {
-            const left = Math.min(...U.daysOf(q.start, U.addDays(q.start, Math.max(0, w.sel.nights - 1))).map(d => t.total - App.roomTypeBooked(t.id, d)));
             const c = w.sel.rooms[t.id] || 0;
-            return `<div class="slot ${c ? 'hl' : ''}"><div style="flex:1"><b>${H(t.name)}</b><div class="small muted">${H(t.beds)} · เหลือ ${left} ห้อง</div></div><b class="num">${U.n(t.group)} ฿</b>
-              <span class="stepper"><button class="minus" data-act="wizRoom" data-k="${t.id}" data-v="-1">−</button><input value="${c}" data-change="wizRoomSet" data-k="${t.id}" data-max="${left}" inputmode="numeric" aria-label="จำนวนห้อง"><button class="plus" data-act="wizRoom" data-k="${t.id}" data-v="1" data-max="${left}">+</button></span></div>`;
+            return `<div class="slot ${c ? 'hl' : ''}"><div style="flex:1"><b>${H(t.name)}</b><div class="small muted">${H(t.beds)}</div></div><b class="num">${U.n(t.group)} ฿</b>
+              <span class="stepper"><button class="minus" data-act="wizRoom" data-k="${t.id}" data-v="-1">−</button><input value="${c}" data-change="wizRoomSet" data-k="${t.id}" inputmode="numeric" aria-label="จำนวนห้อง"><button class="plus" data-act="wizRoom" data-k="${t.id}" data-v="1">+</button></span></div>`;
           }).join('')}
           <div class="small muted" style="margin-top:12px">รวม ${tot} ห้อง · รองรับ ${tot * 2} ท่าน${tot >= 20 ? ' · ฟรีห้องผู้จัด ' + Math.floor(tot / 20) + ' ห้อง' : ''}</div>`;
       }
