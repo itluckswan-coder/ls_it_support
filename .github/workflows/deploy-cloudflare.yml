@@ -29,9 +29,20 @@ jobs:
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "::warning::Add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in Settings → Secrets and variables → Actions, then run this workflow again."
             echo "ready=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          # tolerate stray spaces/quotes/newlines pasted into the secrets
+          acct=$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]"' | tr 'A-F' 'a-f')
+          token=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '[:space:]"')
+          if ! printf '%s' "$acct" | grep -Eq '^[0-9a-f]{32}$'; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is not a Cloudflare Account ID (expected 32 hex characters, e.g. 1a2b…). Copy it from dash.cloudflare.com → Workers & Pages → Account details → Account ID (not the Zone ID, account name or email)."
+            exit 1
+          fi
+          echo "::add-mask::$acct"
+          echo "CLOUDFLARE_ACCOUNT_ID=$acct" >> "$GITHUB_ENV"
+          echo "::add-mask::$token"
+          echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
         working-directory: .
 
       - uses: actions/checkout@v4

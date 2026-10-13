@@ -6,7 +6,7 @@
 ทำครั้งเดียว หลังจากนั้นทุกครั้งที่ merge เข้า `main` ระบบจะอัปเดตเอง
 
 1. สมัคร/เข้าสู่ระบบ https://dash.cloudflare.com แล้วเปิดเมนู **Workers & Pages** หนึ่งครั้ง (เพื่อให้ได้ชื่อ subdomain `*.workers.dev`)
-2. คัดลอก **Account ID** (อยู่ด้านขวาของหน้า Workers & Pages หรือหน้า Overview)
+2. คัดลอก **Account ID** — ตัวอักษร 0-9 a-f ยาว 32 ตัว อยู่ที่ Workers & Pages → แถบขวา “Account details” (ไม่ใช่ Zone ID, ชื่อบัญชี หรืออีเมล)
 3. สร้าง API Token: My Profile → API Tokens → **Create Token** → เลือกแม่แบบ **Edit Cloudflare Workers** → กด *Add more* เพิ่มสิทธิ์ **Account · D1 · Edit** → Create แล้วคัดลอก token
 4. ใน GitHub: repo `ls_it_support` → Settings → Secrets and variables → Actions → **New repository secret** สร้าง 2 ตัว
    - `CLOUDFLARE_API_TOKEN` = token จากข้อ 3
