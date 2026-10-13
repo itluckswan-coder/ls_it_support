@@ -1,5 +1,5 @@
 /* Luck Swan Sales — offline cache */
-const CACHE = 'ls-sales-v3';
+const CACHE = 'ls-sales-v4';
 const ASSETS = [
   'css/app.css',
   'fonts.css',
@@ -53,11 +53,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
-  // network first for the page shell so updates arrive, cache first for static files
-  if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return r; }).catch(() => caches.match(req).then(r => r || caches.match('index.html'))));
+  const path = new URL(req.url).pathname;
+  // pages, scripts, styles and data: network first so edits show up right away; cache is only the offline fallback
+  if (req.mode === 'navigate' || /\.(html|js|css|webmanifest)$/.test(path) || path.endsWith('/')) {
+    e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => {
+      if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return r;
+    }).catch(() => caches.match(req).then(r => r || (req.mode === 'navigate' ? caches.match('index.html') : undefined))));
     return;
   }
+  // images and fonts rarely change: cache first
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
     if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
     return r;

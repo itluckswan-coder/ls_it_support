@@ -426,7 +426,16 @@
     window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); App.deferredInstall = e; });
     if (!location.hash) location.replace(App.state.uid ? '#/home' : '#/login');
     App.render();
-    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
+    if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) {
+      // when a new version is published, the new service worker takes over and the page reloads once by itself
+      const hadController = !!navigator.serviceWorker.controller;
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+        reg.update();
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update(); });
+      }).catch(() => { /* offline support unavailable */ });
+    }
   }
   g.App = App;
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot)); else setTimeout(boot);
