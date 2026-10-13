@@ -76,6 +76,10 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         run: npx wrangler d1 migrations apply luckswan-sales --remote
 
+      - name: Register workers.dev subdomain if needed
+        if: steps.secrets.outputs.ready == 'true'
+        run: node scripts/ensure-subdomain.mjs
+
       - name: Deploy worker and web app
         if: steps.secrets.outputs.ready == 'true'
         run: npx wrangler deploy
