@@ -1,5 +1,5 @@
 /* Luck Swan Sales — offline cache */
-const CACHE = 'ls-sales-v9';
+const CACHE = 'ls-sales-v10';
 const ASSETS = [
   'css/app.css',
   'fonts.css',
@@ -37,6 +37,7 @@ const ASSETS = [
   'index.html',
   'js/api.js',
   'js/app.js',
+  'js/catalog-admin.js',
   'js/data.js',
   'js/sheet.js',
   'js/util.js',
@@ -56,7 +57,7 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
   const path = new URL(req.url).pathname;
-  if (path.includes('/api/')) return; // live data: never cache
+  if (path.includes('/api/') && !path.includes('/api/images/')) return; // live data: never cache (uploaded photos are cached)
   // pages, scripts, styles and data: network first so edits show up right away; cache is only the offline fallback
   if (req.mode === 'navigate' || /\.(html|js|css|webmanifest)$/.test(path) || path.endsWith('/')) {
     e.respondWith(fetch(req, { cache: 'no-cache' }).then(r => {

@@ -5,7 +5,8 @@ const RANK = { sales: 1, acc: 1, head: 2, manager: 3, admin: 4 };
 const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices'];
 const PBKDF2_ITER = 10000; // kept modest so login fits the Workers free-plan CPU budget
 const SESSION_DAYS = { remember: 30, normal: 1 };
-const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings'];
+const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog'];
+const MAX_IMAGE_BYTES = 1500000;
 
 /* ---------------- helpers ---------------- */
 const now = () => new Date().toISOString().slice(0, 19);
@@ -144,6 +145,11 @@ async function applyRules(env, user, kind, id, data, prev) {
       if ((o.status === 'approved' || o.status === 'rejected') && was !== o.status && !can(user, 'staff')) o.status = 'pending';
     }
   }
+  if (kind === 'catalog') {
+    if (!can(user, 'edit_prices')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขเมนูและแพ็กเกจ');
+    if (id !== 'food' || !Array.isArray(data.list)) fail(400, 'ข้อมูลเมนูไม่ถูกต้อง');
+    if (JSON.stringify(data).length > 800000) fail(413, 'ข้อมูลเมนูใหญ่เกินไป');
+  }
   if (kind === 'employees' || kind === 'settings') {
     if (!can(user, 'edit_prices') && !can(user, 'staff')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้');
   }
@@ -199,6 +205,26 @@ async function audit(env, user, kind, id, action, note) {
   await env.DB.prepare('INSERT INTO audit (at, user_id, kind, doc_id, action, note) VALUES (?, ?, ?, ?, ?, ?)').bind(now(), user && user.id, kind, id, action, note || null).run();
 }
 
+/* ---------------- uploaded photos (menus / packages) ---------------- */
+async function putImage(req, env, user) {
+  if (!can(user, 'edit_prices')) fail(403, 'คุณไม่มีสิทธิ์อัปโหลดรูปเมนู');
+  const { mime, data } = await readJson(req);
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) fail(400, 'รองรับเฉพาะรูป JPG, PNG, WebP');
+  if (typeof data !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(data)) fail(400, 'ข้อมูลรูปไม่ถูกต้อง');
+  if (data.length * 0.75 > MAX_IMAGE_BYTES) fail(413, 'รูปใหญ่เกินไป (สูงสุด 1.5 MB)');
+  const id = randomHex(16);
+  await env.DB.prepare('INSERT INTO images (id, mime, data, created_at, created_by) VALUES (?, ?, ?, ?, ?)').bind(id, mime, data, now(), user.id).run();
+  await audit(env, user, 'image', id, 'upload');
+  return json({ id, url: 'api/images/' + id });
+}
+async function getImage(env, id) {
+  const row = await env.DB.prepare('SELECT mime, data FROM images WHERE id = ?').bind(id).first();
+  if (!row) return new Response('Not found', { status: 404 });
+  const bin = atob(row.data), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Response(bytes, { headers: { 'content-type': row.mime, 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' } });
+}
+
 /* ---------------- users ---------------- */
 async function putUser(req, env, user, id) {
   if (!can(user, 'users')) fail(403, 'คุณไม่มีสิทธิ์จัดการผู้ใช้');
@@ -242,6 +268,7 @@ async function importData(env, user, data, opts = {}) {
   for (const [k, v] of Object.entries(data.staff || {})) put('staff', k, v);
   if (Array.isArray(data.employees)) put('employees', 'all', { list: data.employees });
   if (data.settings) put('settings', 'main', data.settings);
+  if (data.catalog && Array.isArray(data.catalog.food) && JSON.stringify(data.catalog).length < 800000) put('catalog', 'food', { list: data.catalog.food });
   if (opts.users) for (const u of data.users || []) {
     if (!u.email || !u.id) continue;
     const exists = await env.DB.prepare('SELECT id FROM users WHERE email = ? OR id = ?').bind(u.email, u.id).first();
@@ -278,6 +305,8 @@ async function api(req, env, url) {
   if (path === '/api/health') return json({ ok: true, setup: (await userCount(env)) === 0, serverTime: now() });
   if (path === '/api/setup' && m === 'POST') return setup(req, env);
   if (path === '/api/login' && m === 'POST') return login(req, env);
+  let ri;
+  if ((ri = /^\/api\/images\/([0-9a-f]{32})$/.exec(path)) && m === 'GET') return getImage(env, ri[1]);
 
   const user = await authUser(req, env);
   if (path === '/api/logout' && m === 'POST') { await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(user._tokenHash).run(); return json({ ok: true }); }
@@ -312,6 +341,7 @@ async function api(req, env, url) {
     await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(user.id, user._tokenHash).run();
     return json({ ok: true });
   }
+  if (path === '/api/images' && m === 'POST') return putImage(req, env, user);
   if (path === '/api/import' && m === 'POST') {
     if (user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่นำเข้าข้อมูลได้');
     const { data, users } = await readJson(req);

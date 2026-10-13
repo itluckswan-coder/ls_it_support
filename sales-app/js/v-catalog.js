@@ -8,14 +8,25 @@
   /* =====================================================================
      FOOD / PACKAGES (1f)
      ===================================================================== */
-  const prices = D.FOOD.filter(f => !/โต๊ะ|งาน/.test(f.unit)).map(f => f.price);
-  const PMIN = Math.floor(Math.min(...prices) / 10) * 10, PMAX = Math.ceil(Math.max(...prices) / 10) * 10;
+  // price slider bounds follow the current (editable) menu list
+  const priceBounds = () => {
+    const prices = D.FOOD.filter(f => !/โต๊ะ|งาน/.test(f.unit)).map(f => Number(f.price) || 0);
+    if (!prices.length) return [0, 100];
+    const lo = Math.floor(Math.min(...prices) / 10) * 10, hi = Math.ceil(Math.max(...prices) / 10) * 10;
+    return [lo, Math.max(hi, lo + 10)];
+  };
 
   App.V.food = {
     title: 'จัดเลี้ยง',
     after() { bindGalleries(); },
     render() {
+      const [PMIN, PMAX] = priceBounds();
       const ui = App.state.ui.food || (App.state.ui.food = { cat: 'all', lo: PMIN, hi: PMAX, tags: [], sort: 'rec' });
+      // keep the filter fully open at the ends when prices change
+      if (ui.lo <= ui._min || ui.lo < PMIN) ui.lo = PMIN;
+      if (ui.hi >= ui._max || ui.hi > PMAX) ui.hi = PMAX;
+      ui._min = PMIN; ui._max = PMAX;
+      const editor = App.can('edit_prices');
       const q = App.ctxQuote();
       const inRange = f => /โต๊ะ|งาน/.test(f.unit) || (f.price >= ui.lo && f.price <= ui.hi);
       let list = D.FOOD.filter(f => (ui.cat === 'all' ? f.cat === 'package' || true : f.cat === ui.cat) && inRange(f) && ui.tags.every(t => (f.tags || []).includes(t)));
@@ -39,7 +50,7 @@
   </aside>
   <div style="min-width:0">
     <div class="between" style="margin-bottom:16px;flex-wrap:wrap">${App.ctxBar(q)}
-      <div class="seg white"><button class="${ui.sort === 'rec' ? 'on' : ''}" data-act="foodSort" data-v="rec">แนะนำ</button><button class="${ui.sort === 'price' ? 'on' : ''}" data-act="foodSort" data-v="price">ราคาต่ำ → สูง</button></div></div>
+      <div class="row wrap">${editor ? `<button class="btn red sm" data-act="foodNew">+ เพิ่มเมนู / แพ็กเกจ</button>` : ''}<div class="seg white"><button class="${ui.sort === 'rec' ? 'on' : ''}" data-act="foodSort" data-v="rec">แนะนำ</button><button class="${ui.sort === 'price' ? 'on' : ''}" data-act="foodSort" data-v="price">ราคาต่ำ → สูง</button></div></div></div>
     <div class="pcards">${list.map(f => card(f, q)).join('') || '<div class="empty">ไม่พบรายการตามตัวกรอง</div>'}</div>
     <div style="height:90px"></div>
   </div>
@@ -48,7 +59,7 @@
   };
   // photo carousel: swipe the image, or tap the small dots under it
   function gallery(f) {
-    const slides = f.gallery || [{ img: f.img || null, cap: f.name }];
+    const slides = D.foodSlides(f);
     const tag = f.best ? '<span class="tag">ขายดี</span>' : '';
     return `<div class="gal" data-gal>
       <div class="gal-track" tabindex="0" aria-label="ภาพเมนู ${H(f.name)}">${slides.map((sl, i) => `<figure class="gal-slide" aria-label="ภาพที่ ${i + 1} จาก ${slides.length}">
@@ -78,8 +89,8 @@
       ${gallery(f)}
       <div class="bd">
         <div class="small b red">${H(f.sub || (D.FOOD_CATS.find(c => c.id === f.cat) || {}).name)}</div>
-        <h3 style="font-size:19px;margin:4px 0 0">${H(f.name)}</h3>
-        <ul>${(f.feat || []).map(x => `<li>${H(x)}</li>`).join('')}</ul>
+        <div class="between" style="align-items:flex-start;gap:8px"><h3 style="font-size:19px;margin:4px 0 0">${H(f.name)}</h3>${App.can('edit_prices') ? `<button class="btn ghost sm" style="height:30px;padding:0 12px;flex:none" data-act="foodEdit" data-v="${H(f.id)}">แก้ไข</button>` : ''}</div>
+        <ul>${D.foodFeat(f).map(x => `<li>${H(x)}</li>`).join('')}</ul>
         <div class="price">${U.n(f.price)}.-${pkg ? ' Net' : ''} <small>/ ${H(f.unit)}${f.min ? ' · ขั้นต่ำ ' + f.min + ' ท่าน/วัน' : ''}</small></div>
         ${inQ ? `<button class="btn soft block" style="margin-top:12px;height:46px" data-act="foodRemove" data-v="${f.id}">${ICON.check} อยู่ในใบเสนอแล้ว · ${U.n(inQ.q1)} ${H(/โต๊ะ|งาน/.test(f.unit) ? f.unit : 'ท่าน')}</button>`
           : `<button class="btn ghost block" style="margin-top:12px;height:46px;border-color:var(--ink)" data-act="foodAdd" data-v="${f.id}">+ เพิ่มในใบเสนอ</button>`}
@@ -95,7 +106,7 @@
     if (f.cat === 'cocktail') sched.push({ day: 1, start: '17:00', end: '19:00' });
     const qty = /โต๊ะ/.test(f.unit) ? Math.ceil(q.pax / 10) : /งาน/.test(f.unit) ? 1 : q.pax;
     const it = D.foodItem(fid, qty, times, f.cat === 'coffee' ? 'เช้า–บ่าย วันละ 2 รอบ' : f.place || f.sub || '', sched);
-    if (f.cat === 'package') { it.name = f.name + ' (' + f.sub + ')'; it.desc = f.feat.slice(0, 2).join(' · '); }
+    if (f.cat === 'package') { it.name = f.name + ' (' + f.sub + ')'; it.desc = D.foodFeat(f).slice(0, 2).join(' · '); }
     q.items.push(it); App.touch(q, 'เพิ่ม ' + f.name);
   }
   Object.assign(App.ACT, {
