@@ -84,7 +84,7 @@
     </section>
     <section class="card" style="margin-bottom:16px;overflow:hidden">
       <div class="card-hd"><h2>กำหนดการ · วันที่ ${ui.day} ${U.DS[U.d(days[ui.day - 1]).getDay()]} ${U.fmtD(days[ui.day - 1], { year: false })}</h2>
-        <div class="row">${days.length > 1 ? `<div class="seg">${days.map((d, i) => `<button class="${ui.day === i + 1 ? 'on' : ''}" data-act="beoDay" data-v="${i + 1}">วันที่ ${i + 1}</button>`).join('')}</div>` : ''}<button class="btn ghost sm no-print" data-act="beoRow" data-i="-1">+ เพิ่ม</button></div></div>
+        <div class="row">${days.length > 1 ? `<div class="seg">${days.map((d, i) => `<button class="${ui.day === i + 1 ? 'on' : ''}" data-act="beoDay" data-v="${i + 1}">วันที่ ${i + 1}</button>`).join('')}</div>` : ''}<button class="btn ghost sm no-print" data-act="beoImport">นำเข้าจากไฟล์</button><button class="btn ghost sm no-print" data-act="beoRow" data-i="-1">+ เพิ่ม</button></div></div>
       <table class="tbl sched resp"><tbody>${sched.map(s => { const i = b.schedule[ui.day].indexOf(s); return `<tr class="click" data-act="beoRow" data-i="${i}"><td class="b num" style="width:80px">${H(s.time)}</td><td>${H(s.task)}</td><td class="muted hide-m">${H(s.place)}</td><td class="r">${tag(s.dept)}</td></tr>`; }).join('') || '<tr><td><div class="empty small">ยังไม่มีกำหนดการ — กด “+ เพิ่ม”</div></td></tr>'}</tbody></table>
     </section>
     <div class="dcards" style="margin-bottom:16px">${D.DEPTS.map(dp => {
@@ -100,6 +100,143 @@
     }
   };
   const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]) || Store.db.beos[0];
+
+  /* ---------- import schedule from .xlsx / .csv ---------- */
+  const DEPT_WORDS = [
+    ['kitchen', /ครัว|อาหาร|f\s*&\s*b|fnb|kitchen|chef|เชฟ/i],
+    ['banquet', /จัดเลี้ยง|banquet|จัดห้อง/i],
+    ['av', /ช่าง|เสียง|ภาพ|\bav\b|a\/v|technic|engineer/i],
+    ['front', /ส่วนหน้า|ต้อนรับ|front|reception|fo\b/i],
+    ['hk', /แม่บ้าน|housekeep|\bhk\b/i],
+    ['acc', /บัญชี|การเงิน|account|finance/i]
+  ];
+  const HEAD = { day: /^(วัน(ที่)?|day|date)$/i, time: /เวลา|time/i, task: /รายละเอียด|งาน|task|activity|กิจกรรม/i, place: /สถานที่|place|location|ห้อง|venue/i, dept: /แผนก|ฝ่าย|dept|department/i };
+  function parseDept(v) {
+    const t = String(v || '').trim(); if (!t) return null;
+    const d = D.DEPTS.find(x => x.id === t.toLowerCase() || x.name === t || x.short === t);
+    if (d) return d.id;
+    const m = DEPT_WORDS.find(([, re]) => re.test(t)); return m ? m[0] : null;
+  }
+  function parseTime(v) {
+    if (typeof v === 'number') { const f = v % 1 || (v < 1 ? v : 0); if (v >= 0 && v < 1 || f) return U.fromHm(Math.round(f * 24 * 60) / 60); if (v >= 0 && v <= 24) return U.fromHm(v); return null; }
+    const t = String(v || '').trim().replace(/\s*(น\.|นาฬิกา|hrs?)$/i, '').split(/\s*[-–~]\s*/)[0];
+    let m = /^(\d{1,2})[:.](\d{2})$/.exec(t) || /^(\d{2})(\d{2})$/.exec(t) || /^(\d{1,2})$/.exec(t);
+    if (!m) return null;
+    const h = Number(m[1]), mi = Number(m[2] || 0);
+    return h <= 24 && mi < 60 ? String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0') : null;
+  }
+  function parseDay(v, days, fallback) {
+    if (v === '' || v == null) return fallback;
+    if (typeof v === 'number') {
+      if (v >= 1 && v <= days.length && Number.isInteger(v)) return v;
+      if (v > 20000) { // Excel date serial
+        const d = new Date(Math.round(v - 25569) * 864e5), i = days.indexOf(U.iso(new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())));
+        return i >= 0 ? i + 1 : null;
+      }
+      return null;
+    }
+    const t = String(v).trim();
+    let m = /^(?:วันที่|day)?\s*(\d{1,2})$/i.exec(t);
+    if (m) { const n = Number(m[1]); return n >= 1 && n <= days.length ? n : null; }
+    m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(t);
+    let y, mo, d;
+    if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else if ((m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})$/.exec(t))) { d = +m[1]; mo = +m[2]; y = +m[3]; if (y < 100) y += 2500; }
+    else {
+      m = /^(\d{1,2})\s*([ก-๙.]+)\s*(\d{2,4})?$/.exec(t);
+      if (m) { const k = U.MS.findIndex(x => x.replace(/\./g, '') === m[2].replace(/\./g, '')); const kl = U.ML.indexOf(m[2]); const mi = k >= 0 ? k : kl; if (mi < 0) return null; d = +m[1]; mo = mi + 1; y = m[3] ? +m[3] : U.d(days[0]).getFullYear(); if (y < 100) y += 2500; }
+      else return null;
+    }
+    if (y > 2400) y -= 543;
+    const i = days.indexOf(U.iso(new Date(y, mo - 1, d)));
+    return i >= 0 ? i + 1 : null;
+  }
+  function parseSchedule(rows, days, fallbackDay) {
+    rows = rows.filter(r => r && r.some(c => String(c).trim() !== ''));
+    let map = { day: 0, time: 1, task: 2, place: 3, dept: 4 }, start = 0;
+    const hi = rows.findIndex((r, i) => i < 5 && r.some(c => HEAD.time.test(String(c))) && r.some(c => HEAD.task.test(String(c))));
+    if (hi >= 0) {
+      map = {}; start = hi + 1;
+      rows[hi].forEach((c, i) => { const t = String(c).trim(); for (const k of ['day', 'time', 'dept', 'place', 'task']) if (map[k] == null && HEAD[k].test(t)) { map[k] = i; break; } });
+    }
+    return rows.slice(start).map((r, i) => {
+      const get = k => map[k] == null ? '' : (r[map[k]] == null ? '' : r[map[k]]);
+      const out = { line: start + i + 1, raw: r, day: parseDay(get('day'), days, fallbackDay), time: parseTime(get('time')), task: String(get('task')).trim(), place: String(get('place')).trim(), dept: parseDept(get('dept')), errs: [] };
+      if (!out.task) out.errs.push('ไม่มีรายละเอียดงาน');
+      if (!out.time) out.errs.push('เวลาไม่ถูกต้อง');
+      if (!out.day) out.errs.push('วันไม่อยู่ในช่วงงาน');
+      if (!out.dept) out.errs.push(String(get('dept')).trim() ? 'ไม่รู้จักแผนก "' + String(get('dept')).trim() + '"' : 'ไม่ได้ระบุแผนก');
+      return out;
+    });
+  }
+  function templateRows(b) {
+    const q = Store.quote(b.quoteId), days = U.daysOf(q.start, q.end);
+    const rows = [['วัน', 'เวลา', 'รายละเอียดงาน', 'สถานที่', 'แผนก']];
+    const cur = Object.entries(b.schedule).flatMap(([d, l]) => l.map(s => [Number(d), s.time, s.task, s.place, dept(s.dept).short]));
+    if (cur.length) return rows.concat(cur.sort((a, c) => a[0] - c[0] || a[1].localeCompare(c[1])));
+    const room = ((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || 'ห้องประชุม';
+    return rows.concat([[1, '06:00', 'จัดห้อง ' + q.pax + ' ที่ + โต๊ะลงทะเบียน', room, 'จัดเลี้ยง'], [1, '07:00', 'ทดสอบเสียงและภาพ', room, 'ช่าง/AV'], [1, '10:00', 'Coffee break ' + q.pax + ' ที่', 'หน้าห้อง', 'ครัว'],
+      [1, '12:00', 'อาหารกลางวัน', 'ห้องอาหาร', 'ครัว'], [1, '14:00', 'เช็กอินกรุ๊ป', 'ล็อบบี้', 'ส่วนหน้า']].concat(days.length > 1 ? [[2, '12:00', 'เช็กเอาต์กรุ๊ป', 'ล็อบบี้', 'ส่วนหน้า']] : []));
+  }
+  const IMPORT_HELP = `
+    <ol style="margin:0 0 14px;padding-left:20px;line-height:1.8">
+      <li>ดาวน์โหลดแม่แบบ (Excel หรือ CSV) — มีกำหนดการของงานนี้ใส่ไว้เป็นตัวอย่าง</li>
+      <li>กรอกหรือแก้ใน Excel / Google Sheets ทีละ 1 แถวต่อ 1 รายการ แล้วบันทึกไฟล์</li>
+      <li>กด “เลือกไฟล์” แล้วตรวจตัวอย่าง แถวสีแดงคือข้อมูลที่ต้องแก้ (จะไม่ถูกนำเข้า)</li>
+      <li>เลือก “เพิ่มต่อจากเดิม” หรือ “แทนที่ทั้งหมด” แล้วกดนำเข้า</li>
+    </ol>
+    <div style="overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-bottom:8px"><table class="tbl compact" style="font-size:12.5px"><thead><tr><th>วัน</th><th>เวลา</th><th>รายละเอียดงาน</th><th>สถานที่</th><th>แผนก</th></tr></thead><tbody>
+      <tr><td>1</td><td>06:00</td><td>จัดห้อง Classroom 80 ที่</td><td>Thikhampon</td><td>จัดเลี้ยง</td></tr>
+      <tr><td>1</td><td>10:00</td><td>Coffee break 80 ที่</td><td>หน้าห้อง</td><td>ครัว</td></tr>
+      <tr><td>2</td><td>12:00</td><td>เช็กเอาต์กรุ๊ป</td><td>ล็อบบี้</td><td>ส่วนหน้า</td></tr></tbody></table></div>
+    <div class="xs muted" style="line-height:1.7"><b>วัน</b> = ลำดับวันของงาน (1, 2, …) หรือวันที่จริง เช่น 12/11/2569, 2026-11-12, 12 พ.ย. 2569 · เว้นว่าง = วันที่เปิดอยู่<br>
+    <b>เวลา</b> = 06:00, 6.00 หรือ 0600 (ถ้าเป็นช่วง เช่น 10:00–10:30 จะใช้เวลาเริ่ม)<br>
+    <b>แผนก</b> = ครัว, จัดเลี้ยง, ช่าง/AV, ส่วนหน้า, แม่บ้าน, บัญชี (ชื่อเต็มหรือภาษาอังกฤษก็ได้)<br>
+    ลำดับคอลัมน์สลับกันได้ ถ้ามีแถวหัวตาราง · รองรับไฟล์ .xlsx และ .csv</div>`;
+
+  App.ACT.beoImport = () => {
+    const b = curB(), q = Store.quote(b.quoteId), days = U.daysOf(q.start, q.end), fallback = App.state.ui.beo.day || 1;
+    let parsed = null;
+    const bg = App.modal(`<h2>นำเข้ากำหนดการจากไฟล์</h2>
+      <div id="impBody">${IMPORT_HELP}
+        <div class="row wrap" style="margin:16px 0 12px"><button class="btn ghost sm" id="tplX">ดาวน์โหลดแม่แบบ Excel</button><button class="btn ghost sm" id="tplC">ดาวน์โหลดแม่แบบ CSV</button></div>
+        <label class="btn dark block" style="cursor:pointer">เลือกไฟล์ (.xlsx / .csv)<input type="file" id="impF" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr"></label>
+        <div id="impMsg" class="small red" style="margin-top:10px" role="alert"></div></div>
+      <div class="acts" id="impActs"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`);
+    bg.querySelector('.modal').style.maxWidth = '760px';
+    const fname = 'กำหนดการ-' + b.id;
+    bg.querySelector('#tplX').onclick = () => {
+      const blob = g.Sheet.writeXlsx(templateRows(b), { sheetName: 'กำหนดการ', widths: [8, 10, 46, 22, 14] });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = fname + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    };
+    bg.querySelector('#tplC').onclick = () => U.download(fname + '.csv', '﻿' + templateRows(b).map(r => r.map(c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(',')).join('\r\n') + '\r\n', 'text/csv');
+    bg.querySelector('#impF').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      const msg = bg.querySelector('#impMsg'); msg.textContent = 'กำลังอ่านไฟล์…';
+      try { parsed = parseSchedule(await g.Sheet.readFile(f), days, fallback); }
+      catch (err) { msg.textContent = err.message || 'อ่านไฟล์ไม่สำเร็จ'; e.target.value = ''; return; }
+      if (!parsed.length) { msg.textContent = 'ไม่พบข้อมูลในไฟล์'; return; }
+      const ok = parsed.filter(r => !r.errs.length), bad = parsed.length - ok.length;
+      bg.querySelector('#impBody').innerHTML = `
+        <div class="between" style="margin-bottom:10px;flex-wrap:wrap"><b>${U.esc(f.name)}</b><span class="small"><span class="teal b">พร้อมนำเข้า ${ok.length} รายการ</span>${bad ? ` · <span class="red b">มีปัญหา ${bad} แถว</span>` : ''}</span></div>
+        <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px"><table class="tbl compact" style="font-size:12.5px"><thead><tr><th>แถว</th><th>วัน</th><th>เวลา</th><th>รายละเอียดงาน</th><th>สถานที่</th><th>แผนก</th></tr></thead><tbody>
+        ${parsed.map(r => `<tr style="${r.errs.length ? 'background:var(--red-tint)' : ''}"><td class="muted">${r.line}</td><td>${r.day || '<span class="red">?</span>'}</td><td>${r.time || '<span class="red">?</span>'}</td>
+          <td>${U.esc(r.task) || '<span class="red">—</span>'}${r.errs.length ? `<div class="xs red">${r.errs.map(U.esc).join(' · ')}</div>` : ''}</td><td>${U.esc(r.place)}</td><td>${r.dept ? tag(r.dept) : '<span class="red">?</span>'}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="row wrap" style="margin-top:14px;gap:18px"><label class="row small"><input type="radio" name="mode" value="append" checked style="accent-color:var(--teal);width:18px;height:18px"> เพิ่มต่อจากกำหนดการเดิม</label>
+          <label class="row small"><input type="radio" name="mode" value="replace" style="accent-color:var(--red);width:18px;height:18px"> แทนที่กำหนดการเดิมทั้งหมด</label></div>`;
+      bg.querySelector('#impActs').innerHTML = `<button class="btn ghost" id="impBack">เลือกไฟล์ใหม่</button><button class="btn red" id="impGo" ${ok.length ? '' : 'disabled'}>นำเข้า ${ok.length} รายการ</button>`;
+      bg.querySelector('#impBack').onclick = () => { App.closeModal(); App.ACT.beoImport(); };
+      bg.querySelector('#impGo').onclick = () => {
+        const mode = (bg.querySelector('input[name=mode]:checked') || {}).value;
+        if (mode === 'replace') Object.keys(b.schedule).forEach(k => b.schedule[k] = []);
+        for (const r of ok) (b.schedule[r.day] = b.schedule[r.day] || []).push({ time: r.time, task: r.task, place: r.place, dept: r.dept });
+        Object.values(b.schedule).forEach(l => l.sort((x, y) => x.time.localeCompare(y.time)));
+        Store.save(); App.closeModal(); App.render();
+        App.toast(`นำเข้า ${ok.length} รายการแล้ว${bad ? ' · ข้าม ' + bad + ' แถว' : ''}`);
+      };
+    };
+  };
   Object.assign(App.ACT, {
     beoF(el) { App.state.ui.beo.f = el.dataset.v; App.go('#/beo'); },
     beoDay(el) { App.state.ui.beo.day = Number(el.dataset.v); App.render(); },

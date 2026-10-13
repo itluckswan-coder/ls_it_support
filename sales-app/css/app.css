@@ -159,6 +159,8 @@ textarea.input{height:auto;min-height:96px;padding:12px 14px;line-height:1.6;res
 .tbl tr.click{cursor:pointer}.tbl tr.click:hover td{background:#FBFAF7}
 .tbl .r{text-align:right}
 .tbl .sub{font-size:12px;color:var(--muted)}
+.tbl.compact th,.tbl.compact td{padding:8px 12px;white-space:nowrap}
+.tbl.compact td:nth-child(3),.tbl.compact td:nth-child(4){white-space:normal;min-width:120px}
 
 /* ---------- login ---------- */
 .login{display:grid;grid-template-columns:1.1fr 1fr;min-height:100vh}
