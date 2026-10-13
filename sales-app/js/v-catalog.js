@@ -247,8 +247,6 @@
       let ui = App.state.ui.rooms;
       if (!ui || ui.q !== (q && q.id)) ui = App.state.ui.rooms = Object.assign(roomState(q), { q: q && q.id });
       const co = U.addDays(ui.ci, ui.nights);
-      const nightsList = U.daysOf(ui.ci, U.addDays(co, -1));
-      const left = t => Math.min(...nightsList.map(d => t.total - App.roomTypeBooked(t.id, d, q && q.id)));
       const sel = D.ROOM_TYPES.filter(t => ui.counts[t.id] > 0);
       const tot = sel.reduce((a, t) => a + ui.counts[t.id], 0);
       const amount = sel.reduce((a, t) => a + ui.counts[t.id] * t.group * ui.nights, 0);
@@ -259,13 +257,13 @@
   <div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div></div>
 <div class="split">
   <div class="rcards">${D.ROOM_TYPES.map(t => {
-    const c = ui.counts[t.id] || 0, l = left(t);
+    const c = ui.counts[t.id] || 0;
     return `<article class="card rcard ${c ? 'on' : ''}">
       <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(t.name)}</span>`}</div>
-      <div class="bd"><div class="between"><h3 style="font-size:19px">${H(t.name)}</h3><span class="small ${l <= 6 ? 'red' : 'teal'}">เหลือ ${l} ห้อง</span></div>
+      <div class="bd"><div class="between"><h3 style="font-size:19px">${H(t.name)}</h3></div>
         <div class="small muted" style="margin:6px 0 12px">${t.size} ตร.ม. · ${H(t.beds)} · อาหารเช้าห้องราชพฤกษ์ 2 ท่าน</div>
         <div class="between"><div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(t.group)} ฿</span><span class="small muted"> / คืน</span></div>
-        <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" data-max="${l}" aria-label="จำนวนห้อง ${H(t.name)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" data-max="${l}" aria-label="เพิ่ม">+</button></span></div>
+        <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.name)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม">+</button></span></div>
       </div></article>`;
   }).join('')}</div>
   <aside class="card pad sticky">
@@ -283,7 +281,7 @@
     }
   };
   Object.assign(App.ACT, {
-    rmStep(el) { const ui = App.state.ui.rooms, k = el.dataset.k; ui.counts[k] = U.clamp((ui.counts[k] || 0) + Number(el.dataset.v), 0, Math.max(Number(el.dataset.max), ui.counts[k] || 0)); App.render(); },
+    rmStep(el) { const ui = App.state.ui.rooms, k = el.dataset.k; ui.counts[k] = U.clamp((ui.counts[k] || 0) + Number(el.dataset.v), 0, 999); App.render(); },
     rmApply() {
       const ui = App.state.ui.rooms;
       const run = id => {
@@ -302,7 +300,7 @@
     }
   });
   Object.assign(App.CHG, {
-    rmSet(el) { const ui = App.state.ui.rooms; ui.counts[el.dataset.k] = U.clamp(parseInt(el.value, 10) || 0, 0, Number(el.dataset.max)); App.render(); },
+    rmSet(el) { const ui = App.state.ui.rooms; ui.counts[el.dataset.k] = U.clamp(parseInt(el.value, 10) || 0, 0, 999); App.render(); },
     rmCi(el) { const ui = App.state.ui.rooms; if (el.value) ui.ci = el.value; App.render(); },
     rmCo(el) { const ui = App.state.ui.rooms; if (el.value) ui.nights = Math.max(1, U.diffDays(ui.ci, el.value)); App.render(); },
     rmLate(el) { App.state.ui.rooms.late = el.checked; App.render(); }
