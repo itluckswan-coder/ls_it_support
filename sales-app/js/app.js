@@ -22,7 +22,7 @@
   };
 
   const NAV = [
-    ['home', 'ภาพรวม', '#/home'], ['quote', 'ใบเสนอราคา', '#/quotes'], ['food', 'จัดเลี้ยง', '#/food'], ['meet', 'ห้องประชุม', '#/meet'], ['room', 'ห้องพัก', '#/rooms'],
+    ['home', 'หน้าหลัก', '#/home'], ['meet', 'ห้องประชุม', '#/meet'], ['room', 'ห้องพัก', '#/rooms'], ['food', 'จัดเลี้ยง', '#/food'], ['quote', 'ใบเสนอราคา', '#/quotes'],
     ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users']
   ];
 
@@ -114,7 +114,7 @@
     shell(active, body, view) {
       const me = App.me();
       const nav = NAV.filter(n => n[0] !== 'users' || App.can('users') || App.can('view_beo'));
-      const tabs = [['home', 'ภาพรวม', '#/home', ICON.home], ['quote', 'ใบเสนอ', '#/quotes', ICON.doc], ['cal', 'ปฏิทิน', '#/cal', ICON.cal], ['beo', 'ใบฟังก์ชัน', '#/beo', ICON.sheet]];
+      const tabs = [['home', 'หน้าหลัก', '#/home', ICON.home], ['quote', 'ใบเสนอ', '#/quotes', ICON.doc], ['cal', 'ปฏิทิน', '#/cal', ICON.cal], ['beo', 'ใบฟังก์ชัน', '#/beo', ICON.sheet]];
       return `
 <header class="topbar">
   <button class="menu-btn" data-act="drawer" aria-label="เมนู">${ICON.menu}</button>
@@ -418,7 +418,7 @@
      HOME (1e)
      ===================================================================== */
   App.V.home = {
-    title: 'ภาพรวม',
+    title: 'หน้าหลัก',
     render() {
       const db = Store.db, me = App.me(), now = new Date(), today = U.today();
       const hr = now.getHours();
@@ -434,9 +434,9 @@
 <div class="page-hd"><div><div class="eyebrow">${U.DL[now.getDay()]} ${U.fmtD(today)}</div><h1>${greet} คุณ${H(App.firstName(me))}</h1></div>
   <a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
 <div class="tiles">
-  <a class="tile red" href="#/food"><span class="k">${D.FOOD.filter(f => f.cat === 'package').length} แพ็กเกจสัมมนา</span><h3>จัดเลี้ยง<br>และอาหาร</h3><span class="go">${ICON.arrow}</span></a>
   <a class="tile teal" href="#/meet"><span class="k">${D.MEETING_ROOMS.length - 1} ห้อง + สระว่ายน้ำ · สูงสุด ${Math.max(...D.MEETING_ROOMS.map(r => Math.max(r.cap.cocktail[1], r.cap.theatre[1])))} ท่าน</span><h3>ห้องประชุม<br>และจัดงาน</h3><span class="go">${ICON.arrow}</span></a>
   <a class="tile yellow" href="#/rooms"><span class="k">${D.ROOM_TYPES.length} ประเภท · ${D.ROOM_TYPES.reduce((a, t) => a + t.total, 0)} ห้อง</span><h3>ห้องพัก<br>กลุ่ม</h3><span class="go">${ICON.arrow}</span></a>
+  <a class="tile red" href="#/food"><span class="k">${D.FOOD.filter(f => f.cat === 'package').length} แพ็กเกจสัมมนา</span><h3>จัดเลี้ยง<br>และอาหาร</h3><span class="go">${ICON.arrow}</span></a>
   <a class="tile dark" href="#/food"><span class="k">เริ่มเร็วที่สุด</span><h3>แพ็กเกจสัมมนา<br>พร้อมห้องพัก</h3><span class="small" style="opacity:.8">Basic · Standard · Premium เริ่ม ${U.n(pkgFrom)} ฿ Net/ท่าน</span></a>
 </div>
 <div class="split">
