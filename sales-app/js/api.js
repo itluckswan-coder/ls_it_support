@@ -64,7 +64,7 @@
       return this.online;
     },
     async req(method, path, body) {
-      const headers = { 'content-type': 'application/json', 'x-device': g.App ? g.App.deviceName() : '' };
+      const headers = { 'content-type': 'application/json', 'x-device': g.App ? encodeURIComponent(g.App.deviceName()) : '' };
       if (this.token) headers.authorization = 'Bearer ' + this.token;
       let r;
       try { r = await fetch('api/' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); }

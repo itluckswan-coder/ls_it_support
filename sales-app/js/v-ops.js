@@ -707,7 +707,7 @@
       <div class="between"><span class="muted">เข้าสู่ระบบล่าสุด</span><span>${fmtLast(u.lastLogin)}${u.lastDevice ? ' · ' + H(u.lastDevice) : ''}</span></div>
       <div class="between" style="margin-top:6px"><span class="muted">ยืนยันตัวตน 2 ขั้นตอน</span>${canEdit ? `<button class="link" data-act="us2fa">${dr.twoFA ? 'เปิดอยู่' : 'ปิดอยู่'}</button>` : `<b class="teal">${dr.twoFA ? 'เปิดอยู่' : 'ปิดอยู่'}</b>`}</div></div>
     ${canEdit ? `<div class="note" style="margin-bottom:14px">การเปลี่ยนบทบาทมีผลทันที ใบเสนอราคาที่ส่งไปแล้วจะไม่เปลี่ยน</div>
-    <div class="row"><button class="btn ghost" style="flex:1" data-act="usResetPw">รีเซ็ตรหัสผ่าน</button><button class="btn red" style="flex:1" data-act="usSave">บันทึก</button></div>
+    <div class="row"><button class="btn ghost" style="flex:1" data-act="usResetPw">เปลี่ยนรหัสผ่าน</button><button class="btn red" style="flex:1" data-act="usSave">บันทึก</button></div>
     ${u.id !== App.state.uid ? `<button class="link red" style="display:block;margin:14px auto 0" data-act="usToggle">${u.status === 'disabled' ? 'เปิดใช้งานบัญชีนี้' : 'ปิดใช้งานบัญชีนี้'}</button>` : ''}`
     : '<div class="note">คุณดูข้อมูลได้อย่างเดียว — การแก้ไขผู้ใช้ต้องใช้สิทธิ์ “จัดการผู้ใช้งาน”</div>'}
   </aside>
@@ -732,13 +732,34 @@
       if (u.status !== 'disabled') App.confirm('ปิดใช้งานบัญชี ' + u.name + '?', run, 'ปิดใช้งาน'); else run();
     },
     usResetPw() {
-      const u = Store.db.users.find(x => x.id === UU().sel);
-      const tmp = 'ls' + Math.random().toString(36).slice(2, 8);
-      App.confirm('รีเซ็ตรหัสผ่านของ ' + u.name + '?', async () => {
-        if (g.API && g.API.online) { try { await g.API.req('POST', 'users/' + encodeURIComponent(u.id) + '/password', { password: tmp }); } catch (e) { App.toast(e.message); return; } }
-        else { u.pw = await g.hashPw(tmp); Store.save(); }
-        App.modal(`<h2>รหัสผ่านชั่วคราว</h2><p class="muted">แจ้งรหัสนี้ให้ ${H(u.name)} และให้เปลี่ยนรหัสหลังเข้าสู่ระบบ</p><input class="input mono" value="${H(tmp)}" readonly onclick="this.select()" style="font-size:20px;text-align:center"><div class="acts"><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
-      }, 'รีเซ็ต');
+      const u = Store.db.users.find(x => x.id === UU().sel), me = App.me();
+      if (u.role === 'admin' && me.role !== 'admin') { App.toast('เฉพาะผู้ดูแลระบบที่เปลี่ยนรหัสผ่านของผู้ดูแลระบบได้'); return; }
+      App.modal(`<h2>เปลี่ยนรหัสผ่าน</h2><p class="muted" style="margin-top:-8px">${H(u.name)} · ${H(u.email)}</p>
+        <div class="field"><label class="f" for="cpPw">รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)</label><div class="pw-wrap"><input class="input" id="cpPw" type="password" autocomplete="new-password"><button type="button" id="cpShow">แสดง</button></div></div>
+        <div class="field"><label class="f" for="cpPw2">ยืนยันรหัสผ่านใหม่</label><input class="input" id="cpPw2" type="password" autocomplete="new-password"></div>
+        <button type="button" class="link" id="cpGen" style="margin-top:8px">สุ่มรหัสผ่านให้</button>
+        ${u.id === me.id ? '' : '<p class="small muted" style="margin:10px 0 0">ผู้ใช้คนนี้จะถูกออกจากระบบทุกเครื่อง และต้องเข้าสู่ระบบใหม่ด้วยรหัสผ่านนี้</p>'}
+        <div class="small red" id="cpErr" style="min-height:20px;margin-top:6px" role="alert"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="cpOk">บันทึกรหัสผ่าน</button></div>`, bg => {
+        const pw = bg.querySelector('#cpPw'), pw2 = bg.querySelector('#cpPw2'), show = bg.querySelector('#cpShow'), err = bg.querySelector('#cpErr');
+        const setShown = on => { pw.type = pw2.type = on ? 'text' : 'password'; show.textContent = on ? 'ซ่อน' : 'แสดง'; };
+        show.onclick = () => setShown(pw.type === 'password');
+        bg.querySelector('#cpGen').onclick = () => {
+          const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint32Array(10));
+          pw.value = pw2.value = Array.from(r, x => abc[x % abc.length]).join(''); setShown(true); err.textContent = '';
+        };
+        bg.querySelector('#cpOk').onclick = async e => {
+          const btn = e.currentTarget;
+          if (pw.value.length < 6) { err.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; return; }
+          if (pw.value !== pw2.value) { err.textContent = 'รหัสผ่านทั้งสองช่องไม่ตรงกัน'; return; }
+          btn.disabled = true;
+          try {
+            if (g.API && g.API.online) await g.API.req('POST', 'users/' + encodeURIComponent(u.id) + '/password', { password: pw.value });
+            else { u.pw = await g.hashPw(pw.value); Store.save(); }
+          } catch (x) { err.textContent = x.message; btn.disabled = false; return; }
+          App.closeModal(); App.toast('เปลี่ยนรหัสผ่านของ ' + u.name + ' แล้ว');
+        };
+      });
     },
     usInvite() {
       App.modal(`<h2>เพิ่มผู้ใช้งาน</h2>

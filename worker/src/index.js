@@ -79,7 +79,9 @@ async function login(req, env) {
   await env.DB.prepare('DELETE FROM login_fail WHERE email = ?').bind(lockKey).run();
   if (u.status === 'invited') u.status = 'active';
   u.lastLogin = now();
-  u.lastDevice = String(req.headers.get('x-device') || '').slice(0, 40);
+  let dev = String(req.headers.get('x-device') || '');
+  try { dev = decodeURIComponent(dev); } catch (e) { /* keep as is */ }
+  u.lastDevice = dev.slice(0, 40);
   await saveUserRow(env, u, row.version + 1);
   await env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(Date.now()).run();
   return json({ token: await createSession(env, u.id, !!remember), user: u });
@@ -255,6 +257,7 @@ async function putUser(req, env, user, id) {
 
 async function setPassword(env, id, password) {
   if (String(password || '').length < 6) fail(400, 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+  if (String(password).length > 128) fail(400, 'รหัสผ่านยาวเกินไป');
   const pw = await hashPassword(String(password));
   await env.DB.prepare('UPDATE users SET pw_hash = ?, pw_salt = ?, updated_at = ? WHERE id = ?').bind(pw.hash, pw.salt, now(), id).run();
 }
@@ -328,8 +331,12 @@ async function api(req, env, url) {
     if (!can(user, 'users')) fail(403, 'คุณไม่มีสิทธิ์จัดการผู้ใช้');
     const { password } = await readJson(req);
     const id = decodeURIComponent(r[1]);
+    const target = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
+    if (!target) fail(404, 'ไม่พบผู้ใช้');
+    if (publicUser(target).role === 'admin' && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่เปลี่ยนรหัสผ่านของผู้ดูแลระบบได้');
     await setPassword(env, id, password);
-    await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
+    // sign the user out everywhere (keep the current session when admins change their own password)
+    await env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(id, user._tokenHash).run();
     await audit(env, user, 'user', id, 'reset-password');
     return json({ ok: true });
   }
