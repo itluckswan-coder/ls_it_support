@@ -379,7 +379,7 @@
   App.V.setup = {
     bare: true, title: 'ตั้งค่าครั้งแรก',
     render() {
-      return `<div class="login"><div class="login-hero" style="background-image:url(img/meet-kinnaree.jpg)"><h2>ตั้งค่าระบบ<br>ฐานข้อมูลกลาง</h2><p style="margin:0;opacity:.9">สร้างบัญชีผู้ดูแลระบบคนแรก แล้วเชิญพนักงานคนอื่นจากหน้า “ผู้ใช้งาน”</p></div>
+      return `<div class="login"><div class="login-hero" style="background-image:url(img/meet-kinnaree.jpg)"><h2>ตั้งค่าระบบ<br>ฐานข้อมูลกลาง</h2><p style="margin:0;opacity:.9">สร้างบัญชีผู้ดูแลระบบคนแรก แล้วเพิ่มผู้ใช้งานคนอื่นจากหน้า “ผู้ใช้งาน”</p></div>
   <div class="login-side"><form class="login-box" id="setupForm">
     <div class="brand"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort" style="width:116px;height:48px"></div>
     <h1>ตั้งค่าครั้งแรก</h1><div class="muted" style="margin-bottom:22px">ทำครั้งเดียว — หลังจากนี้หน้านี้จะไม่แสดงอีก</div>
@@ -405,7 +405,7 @@
         try {
           const u = await g.API.setupAdmin(d, sample);
           App.state.uid = u.id; localStorage.setItem('lsSales.cloudUid', u.id);
-          App.go('#/home'); App.toast('ตั้งค่าเรียบร้อย — เชิญพนักงานได้ที่หน้า “ผู้ใช้งาน”');
+          App.go('#/home'); App.toast('ตั้งค่าเรียบร้อย — เพิ่มผู้ใช้งานได้ที่หน้า “ผู้ใช้งาน”');
         } catch (x) { err.textContent = x.message; }
       };
     }

@@ -678,7 +678,7 @@
       const depts = ['ฝ่ายขายและการตลาด', 'ผู้บริหาร', 'ครัว / F&B', 'จัดเลี้ยง', 'ช่าง / AV', 'ส่วนหน้า', 'แม่บ้าน', 'บัญชี'];
       return `
 <div class="page-hd"><div><h1>ผู้ใช้งาน</h1><div class="small muted">${db.users.length} คน · ใช้งานอยู่ ${db.users.filter(x => x.status === 'active').length} · รอเชิญ ${db.users.filter(x => x.status === 'invited').length} · ปิดใช้ ${db.users.filter(x => x.status === 'disabled').length}</div></div>
-  ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="usCsv">นำเข้าจากไฟล์ CSV</button><button class="btn red" data-act="usInvite">+ เชิญผู้ใช้</button></div>' : ''}</div>
+  ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="usCsv">นำเข้าจากไฟล์ CSV</button><button class="btn red" data-act="usInvite">+ เพิ่มผู้ใช้งาน</button></div>' : ''}</div>
 <div class="row wrap" style="margin-bottom:16px">
   <input class="input" style="max-width:260px;border-radius:999px" placeholder="ค้นหาชื่อ อีเมล…" value="${H(ui.q)}" data-change="usQ" aria-label="ค้นหาผู้ใช้">
   <button class="chip ${ui.role === 'all' ? 'on' : ''}" data-act="usRole" data-v="all">ทั้งหมด <span class="n">${cnt('all')}</span></button>
@@ -741,19 +741,19 @@
       }, 'รีเซ็ต');
     },
     usInvite() {
-      App.modal(`<h2>เชิญผู้ใช้</h2>
+      App.modal(`<h2>เพิ่มผู้ใช้งาน</h2>
         <div class="field"><label class="f">ชื่อ-นามสกุล</label><input class="input" name="name"></div>
         <div class="field"><label class="f">อีเมล</label><input class="input" type="email" name="email" placeholder="name@luckswangroup.com"></div>
         <div class="field"><label class="f">เบอร์โทร</label><input class="input" type="tel" name="phone"></div>
         <div class="grid g2" style="margin-top:14px"><div><label class="f">บทบาท</label><select class="input" name="role">${D.ROLES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}</select></div><div><label class="f">แผนก</label><input class="input" name="dept" value="ฝ่ายขายและการตลาด"></div></div>
         <div class="small red" id="invErr"></div>
-        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">เชิญ</button></div>`, bg => {
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">เพิ่มผู้ใช้งาน</button></div>`, bg => {
         bg.querySelector('#ok').onclick = () => {
           const f = App.formData(bg);
           if (!f.name || !/.+@.+\..+/.test(f.email)) { bg.querySelector('#invErr').textContent = 'กรุณากรอกชื่อและอีเมลให้ถูกต้อง'; return; }
           if (Store.db.users.some(u => u.email.toLowerCase() === f.email.toLowerCase())) { bg.querySelector('#invErr').textContent = 'อีเมลนี้มีอยู่แล้ว'; return; }
           const u = addUser(f); Store.save(); App.closeModal(); UU().sel = u.id; UU().draft = null; App.render();
-          App.modal(`<h2>เชิญ ${H(u.name)} แล้ว</h2><p class="muted">ส่งข้อมูลนี้ให้ผู้ใช้เพื่อเข้าสู่ระบบครั้งแรก:</p><div class="card pad small">ลิงก์: ${H(location.href.split('#')[0])}<br>อีเมล: ${H(u.email)}<br>รหัสผ่านเริ่มต้น: <b class="mono">${H(D.DEFAULT_PW)}</b></div>
+          App.modal(`<h2>เพิ่ม ${H(u.name)} แล้ว</h2><p class="muted">ส่งข้อมูลนี้ให้ผู้ใช้เพื่อเข้าสู่ระบบครั้งแรก:</p><div class="card pad small">ลิงก์: ${H(location.href.split('#')[0])}<br>อีเมล: ${H(u.email)}<br>รหัสผ่านเริ่มต้น: <b class="mono">${H(D.DEFAULT_PW)}</b></div>
             <div class="acts"><a class="btn ghost" href="mailto:${encodeURIComponent(u.email)}?subject=${encodeURIComponent('เชิญเข้าใช้ระบบฝ่ายขาย ลักษวรรณ รีสอร์ต')}&body=${encodeURIComponent('ลิงก์: ' + location.href.split('#')[0] + '\nอีเมล: ' + u.email + '\nรหัสผ่านเริ่มต้น: ' + D.DEFAULT_PW + '\nกรุณาเปลี่ยนรหัสผ่านหลังเข้าสู่ระบบ')}">ส่งอีเมลเชิญ</a><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
         };
       });
