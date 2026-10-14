@@ -148,7 +148,7 @@
       try { const j = await g.API.req('POST', 'beo/' + encodeURIComponent(b.id) + '/' + decision, { comment }); g.API.applyDoc(j.doc); Store.write(); }
       catch (e) { App.toast(e.message); return; }
     } else {
-      const a = b.approval || {}, at = new Date().toISOString().slice(0, 19);
+      const a = b.approval || {}, at = U.nowTH();
       b.approval = decision === 'approve' ? { state: 'approved', by: me.id, byName: me.name, at, comment, requestedBy: a.requestedBy, requestedByName: a.requestedByName }
         : Object.assign({}, a, { state: 'rejected', by: me.id, byName: me.name, at, comment });
       g.API.beoPrev[b.id] = JSON.stringify(b); Store.save();

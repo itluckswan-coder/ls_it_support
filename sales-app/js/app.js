@@ -52,7 +52,7 @@
       const ok = u.pw ? (await g.hashPw(pw)) === u.pw : pw === D.DEFAULT_PW;
       if (!ok) return 'รหัสผ่านไม่ถูกต้อง';
       if (u.status === 'invited') u.status = 'active';
-      u.lastLogin = new Date().toISOString().slice(0, 19);
+      u.lastLogin = U.nowTH();
       u.lastDevice = App.deviceName();
       Store.save();
       App.state.uid = u.id;
@@ -201,7 +201,7 @@
     },
     setCtx(id) { App.state.ctx = id; try { sessionStorage.setItem('lsSales.ctx', id); } catch (e) { /* ignore */ } },
     touch(q, note) {
-      q.updatedAt = new Date().toISOString().slice(0, 19);
+      q.updatedAt = U.nowTH();
       if (note) q.history.unshift({ at: q.updatedAt, t: note, by: App.me() && App.me().name });
       Store.save();
     },

@@ -21,8 +21,8 @@
       const changed = !prev || JSON.stringify(this.content(prev)) !== JSON.stringify(this.content(b));
       if (!changed) { if (prev && prev.approval) b.approval = prev.approval; return; }
       const prevAppr = prev ? (prev.approval || { state: 'approved' }) : null;
-      if (this.rank(user) >= RANK.manager) b.approval = { state: 'approved', by: user.id, byName: user.name, at: new Date().toISOString().slice(0, 19), auto: true };
-      else b.approval = { state: 'pending', requestedBy: user.id, requestedByName: user.name, requestedAt: new Date().toISOString().slice(0, 19),
+      if (this.rank(user) >= RANK.manager) b.approval = { state: 'approved', by: user.id, byName: user.name, at: U.nowTH(), auto: true };
+      else b.approval = { state: 'pending', requestedBy: user.id, requestedByName: user.name, requestedAt: U.nowTH(),
         base: prevAppr && prevAppr.state === 'approved' ? this.content(prev) : (prevAppr ? prevAppr.base || null : null) };
     },
     canDecide(b, me) {
