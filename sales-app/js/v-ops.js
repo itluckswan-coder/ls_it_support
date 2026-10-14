@@ -456,6 +456,7 @@
     });
     return { days, ot: [] };
   }
+  const REQUEST_STAFF_URL = 'https://lin.ee/q04WgSh'; // LINE contact for requesting extra manpower
   const otHours = (empId, plan) => (plan ? plan.ot : []).filter(o => o.status !== 'rejected' && o.staff.includes(empId)).reduce((a, o) => a + o.hours, 0);
 
   App.V.staff = {
@@ -607,7 +608,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const cur = ot || d || (App.state.ui.staffOtDraft = { id: null, date, dept: shifts[0].dp, shiftId: shifts[0].s.id, hours: 2, reason: 'เก็บงานเลี้ยง + ล้างครัว', staff: [], status: 'new' });
       const sh = (day[cur.dept] || []).find(s => s.id === cur.shiftId) || shifts[0].s;
       const emps = sh.staff.map(EMP).filter(Boolean);
-      const extra = Store.db.employees.filter(e => e.dept === cur.dept && !sh.staff.includes(e.id));
+      const extra = Store.db.employees.filter(e => e.dept === cur.dept && !sh.staff.includes(e.id) && !cur.staff.includes(e.id));
+      const others = Store.db.employees.filter(e => e.dept !== cur.dept && !cur.staff.includes(e.id));
       const editable = cur.status === 'new' || cur.status === 'draft';
       const stLabel = { new: 'ใหม่', draft: 'ร่าง · ยังไม่ส่ง', pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ไม่อนุมัติ' }[cur.status];
       return `<div class="row" style="margin-bottom:14px"><h2>ต่อรอบ</h2><span class="badge ${cur.status === 'approved' ? 'st-confirmed' : 'st-sent'}">${stLabel}</span>${plan.ot.some(o => o.date === date) ? `<span class="spacer"></span><button class="link" data-act="stOtNew">+ ใหม่</button>` : ''}</div>
@@ -621,9 +623,12 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         <div class="between small" style="margin:14px 0 8px"><span class="muted">เลือกพนักงาน (${cur.staff.length} / ${emps.length})</span>${editable ? '<button class="link" data-act="stOtAll">เลือกทั้งหมดที่ว่าง</button>' : ''}</div>
         ${emps.concat(cur.staff.map(EMP).filter(e => e && !emps.includes(e))).map(e => {
           const h = e.hours + otHours(e.id, plan) - (ot && ot.staff.includes(e.id) ? ot.hours : 0), on = cur.staff.includes(e.id), full = h + cur.hours > 48 && !on;
-          return `<div class="emp ${full ? 'dis' : ''}" ${editable && !full ? `data-act="stOtEmp" data-e="${e.id}"` : ''}><span class="check ${on ? 'on' : ''}">${on ? ICON.check : ''}</span><span class="avatar sm" style="background:var(--red-soft);color:var(--red-d)">${H(U.initials(e.name))}</span><div style="flex:1;min-width:0"><b style="font-weight:500">${H(e.name)}</b><div class="xs muted">${H(e.role)} · ${H(sh.label)}</div></div><span class="xs ${h >= 48 ? 'red' : h >= 44 ? '' : 'muted'}" style="${h >= 44 && h < 48 ? 'color:var(--yellow-d)' : ''}">${h >= 48 ? 'ครบ 48 ชม.' : h + ' / 48 ชม.'}</span></div>`;
+          return `<div class="emp ${full ? 'dis' : ''}" ${editable && !full ? `data-act="stOtEmp" data-e="${e.id}"` : ''}><span class="check ${on ? 'on' : ''}">${on ? ICON.check : ''}</span><span class="avatar sm" style="background:var(--red-soft);color:var(--red-d)">${H(U.initials(e.name))}</span><div style="flex:1;min-width:0"><b style="font-weight:500">${H(e.name)}</b><div class="xs muted">${H(e.role)} · ${e.dept === cur.dept ? H(sh.label) : 'จากแผนก' + H(dept(e.dept).short)}</div></div><span class="xs ${h >= 48 ? 'red' : h >= 44 ? '' : 'muted'}" style="${h >= 44 && h < 48 ? 'color:var(--yellow-d)' : ''}">${h >= 48 ? 'ครบ 48 ชม.' : h + ' / 48 ชม.'}</span></div>`;
         }).join('')}
-        ${editable && extra.length ? `<button class="link" style="margin-top:8px" data-act="stOtMore">+ พนักงานอื่นในแผนก (${extra.length})</button>` : ''}
+        ${editable ? `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:8px">
+          ${extra.length ? `<button class="link" data-act="stOtMore">+ พนักงานอื่นในแผนก (${extra.length})</button>` : ''}
+          ${others.length ? `<button class="link" data-act="stOtOther">+ พนักงานอื่นนอกแผนก (${others.length})</button>` : ''}
+          <a class="link" href="${REQUEST_STAFF_URL}" target="_blank" rel="noopener noreferrer">+ ขอกำลังพล ↗</a></div>` : ''}
         <div style="background:var(--bg);border-radius:12px;padding:14px;margin:14px 0"><div class="small muted">${cur.staff.length} คน × ${cur.hours} ชม.</div>
           <div class="between" style="margin-top:4px"><b>รวมชั่วโมงทำงานเกินกำหนดการ</b><b style="font:700 20px var(--fh)" class="num">${cur.staff.length * cur.hours} ชม.</b></div></div>
         <div class="xs muted" style="margin-bottom:14px">ต่อรอบเกิน 2 ชม./วัน หรือสะสมเกิน 48 ชม./สัปดาห์ ต้องให้ผู้จัดการแผนกอนุมัติ</div>
@@ -698,6 +703,21 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const o = curOt(), p = SP(), emps = Store.db.employees.filter(e => e.dept === o.dept && !o.staff.includes(e.id));
       App.modal(`<h2>เพิ่มพนักงาน</h2>${emps.map(e => `<button class="pick" data-e="${e.id}"><span>${H(e.name)}<br><span class="xs muted">${H(e.role)}</span></span><span class="xs muted">${e.hours + otHours(e.id, p)} / 48</span></button>`).join('')}<div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`,
         bg => bg.querySelectorAll('.pick').forEach(b => b.onclick = () => { o.staff.push(b.dataset.e); persistOt(o); App.closeModal(); App.render(); }));
+    },
+    stOtOther() {
+      const o = curOt(), p = SP();
+      const groups = D.DEPTS.filter(d => d.id !== o.dept).map(d => ({ d, emps: Store.db.employees.filter(e => e.dept === d.id && !o.staff.includes(e.id)) })).filter(g => g.emps.length);
+      App.modal(`<h2>เพิ่มพนักงานจากแผนกอื่น</h2><p class="small muted" style="margin-top:-8px">มาช่วยต่อรอบ ${H(dept(o.dept).short)} · ${U.fmtD(o.date, { year: false })}</p>
+        <input class="input" id="otoQ" placeholder="ค้นหาชื่อ ตำแหน่ง…" style="margin-bottom:10px" aria-label="ค้นหาพนักงาน">
+        <div id="otoList">${groups.map(g => `<div class="oto-g"><div class="row small" style="gap:8px;margin:12px 0 6px"><i class="dot" style="background:${g.d.color};border-radius:3px"></i><b>${H(g.d.name)}</b></div>
+          ${g.emps.map(e => { const h = e.hours + otHours(e.id, p); return `<button class="pick" data-e="${e.id}" data-s="${H((e.name + ' ' + e.role).toLowerCase())}"><span>${H(e.name)}<br><span class="xs muted">${H(e.role)} · ${H(g.d.short)}</span></span><span class="xs ${h >= 48 ? 'red' : 'muted'}">${h} / 48</span></button>`; }).join('')}</div>`).join('')}</div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`, bg => {
+        bg.querySelectorAll('.pick').forEach(b => b.onclick = () => { o.staff.push(b.dataset.e); persistOt(o); App.closeModal(); App.render(); });
+        bg.querySelector('#otoQ').oninput = e => {
+          const v = e.target.value.trim().toLowerCase();
+          bg.querySelectorAll('.oto-g').forEach(g => { let any = false; g.querySelectorAll('.pick').forEach(b => { const ok = !v || b.dataset.s.includes(v); b.style.display = ok ? '' : 'none'; any = any || ok; }); g.style.display = any ? '' : 'none'; });
+        };
+      });
     },
     stOtSubmit() {
       const o = curOt(); persistOt(o, true);
