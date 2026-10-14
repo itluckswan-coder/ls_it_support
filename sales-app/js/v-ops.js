@@ -739,7 +739,6 @@
       UU().sel = u.id; UU().draft = null; App.render();
       const self = u.id === me.id, d = JSON.parse(JSON.stringify(u));
       const roles = D.ROLES.filter(r => r.id !== 'admin' || me.role === 'admin' || u.role === 'admin');
-      const permsHtml = () => D.PERMS.map(p => `<div class="perm"><div><div>${H(p.name)}</div>${p.note ? `<div class="xs muted">${H(p.note)}</div>` : ''}</div>${App.sw(p.name, d.perms[p.id], `data-perm="${p.id}"`)}</div>`).join('');
       App.modal(`<h2>แก้ไขข้อมูลผู้ใช้งาน</h2><p class="muted" style="margin-top:-8px">${H(u.name)} · รหัส ${H(u.id)}</p>
         <div class="field"><label class="f" for="ueName">ชื่อ-นามสกุล</label><input class="input" id="ueName" name="name" value="${H(u.name)}"></div>
         <div class="grid g2" style="margin-top:14px">
@@ -754,15 +753,11 @@
           <div><label class="f" for="ueStatus">สถานะ</label><select class="input" id="ueStatus" name="status" ${self ? 'disabled' : ''}>${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${k === u.status ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
           <div><label class="f">ยืนยันตัวตน 2 ขั้นตอน</label><div style="padding-top:8px">${App.sw('ยืนยันตัวตน 2 ขั้นตอน', d.twoFA, 'id="ue2fa"')}</div></div>
         </div>
-        <div class="small muted" style="margin:16px 0 4px">สิทธิ์การใช้งาน <span class="xs">(เปลี่ยนบทบาทแล้วสิทธิ์จะตั้งตามบทบาทใหม่ ปรับต่อได้)</span></div>
-        <div id="uePerms">${permsHtml()}</div>
+        <p class="xs muted" style="margin:10px 0 0">เปลี่ยนบทบาทแล้ว สิทธิ์การใช้งานจะตั้งตามบทบาทใหม่ (ปรับรายข้อได้ที่แผงรายละเอียดผู้ใช้)</p>
         <button type="button" class="link" id="uePw" style="margin-top:12px">เปลี่ยนรหัสผ่าน…</button>
         <div class="small red" id="ueErr" style="min-height:20px;margin-top:6px" role="alert"></div>
         <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ueOk">บันทึก</button></div>`, bg => {
-        const err = bg.querySelector('#ueErr'), box = bg.querySelector('#uePerms');
-        const bindPerms = () => box.querySelectorAll('[data-perm]').forEach(i => { i.onchange = () => { d.perms[i.dataset.perm] = i.checked; }; });
-        bindPerms();
-        bg.querySelector('#ueRole').onchange = e => { d.perms = Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[e.target.value].includes(p.id)])); box.innerHTML = permsHtml(); bindPerms(); };
+        const err = bg.querySelector('#ueErr');
         bg.querySelector('#ue2fa').onchange = e => { d.twoFA = e.target.checked; };
         bg.querySelector('#uePw').onclick = () => { App.closeModal(); App.ACT.usResetPw(); };
         bg.querySelector('#ueOk').onclick = async e => {
@@ -771,8 +766,10 @@
           if (!f.name) { err.textContent = 'กรุณากรอกชื่อ'; return; }
           if (!/.+@.+\..+/.test(f.email)) { err.textContent = 'อีเมลไม่ถูกต้อง'; return; }
           if (Store.db.users.some(x => x.id !== u.id && x.email.toLowerCase() === f.email.toLowerCase())) { err.textContent = 'อีเมลนี้มีผู้ใช้อยู่แล้ว'; return; }
-          if (self && !d.perms.users) { err.textContent = 'ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้'; return; }
-          const next = Object.assign({}, u, { name: f.name, email: f.email, phone: (f.phone || '').trim(), role: f.role, dept: f.dept || u.dept, status: self ? u.status : f.status, perms: d.perms, twoFA: d.twoFA });
+          // a new role brings that role's default permissions; same role keeps the current ones
+          const perms = f.role === u.role ? d.perms : Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[f.role].includes(p.id)]));
+          if (self && !perms.users) { err.textContent = 'ไม่สามารถเปลี่ยนบทบาทของตัวเองเป็นบทบาทที่ไม่มีสิทธิ์จัดการผู้ใช้ได้'; return; }
+          const next = Object.assign({}, u, { name: f.name, email: f.email, phone: (f.phone || '').trim(), role: f.role, dept: f.dept || u.dept, status: self ? u.status : f.status, perms, twoFA: d.twoFA });
           btn.disabled = true;
           try {
             if (g.API && g.API.online) {
