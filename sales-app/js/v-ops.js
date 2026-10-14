@@ -497,7 +497,6 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const ui = App.state.ui.staff && App.state.ui.staff.q === q.id ? App.state.ui.staff : (App.state.ui.staff = { q: q.id, date: dates[0], ot: null });
       if (!plan.days[ui.date]) ui.date = dates[0];
       const day = plan.days[ui.date], date = ui.date, dayIdx = dates.indexOf(date) + 1;
-      const rate = db.settings.otRate || 135;
       // KPIs
       let need = 0, have = 0; const short = {};
       for (const [dp, shifts] of Object.entries(day)) for (const s of shifts) { need += s.need; have += Math.min(s.staff.length, s.need); if (s.staff.length < s.need) short[dp] = (short[dp] || 0) + s.need - s.staff.length; }
@@ -526,7 +525,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       // OT panel state
       let ot = ui.ot && plan.ot.find(o => o.id === ui.ot && o.date === date);
       if (!ot && ui.ot !== '__new') ot = plan.ot.find(o => o.date === date && o.status === 'draft') || null;
-      const otPanel = App.V.staff.otPanel(q, plan, day, date, ot, rate);
+      const otPanel = App.V.staff.otPanel(q, plan, day, date, ot);
       // todos
       const todos = [];
       for (const [dp, shifts] of Object.entries(day)) for (const s of shifts) if (s.staff.length < s.need) {
@@ -541,7 +540,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   <div class="card kpi"><div class="small muted">พนักงานที่ต้องใช้</div><div class="v">${need} <small>คน</small></div><div class="small muted">${Object.keys(day).length} แผนก · วันที่ ${dayIdx} (${U.DS[U.d(date).getDay()]} ${U.fmtD(date, { year: false })})</div></div>
   <div class="card kpi"><div class="small muted">จัดรอบแล้ว</div><div class="v">${have} <small>/ ${need} คน</small></div><div class="bar"><i style="width:${need ? have / need * 100 : 0}%"></i></div><div class="small muted" style="margin-top:6px">${need ? Math.round(have / need * 100) : 0}% ของที่ต้องใช้</div></div>
   <div class="card kpi"><div class="small muted">ขาดคน</div><div class="v ${need - have ? 'red' : ''}">${need - have} <small>คน</small></div><div class="small muted">${Object.entries(short).map(([k, v]) => dept(k).short + ' ' + v).join(' · ') || 'ครบทุกแผนก'}</div></div>
-  <div class="card kpi"><div class="small muted">ต่อรอบ (OT)</div><div class="v" style="color:var(--yellow-d)">${otH} <small>ชม.-คน</small></div><div class="small muted">${otN} คน · ประมาณ ฿${U.n(otH * rate)}</div></div>
+  <div class="card kpi"><div class="small muted">ต่อรอบ (QT)</div><div class="v" style="color:var(--yellow-d)">${otH} <small>ชม.</small></div><div class="small muted">รวมชั่วโมงทำงานเกินกำหนดการ · ${otN} คน</div></div>
 </div>
 <div class="split" style="margin-bottom:16px">
   <section class="card" style="overflow:hidden;min-width:0">
@@ -565,15 +564,14 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     </tbody></table></section>
 </div>`;
     },
-    otPanel(q, plan, day, date, ot, rate) {
+    otPanel(q, plan, day, date, ot) {
       const shifts = Object.entries(day).flatMap(([dp, l]) => l.filter(s => s.staff.length).map(s => ({ dp, s })));
       if (!shifts.length) return '<h2>ต่อรอบ</h2><div class="small muted" style="margin-top:8px">ยังไม่มีรอบที่มอบหมายพนักงาน</div>';
       const d = App.state.ui.staffOtDraft && App.state.ui.staffOtDraft.date === date && !ot ? App.state.ui.staffOtDraft : null;
-      const cur = ot || d || (App.state.ui.staffOtDraft = { id: null, date, dept: shifts[0].dp, shiftId: shifts[0].s.id, hours: 2, reason: 'เก็บงานเลี้ยง + ล้างครัว', staff: [], status: 'new', rate });
+      const cur = ot || d || (App.state.ui.staffOtDraft = { id: null, date, dept: shifts[0].dp, shiftId: shifts[0].s.id, hours: 2, reason: 'เก็บงานเลี้ยง + ล้างครัว', staff: [], status: 'new' });
       const sh = (day[cur.dept] || []).find(s => s.id === cur.shiftId) || shifts[0].s;
       const emps = sh.staff.map(EMP).filter(Boolean);
       const extra = Store.db.employees.filter(e => e.dept === cur.dept && !sh.staff.includes(e.id));
-      const total = cur.staff.length * cur.hours * (cur.rate || rate);
       const editable = cur.status === 'new' || cur.status === 'draft';
       const stLabel = { new: 'ใหม่', draft: 'ร่าง · ยังไม่ส่ง', pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ไม่อนุมัติ' }[cur.status];
       return `<div class="row" style="margin-bottom:14px"><h2>ต่อรอบ</h2><span class="badge ${cur.status === 'approved' ? 'st-confirmed' : 'st-sent'}">${stLabel}</span>${plan.ot.some(o => o.date === date) ? `<span class="spacer"></span><button class="link" data-act="stOtNew">+ ใหม่</button>` : ''}</div>
@@ -590,8 +588,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
           return `<div class="emp ${full ? 'dis' : ''}" ${editable && !full ? `data-act="stOtEmp" data-e="${e.id}"` : ''}><span class="check ${on ? 'on' : ''}">${on ? ICON.check : ''}</span><span class="avatar sm" style="background:var(--red-soft);color:var(--red-d)">${H(U.initials(e.name))}</span><div style="flex:1;min-width:0"><b style="font-weight:500">${H(e.name)}</b><div class="xs muted">${H(e.role)} · ${H(sh.label)}</div></div><span class="xs ${h >= 48 ? 'red' : h >= 44 ? '' : 'muted'}" style="${h >= 44 && h < 48 ? 'color:var(--yellow-d)' : ''}">${h >= 48 ? 'ครบ 48 ชม.' : h + ' / 48 ชม.'}</span></div>`;
         }).join('')}
         ${editable && extra.length ? `<button class="link" style="margin-top:8px" data-act="stOtMore">+ พนักงานอื่นในแผนก (${extra.length})</button>` : ''}
-        <div style="background:var(--bg);border-radius:12px;padding:14px;margin:14px 0"><div class="between small muted"><span>${cur.staff.length} คน × ${cur.hours} ชม. × ฿${cur.rate || rate} (OT 1.5 เท่า)</span><span>${cur.staff.length * cur.hours} ชม.-คน</span></div>
-          <div class="between" style="margin-top:4px"><b>ค่าล่วงเวลาโดยประมาณ</b><b style="font:700 20px var(--fh)" class="num">฿${U.n(total)}</b></div></div>
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin:14px 0"><div class="small muted">${cur.staff.length} คน × ${cur.hours} ชม.</div>
+          <div class="between" style="margin-top:4px"><b>รวมชั่วโมงทำงานเกินกำหนดการ</b><b style="font:700 20px var(--fh)" class="num">${cur.staff.length * cur.hours} ชม.</b></div></div>
         <div class="xs muted" style="margin-bottom:14px">ต่อรอบเกิน 2 ชม./วัน หรือสะสมเกิน 48 ชม./สัปดาห์ ต้องให้ผู้จัดการแผนกอนุมัติ</div>
         ${editable ? `<button class="btn red block" data-act="stOtSubmit" ${cur.staff.length ? '' : 'disabled'}>ขออนุมัติต่อรอบ (${cur.staff.length} คน)</button>${cur.status === 'draft' ? '<button class="link red" style="display:block;margin:12px auto 0" data-act="stOtDel">ลบร่าง</button>' : ''}`
           : cur.status === 'pending' && App.can('staff') ? `<div class="row"><button class="btn ghost" style="flex:1" data-act="stOtReject" data-id="${cur.id}">ไม่อนุมัติ</button><button class="btn teal" style="flex:1" data-act="stOtApprove" data-id="${cur.id}">อนุมัติ</button></div>`

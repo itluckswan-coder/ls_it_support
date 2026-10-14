@@ -316,8 +316,8 @@
       'QT-2611-042': {
         days: { '2026-11-12': day(p12), '2026-11-13': day(p13) },
         ot: [
-          { id: 'ot1', date: '2026-11-12', dept: 'kitchen', shiftId: 's2', hours: 2, reason: 'เก็บงานเลี้ยงขันโตก + ล้างครัว', staff: K.slice(0, 4), status: 'draft', rate: 135 },
-          { id: 'ot2', date: '2026-11-12', dept: 'banquet', shiftId: 's4', hours: 2, reason: 'เก็บสถานที่งานเลี้ยง', staff: B.slice(4, 5), status: 'approved', rate: 135 }
+          { id: 'ot1', date: '2026-11-12', dept: 'kitchen', shiftId: 's2', hours: 2, reason: 'เก็บงานเลี้ยงขันโตก + ล้างครัว', staff: K.slice(0, 4), status: 'draft' },
+          { id: 'ot2', date: '2026-11-12', dept: 'banquet', shiftId: 's4', hours: 2, reason: 'เก็บสถานที่งานเลี้ยง', staff: B.slice(4, 5), status: 'approved' }
         ]
       }
     };
@@ -392,7 +392,7 @@
       v: 1,
       settings: { service: 0.10, vat: 0.07, target: 3000000, company: 'บริษัท ลักษวรรณ จำกัด', address: '499 หมู่ 4 ต.ริมกก อ.เมือง จ.เชียงราย 57000',
         phone: '(+66)53-750-855', hq: '(+66)86-756-9933', bank: 'บัญชี บจก.ลักษวรรณ หมายเลขบัญชี 045-8-38475-4 ธนาคารกสิกรไทย', email: 'Sale.marketing@luckswangroup.com', line: '@luckswanresort',
-        gm: 'น.ส. ลักษิกา เตชะธีราวัฒน์', otRate: 135 },
+        gm: 'น.ส. ลักษิกา เตชะธีราวัฒน์' },
       users: seedUsers(),
       quotes: seedQuotes(),
       beos: seedBEO(),
