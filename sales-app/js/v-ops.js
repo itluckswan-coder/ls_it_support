@@ -443,6 +443,9 @@
     });
     return { days, ot: [] };
   }
+  // overtime pay = normal hourly wage × OT_MULT (always today's rate, not the one saved on old requests)
+  const OT_MULT = 1;
+  const otRate = st => Math.round((Number(st.hourlyWage) || 90) * OT_MULT);
   const otHours = (empId, plan) => (plan ? plan.ot : []).filter(o => o.status !== 'rejected' && o.staff.includes(empId)).reduce((a, o) => a + o.hours, 0);
 
   App.V.staff = {
@@ -497,7 +500,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const ui = App.state.ui.staff && App.state.ui.staff.q === q.id ? App.state.ui.staff : (App.state.ui.staff = { q: q.id, date: dates[0], ot: null });
       if (!plan.days[ui.date]) ui.date = dates[0];
       const day = plan.days[ui.date], date = ui.date, dayIdx = dates.indexOf(date) + 1;
-      const rate = db.settings.otRate || 135;
+      const rate = otRate(db.settings);
       // KPIs
       let need = 0, have = 0; const short = {};
       for (const [dp, shifts] of Object.entries(day)) for (const s of shifts) { need += s.need; have += Math.min(s.staff.length, s.need); if (s.staff.length < s.need) short[dp] = (short[dp] || 0) + s.need - s.staff.length; }
@@ -573,7 +576,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const sh = (day[cur.dept] || []).find(s => s.id === cur.shiftId) || shifts[0].s;
       const emps = sh.staff.map(EMP).filter(Boolean);
       const extra = Store.db.employees.filter(e => e.dept === cur.dept && !sh.staff.includes(e.id));
-      const total = cur.staff.length * cur.hours * (cur.rate || rate);
+      const total = cur.staff.length * cur.hours * rate;
       const editable = cur.status === 'new' || cur.status === 'draft';
       const stLabel = { new: 'ใหม่', draft: 'ร่าง · ยังไม่ส่ง', pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ไม่อนุมัติ' }[cur.status];
       return `<div class="row" style="margin-bottom:14px"><h2>ต่อรอบ</h2><span class="badge ${cur.status === 'approved' ? 'st-confirmed' : 'st-sent'}">${stLabel}</span>${plan.ot.some(o => o.date === date) ? `<span class="spacer"></span><button class="link" data-act="stOtNew">+ ใหม่</button>` : ''}</div>
@@ -590,7 +593,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
           return `<div class="emp ${full ? 'dis' : ''}" ${editable && !full ? `data-act="stOtEmp" data-e="${e.id}"` : ''}><span class="check ${on ? 'on' : ''}">${on ? ICON.check : ''}</span><span class="avatar sm" style="background:var(--red-soft);color:var(--red-d)">${H(U.initials(e.name))}</span><div style="flex:1;min-width:0"><b style="font-weight:500">${H(e.name)}</b><div class="xs muted">${H(e.role)} · ${H(sh.label)}</div></div><span class="xs ${h >= 48 ? 'red' : h >= 44 ? '' : 'muted'}" style="${h >= 44 && h < 48 ? 'color:var(--yellow-d)' : ''}">${h >= 48 ? 'ครบ 48 ชม.' : h + ' / 48 ชม.'}</span></div>`;
         }).join('')}
         ${editable && extra.length ? `<button class="link" style="margin-top:8px" data-act="stOtMore">+ พนักงานอื่นในแผนก (${extra.length})</button>` : ''}
-        <div style="background:var(--bg);border-radius:12px;padding:14px;margin:14px 0"><div class="between small muted"><span>${cur.staff.length} คน × ${cur.hours} ชม. × ฿${cur.rate || rate} (QT 1.5 เท่า)</span><span>${cur.staff.length * cur.hours} ชม.-คน</span></div>
+        <div style="background:var(--bg);border-radius:12px;padding:14px;margin:14px 0"><div class="between small muted"><span>${cur.staff.length} คน × ${cur.hours} ชม. × ฿${U.n(rate)} (QT ${OT_MULT} เท่า)</span><span>${cur.staff.length * cur.hours} ชม.-คน</span></div>
           <div class="between" style="margin-top:4px"><b>ค่าล่วงเวลาโดยประมาณ</b><b style="font:700 20px var(--fh)" class="num">฿${U.n(total)}</b></div></div>
         <div class="xs muted" style="margin-bottom:14px">ต่อรอบเกิน 2 ชม./วัน หรือสะสมเกิน 48 ชม./สัปดาห์ ต้องให้ผู้จัดการแผนกอนุมัติ</div>
         ${editable ? `<button class="btn red block" data-act="stOtSubmit" ${cur.staff.length ? '' : 'disabled'}>ขออนุมัติต่อรอบ (${cur.staff.length} คน)</button>${cur.status === 'draft' ? '<button class="link red" style="display:block;margin:12px auto 0" data-act="stOtDel">ลบร่าง</button>' : ''}`
