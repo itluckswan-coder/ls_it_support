@@ -709,7 +709,8 @@
       <div class="between" style="margin-top:6px"><span class="muted">ยืนยันตัวตน 2 ขั้นตอน</span>${canEdit ? `<button class="link" data-act="us2fa">${dr.twoFA ? 'เปิดอยู่' : 'ปิดอยู่'}</button>` : `<b class="teal">${dr.twoFA ? 'เปิดอยู่' : 'ปิดอยู่'}</b>`}</div></div>
     ${canEdit ? `<div class="note" style="margin-bottom:14px">การเปลี่ยนบทบาทมีผลทันที ใบเสนอราคาที่ส่งไปแล้วจะไม่เปลี่ยน</div>
     <div class="row"><button class="btn ghost" style="flex:1" data-act="usResetPw">เปลี่ยนรหัสผ่าน</button><button class="btn red" style="flex:1" data-act="usSave">บันทึก</button></div>
-    ${u.id !== App.state.uid ? `<button class="link red" style="display:block;margin:14px auto 0" data-act="usToggle">${u.status === 'disabled' ? 'เปิดใช้งานบัญชีนี้' : 'ปิดใช้งานบัญชีนี้'}</button>` : ''}`
+    ${u.id !== App.state.uid ? `<button class="link red" style="display:block;margin:14px auto 0" data-act="usToggle">${u.status === 'disabled' ? 'เปิดใช้งานบัญชีนี้' : 'ปิดใช้งานบัญชีนี้'}</button>` : ''}
+    ${u.id !== App.state.uid && App.me().role === 'admin' ? '<button class="btn ghost red" style="width:100%;margin-top:14px" data-act="usDelete">ลบบัญชีนี้</button>' : ''}`
     : '<div class="note">คุณดูข้อมูลได้อย่างเดียว — การแก้ไขผู้ใช้ต้องใช้สิทธิ์ “จัดการผู้ใช้งาน”</div>'}
   </aside>
 </div>`;
@@ -779,6 +780,22 @@
           } catch (x) { err.textContent = x.message; btn.disabled = false; return; }
           App.closeModal(); UU().draft = null; App.render(); App.toast('บันทึกข้อมูลของ ' + f.name + ' แล้ว');
         };
+      });
+    },
+    usDelete() {
+      const u = Store.db.users.find(x => x.id === UU().sel), me = App.me();
+      if (!u || me.role !== 'admin') { App.toast('เฉพาะผู้ดูแลระบบที่ลบบัญชีผู้ใช้ได้'); return; }
+      if (u.id === me.id) { App.toast('ไม่สามารถลบบัญชีของตัวเองได้'); return; }
+      App.modal(`<h2>ลบบัญชีนี้?</h2><p class="muted" style="margin-top:-8px">${H(u.name)} · ${H(u.email)}</p>
+        <p class="small">ผู้ใช้นี้จะเข้าสู่ระบบไม่ได้อีกและกู้คืนไม่ได้ ส่วนใบเสนอราคาและใบฟังก์ชันที่เคยทำไว้ยังอยู่ครบ — ถ้าต้องการระงับชั่วคราว ให้ใช้ “ปิดใช้งานบัญชีนี้” แทน</p>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="delYes">ลบบัญชี</button></div>`, bg => bg.querySelector('#delYes').onclick = async e => {
+        e.currentTarget.disabled = true;
+        try {
+          if (g.API && g.API.online) { await g.API.req('DELETE', 'users/' + encodeURIComponent(u.id)); delete g.API.userSnap[u.id]; }
+        } catch (x) { App.closeModal(); App.toast(x.message); return; }
+        Store.db.users = Store.db.users.filter(x => x.id !== u.id);
+        if (g.API && g.API.online) Store.write(); else Store.save();
+        App.closeModal(); UU().sel = me.id; UU().draft = null; App.render(); App.toast('ลบบัญชี ' + u.name + ' แล้ว');
       });
     },
     usResetPw() {

@@ -101,8 +101,11 @@ async function state(env, since) {
   const users = since
     ? (await env.DB.prepare('SELECT * FROM users WHERE updated_at >= ?').bind(since).all()).results
     : (await env.DB.prepare('SELECT * FROM users').all()).results;
+  // every user id, so clients can drop accounts that were deleted since their last sync
+  const userIds = since ? (await env.DB.prepare('SELECT id FROM users').all()).results.map(r => r.id) : users.map(r => r.id);
   return {
     serverTime: now(),
+    userIds,
     docs: docs.map(d => ({ kind: d.kind, id: d.id, version: d.version, deleted: !!d.deleted, data: d.deleted ? null : JSON.parse(d.data) })),
     users: users.map(r => Object.assign(publicUser(r), { _v: r.version }))
   };
@@ -327,6 +330,16 @@ async function api(req, env, url) {
   }
   if ((r = /^\/api\/beo\/(.+)\/(approve|reject)$/.exec(path)) && m === 'POST') return decideBeo(req, env, user, decodeURIComponent(r[1]), r[2]);
   if ((r = /^\/api\/users\/([^/]+)$/.exec(path)) && m === 'PUT') return putUser(req, env, user, decodeURIComponent(r[1]));
+  if ((r = /^\/api\/users\/([^/]+)$/.exec(path)) && m === 'DELETE') {
+    if (user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบบัญชีผู้ใช้ได้');
+    const id = decodeURIComponent(r[1]);
+    if (id === user.id) fail(400, 'ไม่สามารถลบบัญชีของตัวเองได้');
+    const target = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(id).first();
+    if (!target) fail(404, 'ไม่พบผู้ใช้');
+    await env.DB.batch([env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id), env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id)]);
+    await audit(env, user, 'user', id, 'delete');
+    return json({ ok: true });
+  }
   if ((r = /^\/api\/users\/([^/]+)\/password$/.exec(path)) && m === 'POST') {
     if (!can(user, 'users')) fail(403, 'คุณไม่มีสิทธิ์จัดการผู้ใช้');
     const { password } = await readJson(req);

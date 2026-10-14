@@ -95,6 +95,7 @@ main{padding:28px 32px 48px;max-width:1440px;margin:0 auto}
 .btn.red{background:var(--red);color:#fff}.btn.red:hover{background:var(--red-d)}
 .btn.dark{background:var(--ink);color:#fff}.btn.dark:hover{background:#000}
 .btn.ghost{background:#fff;border-color:var(--line);color:var(--ink)}.btn.ghost:hover{border-color:#cfccc2}
+.btn.ghost.red{color:var(--red);border-color:#e6c3c5}.btn.ghost.red:hover{background:var(--red-tint);border-color:var(--red)}
 .btn.teal{background:var(--teal);color:#fff}
 .btn.soft{background:var(--teal-soft);color:var(--teal-d)}
 .btn.sm{height:34px;padding:0 14px;font-size:13px}

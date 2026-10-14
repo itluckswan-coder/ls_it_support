@@ -228,6 +228,12 @@
           this.applyDoc(d); changed = true;
         }
         for (const u of j.users) if (!this.userSnap[u.id] || u._v !== (Store.db.users.find(x => x.id === u.id) || {})._v) { this.applyUser(u); changed = true; }
+        if (j.userIds) {
+          // drop accounts deleted on the server (only ones the server already knew, never unsent new ones)
+          const live = new Set(j.userIds), db = Store.db;
+          const gone = db.users.filter(u => this.userSnap[u.id] && !live.has(u.id));
+          if (gone.length) { gone.forEach(u => delete this.userSnap[u.id]); db.users = db.users.filter(u => !gone.includes(u)); changed = true; }
+        }
         this.serverTime = j.serverTime;
         if (changed) { Store.write(); if (g.App) g.App.softRender(); }
       } catch (e) { /* retry next tick */ }
