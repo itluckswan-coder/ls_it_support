@@ -104,6 +104,8 @@ main{padding:28px 32px 48px;max-width:1440px;margin:0 auto}
 .link.red{color:var(--red)}
 .icon-btn{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:#fff}
 .icon-btn:hover{border-color:#cfccc2}
+.us-edit{width:28px;height:28px;flex:none;color:var(--muted)}
+.us-edit:hover{color:var(--red);border-color:var(--red)}
 .chip{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:13px;white-space:nowrap;color:var(--ink2)}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .chip.on-teal{background:var(--teal-soft);border-color:var(--teal-soft);color:var(--teal-d)}

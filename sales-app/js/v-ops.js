@@ -656,6 +656,8 @@
      ===================================================================== */
   const ROLE_CLS = { sales: 'r-sales', manager: 'r-manager', admin: 'r-admin', head: 'r-head', acc: 'r-acc' };
   const ST = { active: ['ใช้งานอยู่', 'st-confirmed'], invited: ['รอ', 'st-sent'], disabled: ['ปิดใช้', 'st-draft'] };
+  const depts = ['ฝ่ายขายและการตลาด', 'ผู้บริหาร', 'ครัว / F&B', 'จัดเลี้ยง', 'ช่าง / AV', 'ส่วนหน้า', 'แม่บ้าน', 'บัญชี'];
+  const PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const fmtLast = iso => {
     if (!iso) return 'ยังไม่เคยเข้า';
     const d = iso.slice(0, 10), t = U.today();
@@ -675,7 +677,6 @@
       if (!ui.draft || ui.draft.id !== u.id) ui.draft = JSON.parse(JSON.stringify(u));
       const dr = ui.draft;
       const cnt = r => db.users.filter(x => r === 'all' || x.role === r).length;
-      const depts = ['ฝ่ายขายและการตลาด', 'ผู้บริหาร', 'ครัว / F&B', 'จัดเลี้ยง', 'ช่าง / AV', 'ส่วนหน้า', 'แม่บ้าน', 'บัญชี'];
       return `
 <div class="page-hd"><div><h1>ผู้ใช้งาน</h1><div class="small muted">${db.users.length} คน · ใช้งานอยู่ ${db.users.filter(x => x.status === 'active').length} · รอ ${db.users.filter(x => x.status === 'invited').length} · ปิดใช้ ${db.users.filter(x => x.status === 'disabled').length}</div></div>
   ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="usCsv">นำเข้าจากไฟล์ CSV</button><button class="btn red" data-act="usInvite">+ เพิ่มผู้ใช้งาน</button></div>' : ''}</div>
@@ -688,7 +689,7 @@
   <section class="card" style="overflow:hidden">
     <table class="tbl resp"><thead><tr><th>ผู้ใช้</th><th>บทบาท</th><th>แผนก</th><th>เข้าใช้ล่าสุด</th><th class="r">สถานะ</th></tr></thead><tbody>
     ${rows.map(x => `<tr class="click" data-act="usSel" data-v="${x.id}" style="${x.id === u.id ? 'background:var(--red-tint);box-shadow:inset 3px 0 var(--red)' : ''};${x.status === 'disabled' ? 'opacity:.55' : ''}">
-      <td><div class="row"><span class="avatar sm" style="background:${x.role === 'admin' ? 'var(--ink)' : x.role === 'head' ? 'var(--yellow-soft)' : x.role === 'acc' ? 'var(--navy-soft)' : x.role === 'manager' ? 'var(--red-soft)' : 'var(--teal-soft)'};color:${x.role === 'admin' ? 'var(--yellow)' : 'var(--ink)'}">${H(U.initials(x.name))}</span><div style="min-width:0"><div style="font-weight:500">${H(x.name)}</div><div class="sub" style="overflow:hidden;text-overflow:ellipsis">${H(x.email)}</div></div></div></td>
+      <td><div class="row"><span class="avatar sm" style="background:${x.role === 'admin' ? 'var(--ink)' : x.role === 'head' ? 'var(--yellow-soft)' : x.role === 'acc' ? 'var(--navy-soft)' : x.role === 'manager' ? 'var(--red-soft)' : 'var(--teal-soft)'};color:${x.role === 'admin' ? 'var(--yellow)' : 'var(--ink)'}">${H(U.initials(x.name))}</span><div style="min-width:0"><div class="row" style="gap:6px;flex-wrap:nowrap"><span style="font-weight:500">${H(x.name)}</span>${canEdit ? `<button class="icon-btn us-edit" data-act="usEdit" data-v="${x.id}" title="แก้ไขข้อมูลผู้ใช้" aria-label="แก้ไขข้อมูล ${H(x.name)}">${PENCIL}</button>` : ''}</div><div class="sub" style="overflow:hidden;text-overflow:ellipsis">${H(x.email)}</div></div></div></td>
       <td class="hide-m"><span class="role-badge ${ROLE_CLS[x.role]}">${H(D.ROLES.find(r => r.id === x.role).name)}</span></td><td class="hide-m">${H(x.dept)}</td><td class="hide-m small">${fmtLast(x.lastLogin)}</td>
       <td class="r"><span class="badge ${ST[x.status][1]}">${ST[x.status][0]}</span></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">ไม่พบผู้ใช้</div></td></tr>'}
     </tbody></table>
@@ -730,6 +731,58 @@
       const u = Store.db.users.find(x => x.id === UU().sel);
       const run = () => { u.status = u.status === 'disabled' ? 'active' : 'disabled'; Store.save(); UU().draft = null; App.render(); };
       if (u.status !== 'disabled') App.confirm('ปิดใช้งานบัญชี ' + u.name + '?', run, 'ปิดใช้งาน'); else run();
+    },
+    usEdit(el) {
+      const u = Store.db.users.find(x => x.id === el.dataset.v), me = App.me();
+      if (!u) return;
+      if (u.role === 'admin' && me.role !== 'admin') { App.toast('เฉพาะผู้ดูแลระบบที่แก้ไขข้อมูลของผู้ดูแลระบบได้'); return; }
+      UU().sel = u.id; UU().draft = null; App.render();
+      const self = u.id === me.id, d = JSON.parse(JSON.stringify(u));
+      const roles = D.ROLES.filter(r => r.id !== 'admin' || me.role === 'admin' || u.role === 'admin');
+      const permsHtml = () => D.PERMS.map(p => `<div class="perm"><div><div>${H(p.name)}</div>${p.note ? `<div class="xs muted">${H(p.note)}</div>` : ''}</div>${App.sw(p.name, d.perms[p.id], `data-perm="${p.id}"`)}</div>`).join('');
+      App.modal(`<h2>แก้ไขข้อมูลผู้ใช้งาน</h2><p class="muted" style="margin-top:-8px">${H(u.name)} · รหัส ${H(u.id)}</p>
+        <div class="field"><label class="f" for="ueName">ชื่อ-นามสกุล</label><input class="input" id="ueName" name="name" value="${H(u.name)}"></div>
+        <div class="grid g2" style="margin-top:14px">
+          <div><label class="f" for="ueEmail">อีเมล (ใช้เข้าสู่ระบบ)</label><input class="input" id="ueEmail" type="email" name="email" value="${H(u.email)}" autocomplete="off"></div>
+          <div><label class="f" for="uePhone">เบอร์โทร</label><input class="input" id="uePhone" type="tel" name="phone" value="${H(u.phone || '')}"></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div><label class="f" for="ueRole">บทบาท</label><select class="input" id="ueRole" name="role">${roles.map(r => `<option value="${r.id}" ${r.id === u.role ? 'selected' : ''}>${r.name}</option>`).join('')}</select></div>
+          <div><label class="f" for="ueDept">แผนก</label><input class="input" id="ueDept" name="dept" value="${H(u.dept || '')}" list="ueDepts"><datalist id="ueDepts">${depts.map(x => `<option value="${H(x)}">`).join('')}</datalist></div>
+        </div>
+        <div class="grid g2" style="margin-top:14px">
+          <div><label class="f" for="ueStatus">สถานะ</label><select class="input" id="ueStatus" name="status" ${self ? 'disabled' : ''}>${Object.entries(ST).map(([k, v]) => `<option value="${k}" ${k === u.status ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></div>
+          <div><label class="f">ยืนยันตัวตน 2 ขั้นตอน</label><div style="padding-top:8px">${App.sw('ยืนยันตัวตน 2 ขั้นตอน', d.twoFA, 'id="ue2fa"')}</div></div>
+        </div>
+        <div class="small muted" style="margin:16px 0 4px">สิทธิ์การใช้งาน <span class="xs">(เปลี่ยนบทบาทแล้วสิทธิ์จะตั้งตามบทบาทใหม่ ปรับต่อได้)</span></div>
+        <div id="uePerms">${permsHtml()}</div>
+        <button type="button" class="link" id="uePw" style="margin-top:12px">เปลี่ยนรหัสผ่าน…</button>
+        <div class="small red" id="ueErr" style="min-height:20px;margin-top:6px" role="alert"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ueOk">บันทึก</button></div>`, bg => {
+        const err = bg.querySelector('#ueErr'), box = bg.querySelector('#uePerms');
+        const bindPerms = () => box.querySelectorAll('[data-perm]').forEach(i => { i.onchange = () => { d.perms[i.dataset.perm] = i.checked; }; });
+        bindPerms();
+        bg.querySelector('#ueRole').onchange = e => { d.perms = Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[e.target.value].includes(p.id)])); box.innerHTML = permsHtml(); bindPerms(); };
+        bg.querySelector('#ue2fa').onchange = e => { d.twoFA = e.target.checked; };
+        bg.querySelector('#uePw').onclick = () => { App.closeModal(); App.ACT.usResetPw(); };
+        bg.querySelector('#ueOk').onclick = async e => {
+          const f = App.formData(bg), btn = e.currentTarget;
+          f.name = (f.name || '').trim(); f.email = (f.email || '').trim(); f.dept = (f.dept || '').trim();
+          if (!f.name) { err.textContent = 'กรุณากรอกชื่อ'; return; }
+          if (!/.+@.+\..+/.test(f.email)) { err.textContent = 'อีเมลไม่ถูกต้อง'; return; }
+          if (Store.db.users.some(x => x.id !== u.id && x.email.toLowerCase() === f.email.toLowerCase())) { err.textContent = 'อีเมลนี้มีผู้ใช้อยู่แล้ว'; return; }
+          if (self && !d.perms.users) { err.textContent = 'ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้'; return; }
+          const next = Object.assign({}, u, { name: f.name, email: f.email, phone: (f.phone || '').trim(), role: f.role, dept: f.dept || u.dept, status: self ? u.status : f.status, perms: d.perms, twoFA: d.twoFA });
+          btn.disabled = true;
+          try {
+            if (g.API && g.API.online) {
+              const j = await g.API.req('PUT', 'users/' + encodeURIComponent(u.id), { data: next, version: u._v || 0 });
+              g.API.applyUser(j.user); Store.write();
+            } else { Object.assign(u, next); Store.save(); }
+          } catch (x) { err.textContent = x.message; btn.disabled = false; return; }
+          App.closeModal(); UU().draft = null; App.render(); App.toast('บันทึกข้อมูลของ ' + f.name + ' แล้ว');
+        };
+      });
     },
     usResetPw() {
       const u = Store.db.users.find(x => x.id === UU().sel), me = App.me();
