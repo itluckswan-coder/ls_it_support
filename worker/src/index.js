@@ -228,8 +228,9 @@ async function getImage(env, id) {
 /* ---------------- users ---------------- */
 async function putUser(req, env, user, id) {
   if (!can(user, 'users')) fail(403, 'คุณไม่มีสิทธิ์จัดการผู้ใช้');
-  const { data, version } = await readJson(req);
+  const { data, version, password } = await readJson(req);
   if (!data || !/.+@.+\..+/.test(String(data.email || ''))) fail(400, 'อีเมลไม่ถูกต้อง');
+  if (password != null && (String(password).length < 6 || String(password).length > 128)) fail(400, 'รหัสผ่านต้องมี 6–128 ตัวอักษร');
   if (!['sales', 'manager', 'head', 'acc', 'admin'].includes(data.role)) fail(400, 'บทบาทไม่ถูกต้อง');
   if (data.role === 'admin' && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ตั้งผู้ดูแลระบบได้');
   const row = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
@@ -244,7 +245,7 @@ async function putUser(req, env, user, id) {
     await env.DB.prepare('UPDATE users SET email = ?, data = ?, version = version + 1, updated_at = ? WHERE id = ?').bind(data.email, JSON.stringify(clean), now(), id).run();
     if (clean.status === 'disabled') await env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id).run();
   } else {
-    const pw = await hashPassword(env.DEFAULT_PASSWORD || 'luckswan');
+    const pw = await hashPassword(password != null ? String(password) : (env.DEFAULT_PASSWORD || 'luckswan'));
     await env.DB.prepare('INSERT INTO users (id, email, data, pw_hash, pw_salt, version, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?)').bind(id, data.email, JSON.stringify(clean), pw.hash, pw.salt, now()).run();
   }
   await audit(env, user, 'user', id, row ? 'update' : 'create');

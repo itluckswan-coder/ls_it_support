@@ -743,18 +743,43 @@
     usInvite() {
       App.modal(`<h2>เพิ่มผู้ใช้งาน</h2>
         <div class="field"><label class="f">ชื่อ-นามสกุล</label><input class="input" name="name"></div>
-        <div class="field"><label class="f">อีเมล</label><input class="input" type="email" name="email" placeholder="name@luckswangroup.com"></div>
+        <div class="field"><label class="f">อีเมล</label><input class="input" type="email" name="email" placeholder="name@luckswangroup.com" autocomplete="off"></div>
         <div class="field"><label class="f">เบอร์โทร</label><input class="input" type="tel" name="phone"></div>
         <div class="grid g2" style="margin-top:14px"><div><label class="f">บทบาท</label><select class="input" name="role">${D.ROLES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}</select></div><div><label class="f">แผนก</label><input class="input" name="dept" value="ฝ่ายขายและการตลาด"></div></div>
-        <div class="small red" id="invErr"></div>
+        <div class="grid g2" style="margin-top:14px">
+          <div><label class="f" for="nuPw">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label><div class="pw-wrap"><input class="input" id="nuPw" name="pw" type="password" autocomplete="new-password"><button type="button" id="nuShow">แสดง</button></div></div>
+          <div><label class="f" for="nuPw2">ยืนยันรหัสผ่าน</label><input class="input" id="nuPw2" name="pw2" type="password" autocomplete="new-password"></div>
+        </div>
+        <button type="button" class="link" id="nuGen" style="margin-top:8px">สุ่มรหัสผ่านให้</button>
+        <div class="small red" id="invErr" style="min-height:20px;margin-top:6px" role="alert"></div>
         <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">เพิ่มผู้ใช้งาน</button></div>`, bg => {
-        bg.querySelector('#ok').onclick = () => {
-          const f = App.formData(bg);
-          if (!f.name || !/.+@.+\..+/.test(f.email)) { bg.querySelector('#invErr').textContent = 'กรุณากรอกชื่อและอีเมลให้ถูกต้อง'; return; }
-          if (Store.db.users.some(u => u.email.toLowerCase() === f.email.toLowerCase())) { bg.querySelector('#invErr').textContent = 'อีเมลนี้มีอยู่แล้ว'; return; }
-          const u = addUser(f); Store.save(); App.closeModal(); UU().sel = u.id; UU().draft = null; App.render();
-          App.modal(`<h2>เพิ่ม ${H(u.name)} แล้ว</h2><p class="muted">ส่งข้อมูลนี้ให้ผู้ใช้เพื่อเข้าสู่ระบบครั้งแรก:</p><div class="card pad small">ลิงก์: ${H(location.href.split('#')[0])}<br>อีเมล: ${H(u.email)}<br>รหัสผ่านเริ่มต้น: <b class="mono">${H(D.DEFAULT_PW)}</b></div>
-            <div class="acts"><a class="btn ghost" href="mailto:${encodeURIComponent(u.email)}?subject=${encodeURIComponent('เชิญเข้าใช้ระบบฝ่ายขาย ลักษวรรณ รีสอร์ต')}&body=${encodeURIComponent('ลิงก์: ' + location.href.split('#')[0] + '\nอีเมล: ' + u.email + '\nรหัสผ่านเริ่มต้น: ' + D.DEFAULT_PW + '\nกรุณาเปลี่ยนรหัสผ่านหลังเข้าสู่ระบบ')}">ส่งอีเมลเชิญ</a><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
+        const pw = bg.querySelector('#nuPw'), pw2 = bg.querySelector('#nuPw2'), show = bg.querySelector('#nuShow'), err = bg.querySelector('#invErr');
+        const setShown = on => { pw.type = pw2.type = on ? 'text' : 'password'; show.textContent = on ? 'ซ่อน' : 'แสดง'; };
+        show.onclick = () => setShown(pw.type === 'password');
+        bg.querySelector('#nuGen').onclick = () => {
+          const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint32Array(10));
+          pw.value = pw2.value = Array.from(r, x => abc[x % abc.length]).join(''); setShown(true); err.textContent = '';
+        };
+        bg.querySelector('#ok').onclick = async e => {
+          const f = App.formData(bg), btn = e.currentTarget;
+          f.name = f.name.trim(); f.email = f.email.trim();
+          if (!f.name || !/.+@.+\..+/.test(f.email)) { err.textContent = 'กรุณากรอกชื่อและอีเมลให้ถูกต้อง'; return; }
+          if (Store.db.users.some(u => u.email.toLowerCase() === f.email.toLowerCase())) { err.textContent = 'อีเมลนี้มีอยู่แล้ว'; return; }
+          if (f.pw.length < 6) { err.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; return; }
+          if (f.pw !== f.pw2) { err.textContent = 'รหัสผ่านทั้งสองช่องไม่ตรงกัน'; return; }
+          const u = makeUser(f);
+          btn.disabled = true;
+          try {
+            if (g.API && g.API.online) {
+              // create on the server directly so the password goes with it (never stored in the local cache)
+              const j = await g.API.req('PUT', 'users/' + encodeURIComponent(u.id), { data: u, version: 0, password: f.pw });
+              g.API.applyUser(j.user); Store.write();
+            } else { u.pw = await g.hashPw(f.pw); Store.db.users.push(u); Store.save(); }
+          } catch (x) { err.textContent = x.message; btn.disabled = false; return; }
+          App.closeModal(); UU().sel = u.id; UU().draft = null; App.render();
+          const link = location.href.split('#')[0];
+          App.modal(`<h2>เพิ่ม ${H(u.name)} แล้ว</h2><p class="muted">แจ้งข้อมูลนี้ให้ผู้ใช้ และแจ้งรหัสผ่านที่ตั้งไว้แยกต่างหาก (เช่น บอกด้วยตัวเองหรือทาง LINE ส่วนตัว)</p><div class="card pad small">ลิงก์: ${H(link)}<br>อีเมล: ${H(u.email)}</div>
+            <div class="acts"><a class="btn ghost" href="mailto:${encodeURIComponent(u.email)}?subject=${encodeURIComponent('บัญชีเข้าใช้ระบบฝ่ายขาย ลักษวรรณ รีสอร์ต')}&body=${encodeURIComponent('ลิงก์: ' + link + '\nอีเมล: ' + u.email + '\nรหัสผ่าน: ตามที่ผู้ดูแลระบบแจ้ง\nกรุณาเปลี่ยนรหัสผ่านหลังเข้าสู่ระบบ (เมนูรูปโปรไฟล์ → เปลี่ยนรหัสผ่าน)')}">ส่งอีเมลแจ้งผู้ใช้</a><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
         };
       });
     },
@@ -780,12 +805,12 @@
     },
     usCsvTpl() { U.download('users-template.csv', '﻿ชื่อ,อีเมล,บทบาท,แผนก,เบอร์โทร\nสมหญิง ใจดี,somying@luckswangroup.com,sales,ฝ่ายขายและการตลาด,081-000-0000\n', 'text/csv'); }
   });
-  function addUser(f) {
+  function makeUser(f) {
     const ids = Store.db.users.map(u => parseInt(u.id.slice(1), 10) || 0);
-    const u = { id: 'u' + (Math.max(0, ...ids) + 1), name: f.name, email: f.email, role: f.role, dept: f.dept, status: 'invited', phone: f.phone || '', lastLogin: null,
+    return { id: 'u' + (Math.max(0, ...ids) + 1), name: f.name, email: f.email, role: f.role, dept: f.dept, status: 'invited', phone: f.phone || '', lastLogin: null,
       perms: Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[f.role].includes(p.id)])), twoFA: false, pw: null };
-    Store.db.users.push(u); return u;
   }
+  function addUser(f) { const u = makeUser(f); Store.db.users.push(u); return u; }
   Object.assign(App.CHG, {
     usQ(el) { UU().q = el.value; UU().page = 1; App.render(); },
     usDept(el) { UU().draft.dept = el.value; },
