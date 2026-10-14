@@ -655,7 +655,7 @@
      USERS (1m)
      ===================================================================== */
   const ROLE_CLS = { sales: 'r-sales', manager: 'r-manager', admin: 'r-admin', head: 'r-head', acc: 'r-acc' };
-  const ST = { active: ['ใช้งานอยู่', 'st-confirmed'], invited: ['รอเชิญ', 'st-sent'], disabled: ['ปิดใช้', 'st-draft'] };
+  const ST = { active: ['ใช้งานอยู่', 'st-confirmed'], invited: ['รอ', 'st-sent'], disabled: ['ปิดใช้', 'st-draft'] };
   const fmtLast = iso => {
     if (!iso) return 'ยังไม่เคยเข้า';
     const d = iso.slice(0, 10), t = U.today();
@@ -677,7 +677,7 @@
       const cnt = r => db.users.filter(x => r === 'all' || x.role === r).length;
       const depts = ['ฝ่ายขายและการตลาด', 'ผู้บริหาร', 'ครัว / F&B', 'จัดเลี้ยง', 'ช่าง / AV', 'ส่วนหน้า', 'แม่บ้าน', 'บัญชี'];
       return `
-<div class="page-hd"><div><h1>ผู้ใช้งาน</h1><div class="small muted">${db.users.length} คน · ใช้งานอยู่ ${db.users.filter(x => x.status === 'active').length} · รอเชิญ ${db.users.filter(x => x.status === 'invited').length} · ปิดใช้ ${db.users.filter(x => x.status === 'disabled').length}</div></div>
+<div class="page-hd"><div><h1>ผู้ใช้งาน</h1><div class="small muted">${db.users.length} คน · ใช้งานอยู่ ${db.users.filter(x => x.status === 'active').length} · รอ ${db.users.filter(x => x.status === 'invited').length} · ปิดใช้ ${db.users.filter(x => x.status === 'disabled').length}</div></div>
   ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="usCsv">นำเข้าจากไฟล์ CSV</button><button class="btn red" data-act="usInvite">+ เพิ่มผู้ใช้งาน</button></div>' : ''}</div>
 <div class="row wrap" style="margin-bottom:16px">
   <input class="input" style="max-width:260px;border-radius:999px" placeholder="ค้นหาชื่อ อีเมล…" value="${H(ui.q)}" data-change="usQ" aria-label="ค้นหาผู้ใช้">
