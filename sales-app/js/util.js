@@ -14,7 +14,9 @@
     // date <-> ISO yyyy-mm-dd (local)
     d(iso) { const [y, m, dd] = String(iso).split('-').map(Number); return new Date(y, m - 1, dd); },
     iso(dt) { const p = n => String(n).padStart(2, '0'); return dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate()); },
-    today() { return U.iso(new Date()); },
+    // all timestamps are Thailand time (UTC+7), whatever the device's own time zone is
+    nowTH() { return new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 19); },
+    today() { return U.nowTH().slice(0, 10); },
     addDays(iso, n) { const x = U.d(iso); x.setDate(x.getDate() + n); return U.iso(x); },
     diffDays(a, b) { return Math.round((U.d(b) - U.d(a)) / 864e5); },
     be(y) { return y + 543; },

@@ -302,7 +302,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     qDup() {
       const q = cur(), n = JSON.parse(JSON.stringify(q));
       n.id = Store.nextId('QT'); n.status = 'draft'; n.history = []; n.views = 0; n.approval = null; n.holdUntil = '';
-      n.createdAt = n.updatedAt = new Date().toISOString().slice(0, 19);
+      n.createdAt = n.updatedAt = U.nowTH();
       n.items.forEach(i => i.id = U.uid('i'));
       n.history.unshift({ at: n.createdAt, t: 'สร้างจากสำเนา ' + q.id });
       Store.db.quotes.push(n); Store.save(); App.toast('ทำสำเนาเป็น ' + n.id); App.go('#/quote/' + qid(n.id));
@@ -610,7 +610,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       if (!q.title.trim() || !q.client.trim()) { w.step = 1; App.render(); App.toast('กรุณากรอกชื่องานและชื่อลูกค้า'); return; }
       wizBuild(w);
       q.id = Store.nextId('QT'); q.owner = App.state.uid; q.room = w.sel.room;
-      q.createdAt = q.updatedAt = new Date().toISOString().slice(0, 19);
+      q.createdAt = q.updatedAt = U.nowTH();
       q.history = [{ at: q.createdAt, t: 'สร้างใบเสนอราคา', by: App.me().name }];
       if (q.discount.value > 10) q.approval = App.can('discount_over') ? 'approved' : 'pending';
       Store.db.quotes.push(q); Store.save(); App.state.wiz = null; App.setCtx(q.id);

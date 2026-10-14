@@ -9,7 +9,7 @@ const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog'];
 const MAX_IMAGE_BYTES = 1500000;
 
 /* ---------------- helpers ---------------- */
-const now = () => new Date().toISOString().slice(0, 19);
+const now = () => new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 19); // Thailand time (UTC+7)
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }
 });
