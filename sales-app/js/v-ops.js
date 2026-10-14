@@ -425,6 +425,8 @@
   /* =====================================================================
      STAFF SHIFTS (1l)
      ===================================================================== */
+  const PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
   const EMP = id => Store.db.employees.find(e => e.id === id);
   function genPlan(q) {
     const days = {}, pax = q.pax;
@@ -446,6 +448,43 @@
   App.V.staff = {
     title: 'พนักงาน',
     render(p) {
+      const tab = App.state.ui.staffTab || 'shifts';
+      const tabs = `<div class="seg white" style="margin-bottom:18px" role="tablist"><button role="tab" class="${tab === 'shifts' ? 'on' : ''}" data-act="stTab" data-v="shifts">รอบพนักงาน</button><button role="tab" class="${tab === 'emps' ? 'on' : ''}" data-act="stTab" data-v="emps">พนักงานทั้งหมด</button></div>`;
+      return tabs + (tab === 'emps' ? App.V.staff.renderEmps() : App.V.staff.renderShifts(p));
+    },
+    /* ---- employee directory: add / edit / delete per department ---- */
+    renderEmps() {
+      const db = Store.db, canEdit = App.can('staff');
+      const ui = App.state.ui.emps || (App.state.ui.emps = { q: '', dept: 'all', page: 1 });
+      const list = db.employees.filter(e => (ui.dept === 'all' || e.dept === ui.dept) && (!ui.q || (e.name + ' ' + (e.role || '') + ' ' + (e.phone || '')).toLowerCase().includes(ui.q.toLowerCase())))
+        .sort((a, b) => D.DEPTS.findIndex(d => d.id === a.dept) - D.DEPTS.findIndex(d => d.id === b.dept) || a.name.localeCompare(b.name, 'th'));
+      const per = 15, pages = Math.max(1, Math.ceil(list.length / per)); ui.page = Math.min(ui.page, pages);
+      const rows = list.slice((ui.page - 1) * per, ui.page * per);
+      const cnt = d => db.employees.filter(e => d === 'all' || e.dept === d).length;
+      return `
+<div class="page-hd"><div><h1>พนักงานทั้งหมด</h1><div class="small muted">${db.employees.length} คน · ${D.DEPTS.filter(d => cnt(d.id)).map(d => d.short + ' ' + cnt(d.id)).join(' · ')}</div></div>
+  ${canEdit ? '<div class="row wrap"><button class="btn red" data-act="empNew">+ เพิ่มพนักงาน</button></div>' : ''}</div>
+<div class="row wrap" style="margin-bottom:16px">
+  <input class="input" style="max-width:260px;border-radius:999px" placeholder="ค้นหาชื่อ ตำแหน่ง เบอร์โทร…" value="${H(ui.q)}" data-change="empQ" aria-label="ค้นหาพนักงาน">
+  <button class="chip ${ui.dept === 'all' ? 'on' : ''}" data-act="empDept" data-v="all">ทั้งหมด <span class="n">${cnt('all')}</span></button>
+  ${D.DEPTS.map(d => `<button class="chip ${ui.dept === d.id ? 'on' : ''}" data-act="empDept" data-v="${d.id}">${H(d.short)} <span class="n">${cnt(d.id)}</span></button>`).join('')}
+</div>
+<section class="card" style="overflow:hidden">
+  <table class="tbl resp"><thead><tr><th>พนักงาน</th><th>ตำแหน่ง</th><th>แผนก</th><th>เบอร์โทร</th><th class="r">ชม.สะสม/สัปดาห์</th>${canEdit ? '<th class="r">จัดการ</th>' : ''}</tr></thead><tbody>
+  ${rows.map(e => { const dp = dept(e.dept); return `<tr>
+    <td><div class="row"><span class="avatar sm" style="background:${dp.bg};color:${dp.fg}">${H(U.initials(e.name))}</span><div style="min-width:0"><div style="font-weight:500">${H(e.name)}</div><div class="sub">${H(e.role || '-')} · ${H(dp.short)}</div></div></div></td>
+    <td class="hide-m">${H(e.role || '-')}</td>
+    <td class="hide-m"><span class="role-badge" style="background:${dp.bg};color:${dp.fg}">${H(dp.short)}</span></td>
+    <td class="hide-m small">${H(e.phone || '-')}</td>
+    <td class="r hide-m">${Number(e.hours) || 0} ชม.</td>
+    ${canEdit ? `<td class="r"><div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:nowrap"><button class="icon-btn us-edit" data-act="empEdit" data-v="${e.id}" title="แก้ไข" aria-label="แก้ไข ${H(e.name)}">${PENCIL}</button><button class="icon-btn us-edit emp-del" data-act="empDel" data-v="${e.id}" title="ลบ" aria-label="ลบ ${H(e.name)}">${TRASH}</button></div></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="6"><div class="empty">${db.employees.length ? 'ไม่พบพนักงาน' : 'ยังไม่มีรายชื่อพนักงาน — กด “+ เพิ่มพนักงาน”'}</div></td></tr>`}
+  </tbody></table>
+  <div class="between" style="padding:14px 22px;border-top:1px solid var(--line)"><span class="small muted">แสดง ${list.length ? (ui.page - 1) * per + 1 : 0}–${Math.min(ui.page * per, list.length)} จาก ${list.length} คน</span>
+    <div class="pager"><button data-act="empPage" data-v="${ui.page - 1}" ${ui.page <= 1 ? 'disabled' : ''} aria-label="ก่อนหน้า">‹</button>${Array.from({ length: pages }, (_, i) => `<button class="${ui.page === i + 1 ? 'on' : ''}" data-act="empPage" data-v="${i + 1}">${i + 1}</button>`).join('')}<button data-act="empPage" data-v="${ui.page + 1}" ${ui.page >= pages ? 'disabled' : ''} aria-label="ถัดไป">›</button></div></div>
+</section>
+${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูรายชื่อได้อย่างเดียว — การเพิ่ม/แก้ไข/ลบพนักงานต้องใช้สิทธิ์ “จัดรอบพนักงาน / อนุมัติต่อรอบ”</div>'}`;
+    },
+    renderShifts(p) {
       const db = Store.db;
       const candidates = db.quotes.filter(q => q.status !== 'cancelled' && q.status !== 'draft').sort((a, b) => a.start.localeCompare(b.start));
       const q = Store.quote(p[0]) || Store.quote(App.state.ui.staffQ) || candidates.find(x => db.staff[x.id]) || candidates[0];
@@ -643,6 +682,77 @@
       }, 'จัดวันหยุด');
     }
   });
+  const POSITIONS = { kitchen: ['เชฟ', 'ผู้ช่วยเชฟ', 'พนักงานครัว'], banquet: ['หัวหน้าจัดเลี้ยง', 'พนักงานจัดเลี้ยง'], av: ['หัวหน้าช่าง', 'ช่างเทคนิค'], front: ['หัวหน้าส่วนหน้า', 'พนักงานต้อนรับ'], hk: ['หัวหน้าแม่บ้าน', 'แม่บ้าน'], acc: ['หัวหน้าบัญชี', 'พนักงานบัญชี'] };
+  function empForm(e) {
+    const isNew = !e.id;
+    App.modal(`<h2>${isNew ? 'เพิ่มพนักงาน' : 'แก้ไขข้อมูลพนักงาน'}</h2>${isNew ? '' : `<p class="muted" style="margin-top:-8px">${H(e.name)} · รหัส ${H(e.id)}</p>`}
+      <div class="field"><label class="f" for="emName">ชื่อ-นามสกุล</label><input class="input" id="emName" name="name" value="${H(e.name || '')}"></div>
+      <div class="grid g2" style="margin-top:14px">
+        <div><label class="f" for="emDept">แผนก</label><select class="input" id="emDept" name="dept">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === e.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select></div>
+        <div><label class="f" for="emRole">ตำแหน่ง</label><input class="input" id="emRole" name="role" value="${H(e.role || '')}" list="emRoles" placeholder="เช่น พนักงานครัว"><datalist id="emRoles"></datalist></div>
+      </div>
+      <div class="grid g2" style="margin-top:14px">
+        <div><label class="f" for="emPhone">เบอร์โทร</label><input class="input" id="emPhone" type="tel" name="phone" value="${H(e.phone || '')}"></div>
+        <div><label class="f" for="emHours">ชั่วโมงทำงานสะสม/สัปดาห์</label><input class="input" id="emHours" type="number" min="0" max="168" step="1" name="hours" value="${Number(e.hours) || 0}"></div>
+      </div>
+      <div class="small red" id="emErr" style="min-height:20px;margin-top:6px" role="alert"></div>
+      <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="emOk">${isNew ? 'เพิ่มพนักงาน' : 'บันทึก'}</button></div>`, bg => {
+      const sel = bg.querySelector('#emDept'), dl = bg.querySelector('#emRoles');
+      const fill = () => {
+        const used = Store.db.employees.filter(x => x.dept === sel.value).map(x => x.role).filter(Boolean);
+        dl.innerHTML = [...new Set((POSITIONS[sel.value] || []).concat(used))].map(r => `<option value="${H(r)}">`).join('');
+      };
+      fill(); sel.onchange = fill;
+      bg.querySelector('#emOk').onclick = () => {
+        const f = App.formData(bg), err = bg.querySelector('#emErr');
+        f.name = f.name.trim(); f.role = f.role.trim(); f.phone = f.phone.trim();
+        if (!f.name) { err.textContent = 'กรุณากรอกชื่อพนักงาน'; return; }
+        if (!f.role) { err.textContent = 'กรุณากรอกตำแหน่ง'; return; }
+        if (Store.db.employees.some(x => x.id !== e.id && x.name.replace(/\s+/g, ' ') === f.name.replace(/\s+/g, ' ') && x.dept === f.dept)) { err.textContent = 'มีพนักงานชื่อนี้ในแผนกนี้อยู่แล้ว'; return; }
+        const hours = Math.max(0, Math.min(168, Math.round(Number(f.hours) || 0)));
+        const db = Store.db;
+        if (isNew) {
+          const ids = db.employees.map(x => parseInt(String(x.id).slice(1), 10) || 0);
+          db.employees.push({ id: 'e' + (Math.max(0, ...ids) + 1), name: f.name, dept: f.dept, role: f.role, phone: f.phone, hours });
+        } else {
+          const cur = db.employees.find(x => x.id === e.id); if (!cur) { App.closeModal(); return; }
+          // moving to another department takes the person off that department's old shifts
+          if (cur.dept !== f.dept) unassign(cur.id);
+          Object.assign(cur, { name: f.name, dept: f.dept, role: f.role, phone: f.phone, hours });
+        }
+        Store.save(); App.closeModal(); App.render(); App.toast(isNew ? 'เพิ่ม ' + f.name + ' แล้ว' : 'บันทึกแล้ว');
+      };
+    });
+  }
+  // remove an employee from every shift and OT request in all plans
+  function unassign(id) {
+    for (const plan of Object.values(Store.db.staff)) {
+      for (const day of Object.values(plan.days || {})) for (const s of Object.values(day).flat()) s.staff = s.staff.filter(x => x !== id);
+      for (const o of plan.ot || []) o.staff = o.staff.filter(x => x !== id);
+    }
+  }
+  Object.assign(App.ACT, {
+    stTab(el) { App.state.ui.staffTab = el.dataset.v; App.render(); },
+    empDept(el) { App.state.ui.emps.dept = el.dataset.v; App.state.ui.emps.page = 1; App.render(); },
+    empPage(el) { App.state.ui.emps.page = Number(el.dataset.v); App.render(); },
+    empNew() {
+      if (!App.can('staff')) return;
+      const d = App.state.ui.emps && App.state.ui.emps.dept;
+      empForm({ dept: d && d !== 'all' ? d : D.DEPTS[0].id, hours: 0 });
+    },
+    empEdit(el) { const e = Store.db.employees.find(x => x.id === el.dataset.v); if (e && App.can('staff')) empForm(e); },
+    empDel(el) {
+      const e = Store.db.employees.find(x => x.id === el.dataset.v); if (!e || !App.can('staff')) return;
+      const used = Object.values(Store.db.staff).some(p => Object.values(p.days || {}).some(day => Object.values(day).flat().some(s => s.staff.includes(e.id))));
+      App.modal(`<h2>ลบพนักงานคนนี้?</h2><p class="muted" style="margin-top:-8px">${H(e.name)} · ${H(e.role || '')} · ${H(dept(e.dept).short)}</p>
+        <p class="small">${used ? 'พนักงานคนนี้ถูกจัดอยู่ในรอบงาน — เมื่อลบ ชื่อจะถูกเอาออกจากทุกรอบและคำขอต่อรอบด้วย ' : ''}ลบแล้วกู้คืนไม่ได้</p>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="emDelOk">ลบพนักงาน</button></div>`, bg => bg.querySelector('#emDelOk').onclick = () => {
+        unassign(e.id); Store.db.employees = Store.db.employees.filter(x => x.id !== e.id);
+        Store.save(); App.closeModal(); App.render(); App.toast('ลบ ' + e.name + ' แล้ว');
+      });
+    }
+  });
+  App.CHG.empQ = el => { App.state.ui.emps.q = el.value; App.state.ui.emps.page = 1; App.render(); };
   App.CHG.stOtShift = el => { const o = curOt(); const [dp, sid] = el.value.split('|'); o.dept = dp; o.shiftId = sid; o.staff = []; persistOt(o); App.render(); };
   App.CHG.stOtReason = el => { const o = curOt(); o.reason = el.value; persistOt(o); };
   function persistOt(o, force) {
@@ -657,7 +767,6 @@
   const ROLE_CLS = { sales: 'r-sales', manager: 'r-manager', admin: 'r-admin', head: 'r-head', acc: 'r-acc' };
   const ST = { active: ['ใช้งานอยู่', 'st-confirmed'], invited: ['รอ', 'st-sent'], disabled: ['ปิดใช้', 'st-draft'] };
   const depts = ['ฝ่ายขายและการตลาด', 'ผู้บริหาร', 'ครัว / F&B', 'จัดเลี้ยง', 'ช่าง / AV', 'ส่วนหน้า', 'แม่บ้าน', 'บัญชี'];
-  const PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const fmtLast = iso => {
     if (!iso) return 'ยังไม่เคยเข้า';
     const d = iso.slice(0, 10), t = U.today();
