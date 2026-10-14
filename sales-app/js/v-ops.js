@@ -428,7 +428,20 @@
   const PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
   const EMP = id => Store.db.employees.find(e => e.id === id);
+  // staffing rules by guest count: { dept: [{ upTo: 50, n: 1 }, …, { upTo: null, n: 4 }] } — n people per shift
+  const DEFAULT_RULES = { kitchen: [{ upTo: 50, n: 1 }, { upTo: 100, n: 2 }, { upTo: 150, n: 3 }, { upTo: null, n: 4 }] };
+  const staffRules = () => (Store.db.settings && Store.db.settings.staffRules) || DEFAULT_RULES;
+  const ruleNeed = (dp, pax) => {
+    const tiers = staffRules()[dp]; if (!tiers || !tiers.length) return null;
+    const t = tiers.find(x => x.upTo == null || pax <= x.upTo) || tiers[tiers.length - 1];
+    return Math.max(0, Number(t.n) || 0);
+  };
   function genPlan(q) {
+    const plan = genPlanBase(q);
+    for (const day of Object.values(plan.days)) for (const [dp, shifts] of Object.entries(day)) { const n = ruleNeed(dp, q.pax); if (n != null) shifts.forEach(s => { s.need = n; }); }
+    return plan;
+  }
+  function genPlanBase(q) {
     const days = {}, pax = q.pax;
     const need = { kitchen: Math.max(2, Math.ceil(pax / 10)), banquet: Math.max(2, Math.ceil(pax / 12)), av: q.items.some(i => i.ref === 'svc:av') ? 2 : 1, front: q.items.some(i => i.sec === 'room') ? 4 : 2, hk: q.items.some(i => i.sec === 'room') ? Math.max(2, Math.ceil(q.items.filter(i => i.sec === 'room').reduce((a, r) => a + Number(r.q1), 0) / 6)) : 2 };
     U.daysOf(q.start, q.end).forEach(d => {
@@ -449,8 +462,31 @@
     title: 'พนักงาน',
     render(p) {
       const tab = App.state.ui.staffTab || 'shifts';
-      const tabs = `<div class="seg white" style="margin-bottom:18px" role="tablist"><button role="tab" class="${tab === 'shifts' ? 'on' : ''}" data-act="stTab" data-v="shifts">รอบพนักงาน</button><button role="tab" class="${tab === 'emps' ? 'on' : ''}" data-act="stTab" data-v="emps">พนักงานทั้งหมด</button></div>`;
-      return tabs + (tab === 'emps' ? App.V.staff.renderEmps() : App.V.staff.renderShifts(p));
+      const tabs = `<div class="seg white" style="margin-bottom:18px" role="tablist"><button role="tab" class="${tab === 'shifts' ? 'on' : ''}" data-act="stTab" data-v="shifts">รอบพนักงาน</button><button role="tab" class="${tab === 'emps' ? 'on' : ''}" data-act="stTab" data-v="emps">พนักงานทั้งหมด</button><button role="tab" class="${tab === 'rules' ? 'on' : ''}" data-act="stTab" data-v="rules">เงื่อนไขจำนวนพนักงาน</button></div>`;
+      return tabs + (tab === 'emps' ? App.V.staff.renderEmps() : tab === 'rules' ? App.V.staff.renderRules() : App.V.staff.renderShifts(p));
+    },
+    /* ---- staffing rules: people needed per shift by guest count ---- */
+    renderRules() {
+      const canEdit = App.can('staff'), ui = App.state.ui;
+      if (!ui.rulesDraft) ui.rulesDraft = JSON.parse(JSON.stringify(staffRules()));
+      const R = ui.rulesDraft, dis = canEdit ? '' : 'disabled';
+      const card = dp => {
+        const tiers = R[dp.id];
+        const body = !tiers ? '<p class="small muted" style="margin:6px 0 0">ใช้การคำนวณอัตโนมัติของระบบ (ตามจำนวนลูกค้าและรายการในใบเสนอ)</p>' : `
+          <table class="tbl" style="margin-top:8px"><thead><tr><th>จำนวนลูกค้าต่องาน</th><th class="r">พนักงานต่อรอบ</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>
+          ${tiers.map((t, i) => { const from = i ? (Number(tiers[i - 1].upTo) || 0) + 1 : 1, last = i === tiers.length - 1; return `<tr>
+            <td><div class="row" style="gap:6px;flex-wrap:nowrap">${last ? `<span>${from} คนขึ้นไป</span>` : `<span style="white-space:nowrap">${from} –</span><input class="input" style="width:76px;height:36px" type="number" min="${from}" value="${t.upTo}" data-change="ruleUp" data-d="${dp.id}" data-i="${i}" ${dis} aria-label="ถึงจำนวนลูกค้า"><span>คน</span>`}</div></td>
+            <td class="r"><span class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input class="input" style="width:70px;height:36px" type="number" min="0" value="${t.n}" data-change="ruleN" data-d="${dp.id}" data-i="${i}" ${dis} aria-label="จำนวนพนักงาน"><span>คน</span></span></td>
+            ${canEdit ? `<td class="r">${tiers.length > 1 ? `<button class="icon-btn us-edit emp-del" data-act="ruleDel" data-d="${dp.id}" data-i="${i}" title="ลบช่วงนี้" aria-label="ลบช่วงนี้">${TRASH}</button>` : ''}</td>` : ''}</tr>`; }).join('')}
+          </tbody></table>${canEdit ? `<button class="link" style="margin-top:8px" data-act="ruleAdd" data-d="${dp.id}">+ เพิ่มช่วงจำนวนลูกค้า</button>` : ''}`;
+        return `<section class="card pad"><div class="between"><div class="row" style="gap:8px"><i class="dot" style="background:${dp.color};border-radius:3px"></i><h3>${H(dp.name)}</h3></div>
+          <label class="row small" style="gap:8px;cursor:pointer">ใช้เงื่อนไข${App.sw('ใช้เงื่อนไขของ ' + dp.short, !!tiers, `data-change="ruleOn" data-d="${dp.id}" ${dis}`)}</label></div>${body}</section>`;
+      };
+      return `
+<div class="page-hd"><div><h1>เงื่อนไขจำนวนพนักงาน</h1><div class="small muted">จำนวนพนักงานที่ต้องใช้ในแต่ละรอบ ตามจำนวนลูกค้าต่องาน — ใช้ตอนกด “สร้างแผนจากใบเสนอราคา” หรือ “ใช้เงื่อนไขกับแผนนี้”</div></div>
+  ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="ruleReset">ยกเลิกการแก้ไข</button><button class="btn red" data-act="ruleSave">บันทึกเงื่อนไข</button></div>' : ''}</div>
+<div class="grid g2">${D.DEPTS.filter(d => d.id !== 'acc').map(card).join('')}</div>
+${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูเงื่อนไขได้อย่างเดียว — การแก้ไขต้องใช้สิทธิ์ “จัดรอบพนักงาน / อนุมัติต่อรอบ”</div>'}`;
     },
     /* ---- employee directory: add / edit / delete per department ---- */
     renderEmps() {
@@ -535,7 +571,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       for (const o of plan.ot.filter(o => o.status === 'pending')) todos.push({ c: 'var(--yellow)', t: `ต่อรอบ ${dept(o.dept).short} รออนุมัติ · ${o.staff.length} คน`, s: `${U.fmtD(o.date, { year: false })} · +${o.hours} ชม. · ${o.reason}`, a: App.can('staff') ? `<button class="btn ghost sm" data-act="stOtApprove" data-id="${o.id}">อนุมัติ</button>` : '<span class="small muted">รอผู้จัดการ</span>' });
       for (const e of Store.db.employees) { const h = e.hours + otHours(e.id, plan); if (h >= 48 && Object.values(day).flat().some(s => s.staff.includes(e.id))) todos.push({ c: 'var(--muted2)', t: `${e.name} ชั่วโมงสะสม ${h} ชม.`, s: 'ครบ 48 ชม./สัปดาห์ ควรจัดวันหยุด', a: `<button class="btn ghost sm" data-act="stOff" data-e="${e.id}">จัดวันหยุด</button>` }); }
       return head(`<div class="row wrap"><div class="seg white">${dates.map((d, i) => `<button class="${d === date ? 'on' : ''}" data-act="stDate" data-v="${d}">${U.DS[U.d(d).getDay()]} ${U.fmtD(d, { year: false })}</button>`).join('')}</div>
-        <button class="btn ghost" data-act="stShare">ส่งตารางให้หัวหน้าแผนก</button><button class="btn dark" data-act="stShift">+ เพิ่มรอบ</button></div>`) + `
+        ${App.can('staff') ? '<button class="btn ghost" data-act="stApplyRules">ใช้เงื่อนไขกับแผนนี้</button>' : ''}<button class="btn ghost" data-act="stShare">ส่งตารางให้หัวหน้าแผนก</button><button class="btn dark" data-act="stShift">+ เพิ่มรอบ</button></div>`) + `
 <div class="grid g4" style="margin-bottom:16px">
   <div class="card kpi"><div class="small muted">พนักงานที่ต้องใช้</div><div class="v">${need} <small>คน</small></div><div class="small muted">${Object.keys(day).length} แผนก · วันที่ ${dayIdx} (${U.DS[U.d(date).getDay()]} ${U.fmtD(date, { year: false })})</div></div>
   <div class="card kpi"><div class="small muted">จัดรอบแล้ว</div><div class="v">${have} <small>/ ${need} คน</small></div><div class="bar"><i style="width:${need ? have / need * 100 : 0}%"></i></div><div class="small muted" style="margin-top:6px">${need ? Math.round(have / need * 100) : 0}% ของที่ต้องใช้</div></div>
@@ -730,7 +766,38 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     }
   }
   Object.assign(App.ACT, {
-    stTab(el) { App.state.ui.staffTab = el.dataset.v; App.render(); },
+    stTab(el) { App.state.ui.staffTab = el.dataset.v; App.state.ui.rulesDraft = null; App.render(); },
+    ruleAdd(el) {
+      const t = App.state.ui.rulesDraft[el.dataset.d], last = t[t.length - 1], prev = t.length > 1 ? Number(t[t.length - 2].upTo) || 0 : 0;
+      // the open-ended last tier gets a limit; a new open-ended tier goes after it
+      last.upTo = prev + 50; t.push({ upTo: null, n: (Number(last.n) || 0) + 1 }); App.render();
+    },
+    ruleDel(el) { const t = App.state.ui.rulesDraft[el.dataset.d]; t.splice(Number(el.dataset.i), 1); t[t.length - 1].upTo = null; App.render(); },
+    ruleReset() { App.state.ui.rulesDraft = null; App.render(); },
+    ruleSave() {
+      const R = App.state.ui.rulesDraft;
+      for (const [dp, t] of Object.entries(R)) {
+        if (!t) continue;
+        let prev = 0;
+        for (let i = 0; i < t.length - 1; i++) {
+          const up = Number(t[i].upTo);
+          if (!Number.isInteger(up) || up <= prev) { App.toast(`${dept(dp).short}: ช่วงจำนวนลูกค้าต้องเรียงจากน้อยไปมาก (ช่วงที่ ${i + 1})`); return; }
+          prev = up;
+        }
+        if (t.some(x => !Number.isInteger(Number(x.n)) || Number(x.n) < 0)) { App.toast(`${dept(dp).short}: จำนวนพนักงานต้องเป็นจำนวนเต็ม 0 ขึ้นไป`); return; }
+        t.forEach((x, i) => { x.n = Number(x.n); x.upTo = i === t.length - 1 ? null : Number(x.upTo); });
+      }
+      Store.db.settings.staffRules = JSON.parse(JSON.stringify(R)); Store.save();
+      App.state.ui.rulesDraft = null; App.render(); App.toast('บันทึกเงื่อนไขแล้ว — ใช้กับแผนที่สร้างใหม่ หรือกด “ใช้เงื่อนไขกับแผนนี้” ในแต่ละงาน');
+    },
+    stApplyRules() {
+      const q = Store.quote(App.state.ui.staffQ), p = SP(); if (!q || !p) return;
+      App.confirm(`ตั้งจำนวนพนักงานที่ต้องใช้ของงาน ${q.id} (${q.pax} ท่าน) ใหม่ตามเงื่อนไข?`, () => {
+        let n = 0;
+        for (const day of Object.values(p.days)) for (const [dp, shifts] of Object.entries(day)) { const k = ruleNeed(dp, q.pax); if (k != null) shifts.forEach(s => { s.need = k; n++; }); }
+        Store.save(); App.render(); App.toast(n ? 'ปรับจำนวนที่ต้องใช้ตามเงื่อนไขแล้ว (คนที่มอบหมายไว้ยังอยู่)' : 'ยังไม่มีแผนกที่ตั้งเงื่อนไขไว้');
+      }, 'ใช้เงื่อนไข');
+    },
     empDept(el) { App.state.ui.emps.dept = el.dataset.v; App.state.ui.emps.page = 1; App.render(); },
     empPage(el) { App.state.ui.emps.page = Number(el.dataset.v); App.render(); },
     empNew() {
@@ -750,6 +817,10 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       });
     }
   });
+  const RD = el => App.state.ui.rulesDraft[el.dataset.d][Number(el.dataset.i)];
+  App.CHG.ruleUp = el => { RD(el).upTo = el.value; App.render(); };
+  App.CHG.ruleN = el => { RD(el).n = el.value; };
+  App.CHG.ruleOn = el => { const R = App.state.ui.rulesDraft; R[el.dataset.d] = el.checked ? (R[el.dataset.d] || [{ upTo: 50, n: 1 }, { upTo: null, n: 2 }]) : null; if (!el.checked) delete R[el.dataset.d]; App.render(); };
   App.CHG.empQ = el => { App.state.ui.emps.q = el.value; App.state.ui.emps.page = 1; App.render(); };
   App.CHG.stOtShift = el => { const o = curOt(); const [dp, sid] = el.value.split('|'); o.dept = dp; o.shiftId = sid; o.staff = []; persistOt(o); App.render(); };
   App.CHG.stOtReason = el => { const o = curOt(); o.reason = el.value; persistOt(o); };
