@@ -10,6 +10,9 @@
     { id: 'other', name: 'บริการอื่น ๆ', color: 'var(--ink2)' }
   ];
   const qid = id => encodeURIComponent(id);
+  // deleting a quote is for sales managers and admins only (the server enforces the same rule)
+  const canDelQ = () => { const me = App.me(); return !!me && (me.role === 'admin' || me.role === 'manager'); };
+  const TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
   const timeNow = iso => iso ? iso.slice(11, 16) : '';
 
   /* =====================================================================
@@ -23,6 +26,7 @@
       const qs = all.filter(q => (ui.st === 'all' || q.status === ui.st) && (!ui.q || [q.id, q.client, q.title, q.contact].join(' ').toLowerCase().includes(ui.q.toLowerCase())))
         .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       const cnt = s => all.filter(q => s === 'all' || q.status === s).length;
+      const canDel = canDelQ();
       return `
 <div class="page-hd"><div><h1>ใบเสนอราคา</h1><div class="muted small">${all.length} ใบ · ยืนยันแล้ว ${cnt('confirmed')} · รอลูกค้า ${cnt('sent')}</div></div><a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
 <div class="row wrap" style="margin-bottom:16px">
@@ -34,7 +38,7 @@
 ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td class="mono small muted hide-m">${H(q.id)}</td>
   <td><b style="font-weight:500">${H(q.client)}</b><div class="sub">${H(q.title)} · <span class="mono">${H(q.id)}</span></div></td>
   <td class="hide-m">${U.fmtRange(q.start, q.end)}</td><td class="hide-m num">${U.n(q.pax)}</td>
-  <td class="r num b">${U.n(App.calc(q).net, 2)}<div class="sub show-m" style="font-weight:400">${U.fmtRange(q.start, q.end, { year: false })} · ${U.n(q.pax)} ท่าน</div></td><td class="r">${App.statusBadge(q.status)}</td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">ไม่พบใบเสนอราคา</div></td></tr>'}
+  <td class="r num b">${U.n(App.calc(q).net, 2)}<div class="sub show-m" style="font-weight:400">${U.fmtRange(q.start, q.end, { year: false })} · ${U.n(q.pax)} ท่าน</div></td><td class="r"><div class="row" style="gap:8px;justify-content:flex-end;flex-wrap:nowrap">${App.statusBadge(q.status)}${canDel ? `<button class="icon-btn us-edit emp-del" data-act="qDelete" data-id="${H(q.id)}" title="ลบใบเสนอราคา" aria-label="ลบใบเสนอราคา ${H(q.id)}">${TRASH}</button>` : ''}</div></td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">ไม่พบใบเสนอราคา</div></td></tr>'}
 </tbody></table></section>`;
     }
   };
@@ -125,6 +129,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         ${App.holding(q) ? `<button class="btn ghost sm" data-act="qToBeo">ใบฟังก์ชัน</button><a class="btn ghost sm" href="#/staff/${qid(q.id)}">จัดรอบพนักงาน</a>` : ''}
         ${q.status !== 'cancelled' ? `<button class="btn ghost sm" data-act="qStatus" data-v="cancelled" style="color:var(--red)">ยกเลิก</button>` : `<button class="btn ghost sm" data-act="qStatus" data-v="draft">กู้คืนเป็นร่าง</button>`}
       </div>
+      ${canDelQ() ? `<button class="btn ghost red sm" style="width:100%;margin-top:12px" data-act="qDelete" data-id="${H(q.id)}">ลบใบเสนอราคา</button>` : ''}
       ${q.history && q.history.length ? `<div class="hr"></div><div class="small muted" style="margin-bottom:6px">ประวัติ</div>${q.history.slice(0, 5).map((h, i) => `<div class="row small" style="padding:4px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('')}` : ''}
     </section>
   </aside>
@@ -290,6 +295,25 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       bg => bg.querySelector('#ok').onclick = () => { const f = App.formData(bg); App.closeModal(); setDisc(q, { type: f.type, value: Math.max(0, parseFloat(String(f.value).replace(/,/g, '')) || 0) }); });
     },
     qApprove() { const q = cur(); q.approval = 'approved'; App.touch(q, 'อนุมัติส่วนลด ' + U.n(App.calc(q).pct, 1) + '%'); App.render(); },
+    qDelete(el) {
+      const q = Store.quote(el.dataset.id); if (!q) return;
+      if (!canDelQ()) { App.toast('เฉพาะผู้ดูแลระบบและผู้จัดการฝ่ายขายที่ลบใบเสนอราคาได้'); return; }
+      const db = Store.db, beos = db.beos.filter(b => b.quoteId === q.id), plan = !!db.staff[q.id];
+      const also = [beos.length ? 'ใบฟังก์ชัน ' + beos.map(b => b.id).join(', ') : '', plan ? 'แผนรอบพนักงานของงานนี้' : ''].filter(Boolean);
+      App.modal(`<h2>ลบใบเสนอราคานี้?</h2><p class="muted" style="margin-top:-8px">${H(q.id)} · ${H(q.client)} · ${H(q.title)}</p>
+        ${also.length ? `<div class="note" style="margin-bottom:10px">จะลบ ${H(also.join(' และ '))} ที่ผูกกับใบเสนอนี้ไปด้วย</div>` : ''}
+        <p class="small">ลบแล้วกู้คืนไม่ได้ — ถ้าลูกค้าแค่ยกเลิกงาน แนะนำให้ใช้ปุ่ม “ยกเลิก” แทนเพื่อเก็บประวัติไว้</p>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="qdYes">ลบใบเสนอราคา</button></div>`, bg => bg.querySelector('#qdYes').onclick = () => {
+        db.quotes = db.quotes.filter(x => x.id !== q.id);
+        db.beos = db.beos.filter(b => b.quoteId !== q.id);
+        delete db.staff[q.id];
+        if (App.state.ctx === q.id) App.setCtx('');
+        if (App.state.ui.staffQ === q.id) { App.state.ui.staffQ = null; App.state.ui.staff = null; }
+        Store.save(); App.closeModal();
+        if (location.hash.startsWith('#/quote/')) App.go('#/quotes'); else App.render();
+        App.toast('ลบใบเสนอราคา ' + q.id + ' แล้ว');
+      });
+    },
     qStatus(el) {
       const q = cur(), v = el.dataset.v;
       const run = () => {
