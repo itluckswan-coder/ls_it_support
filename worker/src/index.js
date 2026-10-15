@@ -113,7 +113,7 @@ async function state(env, since) {
 
 /* ---------------- business rules ---------------- */
 const beoContent = b => {
-  const { approval, status, rev, revNote, signoff, ...c } = b || {};
+  const { approval, status, rev, revNote, signoff, ss, ...c } = b || {};
   c.depts = Object.fromEntries(Object.entries((b && b.depts) || {}).map(([k, v]) => [k, { items: v.items || [], owner: v.owner || '' }]));
   return c;
 };
@@ -143,6 +143,8 @@ async function applyRules(env, user, kind, id, data, prev) {
         base: prevAppr && prevAppr.state === 'approved' ? beoContent(prev) : (prevAppr ? prevAppr.base || null : null)
       };
     } else data.approval = prevAppr || data.approval || { state: 'approved' };
+    // the sales summary (ใบสรุปสำหรับฝ่ายขาย) belongs to admins, sales managers and sales staff
+    if (!['admin', 'manager', 'sales'].includes(user.role)) { if (prev && prev.ss) data.ss = prev.ss; else delete data.ss; }
     // admin sign-off: only admins set it, and any change to the content clears it
     if (user.role !== 'admin') { if (prev && prev.signoff) data.signoff = prev.signoff; else delete data.signoff; }
     if (changed) delete data.signoff;

@@ -1,5 +1,5 @@
 /* Luck Swan Sales — offline cache */
-const CACHE = 'ls-sales-v35';
+const CACHE = 'ls-sales-v36';
 const ASSETS = [
   'css/app.css',
   'fonts.css',
@@ -41,6 +41,7 @@ const ASSETS = [
   'js/beoform.js',
   'js/data.js',
   'js/floorplan.js',
+  'js/salessum.js',
   'js/sheet.js',
   'js/util.js',
   'js/v-catalog.js',
