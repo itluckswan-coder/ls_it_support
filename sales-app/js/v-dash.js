@@ -14,6 +14,13 @@
 
   /* ---- periods: weeks start Monday; revenue counts on the event's start date ---- */
   function weekStart(iso) { const d = U.d(iso), dow = (d.getDay() + 6) % 7; return U.addDays(iso, -dow); }
+  // selectable years: from 2569 (2026, when the system started) to this year, or later once a confirmed event falls in a later year
+  const FIRST_YEAR = 2026;
+  function yearSpan() {
+    const now = U.d(U.today()).getFullYear();
+    const last = Store.db.quotes.filter(q => q.status === 'confirmed' && q.start).reduce((m, q) => Math.max(m, Number(q.start.slice(0, 4)) || 0), now);
+    return { min: Math.min(FIRST_YEAR, now), max: Math.max(now, last) };
+  }
   const UNIT = { day: 'วัน', week: 'สัปดาห์', month: 'เดือน' };
   // selected range: a calendar year, or one month of it
   function range(ui) {
@@ -94,6 +101,7 @@
       const me = App.me();
       if (!me || me.role !== 'admin') return '<div class="card pad" style="max-width:520px;margin:40px auto;text-align:center"><h2>เฉพาะผู้ดูแลระบบ</h2><p class="muted">หน้า Dashboard เปิดดูได้เฉพาะบทบาทผู้ดูแลระบบ</p><a class="btn ghost" href="#/home">กลับหน้าหลัก</a></div>';
       const ui = App.state.ui.dash || (App.state.ui.dash = { year: U.d(U.today()).getFullYear(), month: null, mode: 'month', table: false });
+      const ys = yearSpan(); ui.year = Math.min(ys.max, Math.max(ys.min, ui.year));
       if (!modesFor(ui).includes(ui.mode)) ui.mode = ui.month == null ? 'month' : 'week';
       const db = Store.db, ps = periods(ui), rg = range(ui), pr = prevRange(ui), from = rg.a, to = rg.b;
       const live = db.quotes.filter(q => q.status !== 'cancelled');
@@ -123,7 +131,7 @@
   <div class="row wrap"><div class="seg white" role="group" aria-label="แสดงเป็น">${modesFor(ui).map(m => `<button class="${ui.mode === m ? 'on' : ''}" data-act="dashMode" data-v="${m}" aria-pressed="${ui.mode === m}">ราย${UNIT[m]}</button>`).join('')}</div>
   <button class="btn ghost" data-act="dashCsv">ดาวน์โหลด CSV</button></div></div>
 <section class="card dash-pick" aria-label="เลือกช่วงเวลา">
-  <div class="dash-year"><button class="icon-btn" data-act="dashYear" data-v="-1" aria-label="ปีก่อน">${App.ICON.left}</button><b>ปี ${U.be(ui.year)}</b><button class="icon-btn" data-act="dashYear" data-v="1" aria-label="ปีถัดไป">${App.ICON.right}</button></div>
+  <div class="dash-year"><button class="icon-btn" data-act="dashYear" data-v="-1" aria-label="ปีก่อน" ${ui.year <= ys.min ? 'disabled' : ''}>${App.ICON.left}</button><b>ปี ${U.be(ui.year)}</b><button class="icon-btn" data-act="dashYear" data-v="1" aria-label="ปีถัดไป" ${ui.year >= ys.max ? 'disabled' : ''}>${App.ICON.right}</button></div>
   <div class="dash-months" role="group" aria-label="เลือกเดือน">
     <button class="chip ${ui.month == null ? 'on' : ''}" data-act="dashMonth" data-v="" aria-pressed="${ui.month == null}">ทั้งปี</button>
     ${U.MS.map((m, i) => `<button class="chip ${ui.month === i ? 'on' : ''} ${ui.year === thisY && i === thisM ? 'now' : ''}" data-act="dashMonth" data-v="${i}" aria-pressed="${ui.month === i}">${m}</button>`).join('')}
@@ -184,7 +192,7 @@
 
   Object.assign(App.ACT, {
     dashMode(el) { App.state.ui.dash.mode = el.dataset.v; App.render(); },
-    dashYear(el) { App.state.ui.dash.year += Number(el.dataset.v); App.render(); },
+    dashYear(el) { const ui = App.state.ui.dash, ys = yearSpan(); ui.year = Math.min(ys.max, Math.max(ys.min, ui.year + Number(el.dataset.v))); App.render(); },
     dashMonth(el) { const ui = App.state.ui.dash; ui.month = el.dataset.v === '' ? null : Number(el.dataset.v); App.render(); },
     dashTable() { App.state.ui.dash.table = !App.state.ui.dash.table; App.render(); },
     dashCsv() {
