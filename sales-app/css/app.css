@@ -634,7 +634,7 @@ main.bleed{padding:0;max-width:none}
 .fp-wide{grid-column:span 2}
 .fp-main{flex:1 1 480px;min-width:0}
 .fp-paper{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:auto}
-.fp-paper svg{display:block;width:100%;height:auto;touch-action:none;min-width:560px}
+.fp-paper svg{display:block;width:100%;height:auto;touch-action:none;min-width:560px;user-select:none;-webkit-user-select:none}
 .fp-thumb{display:block;padding:12px 16px;background:#fff}
 .fp-thumb svg{display:block;width:100%;height:auto;max-height:520px}
 @media (max-width:760px){.fp-side{flex:1 1 100%}}

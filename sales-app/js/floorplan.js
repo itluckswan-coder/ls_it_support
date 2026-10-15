@@ -196,7 +196,7 @@
     if (!['screen', 'door', 'pillar'].includes(i.type)) s += T(H(i.type === 'block' && i.label ? i.label : NAMES[i.type]), w > 2 ? 13 : 9, i.type === 'carpet' ? '#fff' : '#333');
     return s;
   }
-  // full drawing; sel = selected item id (left out of exports)
+  // full drawing; sel = selected item ids (left out of exports)
   // a plan tied to a room takes the room's size and locked fixtures from แก้ไขปรับปรุง
   const geom = p => p.room ? { W: roomDim(p.room)[0], H: roomDim(p.room)[1], fixed: fixedOf(p.room) } : { W: p.W, H: p.H, fixed: [] };
   function build(p, sel, noFixed) {
@@ -212,7 +212,7 @@
     for (const i of p.items) {
       const [dw, dh] = dims(i);
       gr += `<g data-id="${i.id}" transform="translate(${i.x * S} ${i.y * S}) rotate(${i.rot})" style="cursor:move">${shape(i)}` +
-        (sel === i.id ? `<rect x="${-dw * S / 2 - 4}" y="${-dh * S / 2 - 4}" width="${dw * S + 8}" height="${dh * S + 8}" fill="none" stroke="#A8262D" stroke-width="2" stroke-dasharray="6 4"/>` : '') + '</g>';
+        (sel && sel.includes(i.id) ? `<rect x="${-dw * S / 2 - 4}" y="${-dh * S / 2 - 4}" width="${dw * S + 8}" height="${dh * S + 8}" fill="none" stroke="#A8262D" stroke-width="2" stroke-dasharray="6 4"/>` : '') + '</g>';
     }
     const seats = seatsOf(p);
     return { vw, vh, svg: `<rect width="${vw}" height="${vh}" fill="#fff"/><text x="${S}" y="${S * 0.95}" font-size="26" font-weight="700" fill="#222">${H(p.title || '')}</text>
@@ -223,7 +223,7 @@
   App.planSeats = seatsOf;
 
   /* ---------- the editor page ---------- */
-  let sel = null, drag = null;
+  let sel = [], drag = null, marq = null;
   App.V.plan = {
     title: 'ออกแบบผังงาน', nav: 'beo',
     render(params) {
@@ -240,7 +240,7 @@
           <h2>ยังไม่มีผังงานของวันที่ ${day}</h2><p class="muted">สร้างผังตั้งต้นจากใบเสนอราคา: ${H((rf.room && (rf.room.th || rf.room.name)) || 'ห้องจัดงาน')} · ${H(lay)} · ${U.n(q.pax)} ท่าน แล้วลากปรับได้</p>
           ${edit ? `<div class="row wrap" style="justify-content:center"><button class="btn red" data-act="fpAuto">สร้างผังจากใบเสนอราคา</button><button class="btn ghost" data-act="fpBlank">เริ่มจากห้องว่าง</button></div>` : '<p class="small muted">คุณดูได้อย่างเดียว</p>'}</div>`;
       }
-      if (!p.items.some(i => i.id === sel)) sel = null;
+      sel = sel.filter(id => p.items.some(i => i.id === id));
       const pax = Number(q.pax) || 0, seats = seatsOf(p);
       return head + `
 <div class="fp">
@@ -263,7 +263,7 @@
   </aside>
   <div class="fp-main">
     <div class="fp-paper"><svg id="fpSvg" viewBox="0 0 10 10" font-family="IBM Plex Sans Thai, Tahoma, sans-serif"></svg></div>
-    <div class="small muted" style="margin-top:8px">รวมที่นั่ง <b id="fpTot">${seats}</b> ที่ · ใบฟังก์ชัน ${U.n(pax)} ท่าน${edit ? ' · คลิกเพื่อเลือก ลากเพื่อย้าย · Delete ลบ · R หมุน' : ''}</div>
+    <div class="small muted" style="margin-top:8px">รวมที่นั่ง <b id="fpTot">${seats}</b> ที่ · ใบฟังก์ชัน ${U.n(pax)} ท่าน${edit ? ' · คลิกเพื่อเลือก · ลากคลุมบนพื้นที่ว่างเพื่อเลือกหลายชิ้น · ลากเพื่อย้าย · Delete ลบ · R หมุน' : ''}</div>
     <div id="fpWarn">${warn(p, pax)}</div>
   </div>
 </div>`;
@@ -302,7 +302,7 @@
   </aside>
   <div class="fp-main">
     <div class="fp-paper"><svg id="fpSvg" viewBox="0 0 10 10" font-family="IBM Plex Sans Thai, Tahoma, sans-serif"></svg></div>
-    <div class="small muted" style="margin-top:8px">ของที่ห้ามย้าย ${d.items.length} ชิ้น · คลิกเพื่อเลือก ลากเพื่อย้าย · Delete ลบ · R หมุน · บันทึกอัตโนมัติ</div>
+    <div class="small muted" style="margin-top:8px">ของที่ห้ามย้าย ${d.items.length} ชิ้น · คลิกเพื่อเลือก · ลากคลุมบนพื้นที่ว่างเพื่อเลือกหลายชิ้น · ลากเพื่อย้าย · Delete ลบ · R หมุน · บันทึกอัตโนมัติ</div>
     <section class="card" style="margin-top:16px;overflow:hidden">
       <div class="card-hd"><div><h2>ขนาดมาตรฐานของสิ่งของ</h2><div class="small muted">ใช้กับของที่ไม่ได้ตั้งขนาดเฉพาะชิ้น ในทุกห้อง (เมตร) · โต๊ะยาว แถวเก้าอี้ และโต๊ะห้องเรียน ยาวตามจำนวนที่นั่ง</div></div></div>
       <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>สิ่งของ</th><th>กว้าง</th><th>ลึก</th><th class="r"></th></tr></thead><tbody>
@@ -334,21 +334,32 @@
     if (p.missing) out.push(`วางไม่พอ ${p.missing} โต๊ะในห้องขนาดนี้ — ลองลดขนาดโต๊ะ ขยายห้อง หรือจัดชิดขึ้น`);
     return out.length ? `<div class="note" style="margin-top:8px">${out.map(H).join(' · ')}</div>` : '';
   }
+  const picked = p => p.items.filter(i => sel.includes(i.id));
   function selPanel(p) {
-    const it = p.items.find(i => i.id === sel);
-    if (!it) return '<h3>ที่เลือกอยู่</h3><div class="small muted">แตะที่โต๊ะหรือของในผังเพื่อเลือก</div>';
+    const list = picked(p), tip = '<div class="xs muted" style="margin-top:8px">ลากบนพื้นที่ว่างเพื่อคลุมเลือกหลายชิ้น · Shift/Ctrl + คลิก เพื่อเพิ่ม/เอาออกทีละชิ้น · ลูกศรขยับทีละ 10 ซม.</div>';
+    if (!list.length) return `<h3>ที่เลือกอยู่</h3><div class="small muted">แตะที่โต๊ะหรือของในผังเพื่อเลือก</div>${p.items.length ? '<button class="btn ghost sm" style="width:100%;margin-top:8px" data-act="fpAll">เลือกทั้งหมด</button>' : ''}${tip}`;
+    const seated = list.filter(i => SEATED.includes(i.type)), seatBtns = `<button class="icon-btn" data-act="fpSeat" data-v="-1" aria-label="ลดที่นั่ง">−</button><button class="icon-btn" data-act="fpSeat" data-v="1" aria-label="เพิ่มที่นั่ง">+</button>`;
+    const actions = `<div class="fp-grid"><button class="btn ghost sm" data-act="fpRot">⟳ หมุน 15°</button><button class="btn ghost sm" data-act="fpDup">คัดลอก</button><button class="btn ghost sm fp-wide" data-act="fpDel" style="color:var(--red)">ลบ${list.length > 1 ? ' ' + list.length + ' ชิ้น' : ''}</button></div>`;
+    if (list.length > 1) {
+      const kinds = Object.entries(list.reduce((m, i) => (m[NAMES[i.type]] = (m[NAMES[i.type]] || 0) + 1, m), {})).map(([k, n]) => k + ' ' + n).join(' · ');
+      return `<h3>เลือกอยู่ ${list.length} ชิ้น</h3><div class="small muted" style="margin-bottom:8px">${H(kinds)}</div>
+        ${seated.length ? `<div class="row" style="margin-bottom:8px"><span style="flex:1">ที่นั่งต่อโต๊ะ (${seated.length} โต๊ะ) รวม <b>${seated.reduce((a, i) => a + i.seats, 0)}</b></span>${seatBtns}</div>` : ''}
+        ${actions}<button class="link" style="margin-top:8px" data-act="fpNone">ยกเลิกการเลือก</button>${tip}`;
+    }
+    const it = list[0];
     return `<h3>ที่เลือกอยู่ · ${H(NAMES[it.type])}</h3>
-      ${SEATED.includes(it.type) ? `<div class="row" style="margin-bottom:8px"><span style="flex:1">ที่นั่ง: <b>${it.seats}</b></span><button class="icon-btn" data-act="fpSeat" data-v="-1" aria-label="ลดที่นั่ง">−</button><button class="icon-btn" data-act="fpSeat" data-v="1" aria-label="เพิ่มที่นั่ง">+</button></div>` : ''}
+      ${SEATED.includes(it.type) ? `<div class="row" style="margin-bottom:8px"><span style="flex:1">ที่นั่ง: <b>${it.seats}</b></span>${seatBtns}</div>` : ''}
       ${SIZED.includes(it.type) ? `<div class="small muted" style="margin-bottom:4px">${it.type === 'round' ? 'เส้นผ่านศูนย์กลาง (ม.)' : 'ขนาด กว้าง × ลึก (ม.)'}</div>
         <div class="row" style="gap:6px;margin-bottom:8px"><input class="input" type="number" min="0.1" max="40" step="0.1" value="${dims(it)[0]}" data-change="fpSize" data-k="w" aria-label="กว้าง">${it.type === 'round' ? '' : `<span>×</span><input class="input" type="number" min="0.1" max="40" step="0.1" value="${dims(it)[1]}" data-change="fpSize" data-k="h" aria-label="ลึก">`}</div>` : ''}
       ${it.type === 'block' ? `<input class="input" value="${H(it.label || '')}" placeholder="ข้อความบนบล็อก เช่น ห้องควบคุม" data-change="fpLabel" aria-label="ข้อความบนบล็อก" style="margin-bottom:8px">` : ''}
-      <div class="fp-grid"><button class="btn ghost sm" data-act="fpRot">⟳ หมุน 15°</button><button class="btn ghost sm" data-act="fpDup">คัดลอก</button><button class="btn ghost sm fp-wide" data-act="fpDel" style="color:var(--red)">ลบ</button></div>`;
+      ${actions}${tip}`;
   }
   const setupMode = () => App.state.route === 'plansetup';
   const P = () => setupMode() ? setupDoc() : planOf(curBeo(), dayOf());
   function drawSvg() {
     const p = P(), s = document.getElementById('fpSvg'); if (!p || !s) return;
-    const b = build(p, sel, setupMode()); s.setAttribute('viewBox', `0 0 ${b.vw} ${b.vh}`); s.innerHTML = b.svg;
+    const b = build(p, sel, setupMode()); s.setAttribute('viewBox', `0 0 ${b.vw} ${b.vh}`);
+    s.innerHTML = b.svg + (marq ? `<rect x="${(Math.min(marq.x0, marq.x1) + 1) * S}" y="${(Math.min(marq.y0, marq.y1) + 2) * S}" width="${Math.abs(marq.x1 - marq.x0) * S}" height="${Math.abs(marq.y1 - marq.y0) * S}" fill="rgba(168,38,45,.08)" stroke="#A8262D" stroke-width="1.5" stroke-dasharray="5 4"/>` : '');
     const t = document.getElementById('fpTot'); if (t) t.textContent = seatsOf(p);
   }
   function refreshSide() {
@@ -361,31 +372,62 @@
     const s = document.getElementById('fpSvg'); if (!s || !(setupMode() ? isAdmin() : canEdit())) return;
     const pos = e => { const pt = s.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(s.getScreenCTM().inverse()); return [(q.x - S) / S, (q.y - 2 * S) / S]; };
     s.addEventListener('pointerdown', e => {
-      const gEl = e.target.closest('[data-id]'), p = P();
-      if (!gEl) { sel = null; drawSvg(); refreshSide(); return; }
-      sel = Number(gEl.dataset.id); const it = p.items.find(v => v.id === sel), [x, y] = pos(e);
-      drag = { dx: it.x - x, dy: it.y - y, moved: false }; s.setPointerCapture(e.pointerId); drawSvg(); refreshSide();
+      const gEl = e.target.closest('[data-id]'), p = P(), [x, y] = pos(e), add = e.shiftKey || e.ctrlKey || e.metaKey;
+      e.preventDefault(); s.setPointerCapture(e.pointerId);
+      if (!gEl) {
+        // empty floor: start a selection box (Shift/Ctrl keeps what is already selected)
+        marq = { x0: x, y0: y, x1: x, y1: y, base: add ? sel.slice() : [] };
+        if (!add) sel = [];
+        drawSvg(); refreshSide(); return;
+      }
+      const id = Number(gEl.dataset.id);
+      if (add) { sel = sel.includes(id) ? sel.filter(v => v !== id) : sel.concat(id); drawSvg(); refreshSide(); return; }
+      if (!sel.includes(id)) sel = [id];
+      // drag every selected item together
+      drag = { x, y, moved: false, orig: picked(p).map(i => [i, i.x, i.y]) };
+      drawSvg(); refreshSide();
     });
     s.addEventListener('pointermove', e => {
-      if (!drag) return; const it = P().items.find(v => v.id === sel); if (!it) return;
-      const [x, y] = pos(e); it.x = Math.round((x + drag.dx) * 10) / 10; it.y = Math.round((y + drag.dy) * 10) / 10; drag.moved = true; drawSvg();
+      const [x, y] = pos(e);
+      if (marq) {
+        marq.x1 = x; marq.y1 = y;
+        const r = { x0: Math.min(marq.x0, x), x1: Math.max(marq.x0, x), y0: Math.min(marq.y0, y), y1: Math.max(marq.y0, y) };
+        // an item is picked when its centre is inside the box, so grazing a neighbour does not grab it
+        const hit = P().items.filter(i => i.x >= r.x0 && i.x <= r.x1 && i.y >= r.y0 && i.y <= r.y1).map(i => i.id);
+        sel = marq.base.concat(hit.filter(id => !marq.base.includes(id)));
+        drawSvg(); return;
+      }
+      if (!drag) return;
+      const dx = x - drag.x, dy = y - drag.y;
+      for (const [i, ox, oy] of drag.orig) { i.x = Math.round((ox + dx) * 10) / 10; i.y = Math.round((oy + dy) * 10) / 10; }
+      drag.moved = true; drawSvg();
     });
-    const end = () => { if (drag && drag.moved) { save(); refreshSide(); } drag = null; };
+    const end = () => {
+      if (marq) { marq = null; drawSvg(); refreshSide(); }
+      if (drag && drag.moved) { save(); refreshSide(); }
+      drag = null;
+    };
     s.addEventListener('pointerup', end); s.addEventListener('pointercancel', end);
   }
   // Delete / R while the editor is open (not while typing or in a dialog)
   document.addEventListener('keydown', e => {
-    if (!(App.state.route === 'plan' ? canEdit() : setupMode() && isAdmin()) || sel == null || document.getElementById('modalBg')) return;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (!(App.state.route === 'plan' ? canEdit() : setupMode() && isAdmin()) || document.getElementById('modalBg')) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !P()) return;
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); App.ACT.fpAll(); return; }
+    if (!sel.length) return;
+    if (e.key === 'Escape') App.ACT.fpNone();
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); App.ACT.fpDel(); }
     if (e.key === 'r' || e.key === 'R') App.ACT.fpRot();
+    const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (mv) { e.preventDefault(); const d = e.shiftKey ? 0.5 : 0.1; step(it => { it.x = Math.round((it.x + mv[0] * d) * 10) / 10; it.y = Math.round((it.y + mv[1] * d) * 10) / 10; }); }
   });
 
   function setPlan(p) {
-    const b = curBeo(); b.plans = b.plans || {}; b.plans[dayOf()] = p; sel = null; Store.save(); App.render();
+    const b = curBeo(); b.plans = b.plans || {}; b.plans[dayOf()] = p; sel = []; Store.save(); App.render();
     if (p.missing) App.toast(`วางไม่พอ ${p.missing} โต๊ะ — ปรับผังเพิ่มเติมได้`);
   }
-  const step = fn => { const p = P(), it = p && p.items.find(i => i.id === sel); if (!it) return; fn(it, p); save(); drawSvg(); refreshSide(); };
+  // apply a change to every selected item
+  const step = fn => { const p = P(), list = p ? picked(p) : []; if (!list.length) return; list.forEach(it => fn(it, p, list)); save(); drawSvg(); refreshSide(); };
   Object.assign(App.ACT, {
     fpAuto() { const b = curBeo(), q = Store.quote(b.quoteId); const go = () => setPlan(autoPlan(q, dayOf())); if (P() && P().items.length) App.confirm('แทนที่ผังปัจจุบันด้วยผังจากใบเสนอราคา?', go, 'แทนที่'); else go(); },
     fpBlank() { const b = curBeo(), q = Store.quote(b.quoteId), rf = roomFor(q, dayOf()), [w, h] = roomDim(rf.id); setPlan({ title: q.title || '', room: rf.room ? rf.id : undefined, W: w, H: h, items: [] }); },
@@ -400,11 +442,26 @@
       const go = () => setPlan(histPlan(h));
       if (P().items.length) App.confirm('แทนที่ผังปัจจุบันด้วยแปลน “' + h.r + ' · ' + h.l + '”?', go, 'แทนที่'); else go();
     },
-    fpAdd(el) { const p = P(), G = setupMode() ? p : geom(p), n = p.items.length % 5; sel = mk(p, el.dataset.v, G.W / 2 + n * 0.4, G.H / 2 + n * 0.4).id; save(); drawSvg(); refreshSide(); },
-    fpRot() { step(it => { it.rot = (it.rot + 15) % 360; }); },
-    fpDup() { step((it, p) => { const n = mk(p, it.type, it.x + 1, it.y + 1, it.rot, it.seats); sel = n.id; }); },
-    fpDel() { const p = P(); if (!p) return; p.items = p.items.filter(i => i.id !== sel); sel = null; save(); drawSvg(); refreshSide(); },
-    fpSeat(el) { step(it => { it.seats = Math.max(1, Math.min(it.type === 'chairrow' ? 40 : 16, it.seats + Number(el.dataset.v))); }); },
+    fpAdd(el) { const p = P(), G = setupMode() ? p : geom(p), n = p.items.length % 5; sel = [mk(p, el.dataset.v, G.W / 2 + n * 0.4, G.H / 2 + n * 0.4).id]; save(); drawSvg(); refreshSide(); },
+    fpAll() { const p = P(); if (!p) return; sel = p.items.map(i => i.id); drawSvg(); refreshSide(); },
+    fpNone() { sel = []; drawSvg(); refreshSide(); },
+    fpRot() {
+      // several items turn together around their common centre
+      const p = P(), list = p ? picked(p) : []; if (!list.length) return;
+      const cx = list.reduce((a, i) => a + i.x, 0) / list.length, cy = list.reduce((a, i) => a + i.y, 0) / list.length, r = Math.PI / 12, c = Math.cos(r), sn = Math.sin(r);
+      for (const i of list) {
+        if (list.length > 1) { const dx = i.x - cx, dy = i.y - cy; i.x = Math.round((cx + dx * c - dy * sn) * 10) / 10; i.y = Math.round((cy + dx * sn + dy * c) * 10) / 10; }
+        i.rot = (i.rot + 15) % 360;
+      }
+      save(); drawSvg(); refreshSide();
+    },
+    fpDup() {
+      const p = P(), list = p ? picked(p) : []; if (!list.length) return;
+      sel = list.map(it => { const n = mk(p, it.type, it.x + 1, it.y + 1, it.rot, it.seats); ['w', 'h', 'label'].forEach(k => { if (it[k] != null) n[k] = it[k]; }); return n.id; });
+      save(); drawSvg(); refreshSide();
+    },
+    fpDel() { const p = P(); if (!p || !sel.length) return; p.items = p.items.filter(i => !sel.includes(i.id)); sel = []; save(); drawSvg(); refreshSide(); },
+    fpSeat(el) { step(it => { if (SEATED.includes(it.type)) it.seats = Math.max(1, Math.min(it.type === 'chairrow' ? 40 : 16, it.seats + Number(el.dataset.v))); }); },
     fpPng() {
       const p = P(); if (!p) return;
       const b = build(p, null, setupMode()), sc = 2, x = `<svg xmlns="http://www.w3.org/2000/svg" width="${b.vw * sc}" height="${b.vh * sc}" viewBox="0 0 ${b.vw} ${b.vh}" font-family="IBM Plex Sans Thai, Tahoma, sans-serif">${b.svg}</svg>`;
