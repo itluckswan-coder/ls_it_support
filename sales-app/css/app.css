@@ -651,3 +651,39 @@ main.bleed{padding:0;max-width:none}
 .fp-sw.on{outline:2px solid var(--ink);outline-offset:2px}
 #fpUndo{display:inline-flex;align-items:center;gap:6px}
 #fpUndo:disabled{opacity:.45;cursor:default}
+
+/* ---------- รายละเอียดฟังก์ชัน (Banquet Function Event form) ---------- */
+.fnf-wrap{overflow-x:auto;background:var(--bg);padding:4px 0 20px}
+.fnf-paper{background:#fff;color:#111;width:1060px;margin:0 auto;padding:22px 26px;box-shadow:0 2px 12px rgba(0,0,0,.08);font:12.5px/1.45 var(--fb);page:fnland}
+.fnf-head{display:grid;grid-template-columns:200px 1fr 300px;align-items:center;gap:12px;margin-bottom:6px}
+.fnf-head img{width:170px}
+.fnf-title{text-align:center;font-size:14px}
+.fnf-meta{border-collapse:collapse;width:100%}
+.fnf-meta th{text-align:right;font-weight:600;padding:2px 8px;white-space:nowrap;font-size:12px}
+.fnf-meta td{border-bottom:1px solid #444;padding:2px 6px;text-align:center}
+.fnf-no{font:700 18px var(--fh)}
+.fnf-org{display:flex;justify-content:space-between;gap:20px;margin:4px 0 8px;font-size:13px}
+.fnf-t{width:100%;border-collapse:collapse;margin-top:-1px;table-layout:fixed}
+.fnf-t th,.fnf-t td{border:1px solid #333;padding:6px 8px;vertical-align:top;word-wrap:break-word}
+.fnf-t th{font-weight:600;text-align:right;width:130px;background:#fafafa}
+.fnf-t th.sec{text-align:center;width:auto;background:#f1f0eb}
+.fnf-t td.c{text-align:center;vertical-align:middle}
+.fnf-menu{text-align:center}
+.fnf-mt{font-weight:600;font-size:13px}
+.fnf-mh{font-weight:600;margin:2px 0 4px}
+.fnf-fyi{margin-top:8px}
+.fnf-small{font-size:11px;font-weight:400}
+.fnf-total{font:700 16px var(--fh)}
+.fnf-sign{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:22px;text-align:center}
+.fnf-sign span{display:block;text-align:left;font-weight:600}
+.fnf-line{border-bottom:1px solid #333;margin:28px 40px 6px}
+.fnf-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;align-items:start}
+.fnf-form h3{margin:0 0 6px}
+.fnf-mrow{border-top:1px solid var(--line);padding:10px 0;margin-top:6px}
+@page fnland{size:A4 landscape;margin:8mm}
+@media print{
+  .fnf-wrap{background:#fff;padding:0;overflow:visible}
+  .fnf-paper{box-shadow:none;width:auto;padding:0;margin:0;font-size:11px}
+  .fnf-t th,.fnf-t td{padding:4px 6px}
+  .fnf-t{break-inside:avoid}
+}
