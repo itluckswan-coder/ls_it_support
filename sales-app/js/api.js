@@ -10,7 +10,7 @@
   const Approval = {
     RANK,
     content(b) {
-      const { approval, status, rev, revNote, signoff, ...c } = b || {};
+      const { approval, status, rev, revNote, signoff, ss, ...c } = b || {};
       c.depts = Object.fromEntries(Object.entries((b && b.depts) || {}).map(([k, v]) => [k, { items: v.items || [], owner: v.owner || '' }]));
       return c;
     },
