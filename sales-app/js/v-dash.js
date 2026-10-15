@@ -136,6 +136,7 @@
     <button class="chip ${ui.month == null ? 'on' : ''}" data-act="dashMonth" data-v="" aria-pressed="${ui.month == null}">ทั้งปี</button>
     ${U.MS.map((m, i) => `<button class="chip ${ui.month === i ? 'on' : ''} ${ui.year === thisY && i === thisM ? 'now' : ''}" data-act="dashMonth" data-v="${i}" aria-pressed="${ui.month === i}">${m}</button>`).join('')}
   </div>
+  <button class="btn ghost sm dash-reset" data-act="dashReset" title="กลับไปเดือนปัจจุบัน"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>รีเซ็ต</button>
 </section>
 <div class="grid g4" style="margin-bottom:16px">
   <div class="card kpi" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="small" style="color:#C9CFCC">รายรับยืนยันทั้งช่วง</div><div class="v" style="color:var(--yellow)">${baht(total)}</div><div class="small" style="color:#C9CFCC">${cq.length} งาน · ${U.n(pax)} ท่าน</div></div>
@@ -193,6 +194,8 @@
   Object.assign(App.ACT, {
     dashMode(el) { App.state.ui.dash.mode = el.dataset.v; App.render(); },
     dashYear(el) { const ui = App.state.ui.dash, ys = yearSpan(); ui.year = Math.min(ys.max, Math.max(ys.min, ui.year + Number(el.dataset.v))); App.render(); },
+    // back to the current year and month
+    dashReset() { const ui = App.state.ui.dash, t = U.d(U.today()); ui.year = t.getFullYear(); ui.month = t.getMonth(); App.render(); },
     dashMonth(el) { const ui = App.state.ui.dash; ui.month = el.dataset.v === '' ? null : Number(el.dataset.v); App.render(); },
     dashTable() { App.state.ui.dash.table = !App.state.ui.dash.table; App.render(); },
     dashCsv() {
