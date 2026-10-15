@@ -71,9 +71,9 @@
       return `<div class="split left side260">${left}
   <div style="min-width:0">
     <div class="page-hd" style="align-items:flex-start;margin-bottom:16px"><div>
-      <div class="row wrap small" style="gap:8px"><span class="mono muted">${H(b.id)}</span><a class="link" href="#/quote/${encodeURIComponent(q.id)}">อ้างอิง ${H(q.id)}</a>${b.rev ? `<span class="badge st-tentative">แก้ไขครั้งที่ ${b.rev}${b.revNote ? ' · ' + H(b.revNote) : ''}</span>` : ''}</div>
+      <div class="row wrap small" style="gap:8px"><span class="mono muted">${H(b.id)}</span>${b.fn && b.fn.no ? `<span class="badge st-draft">Function No. ${H(b.fn.no)}</span>` : ''}<a class="link" href="#/quote/${encodeURIComponent(q.id)}">อ้างอิง ${H(q.id)}</a>${b.rev ? `<span class="badge st-tentative">แก้ไขครั้งที่ ${b.rev}${b.revNote ? ' · ' + H(b.revNote) : ''}</span>` : ''}</div>
       <h1 style="margin-top:6px">${H(q.title)} · ${H(q.client)}</h1></div>
-      <div class="row wrap"><a class="btn ghost no-print" href="#/plan/${encodeURIComponent(b.id)}/${ui.day}">ออกแบบผังงาน</a>${App.me() && App.me().role === 'admin' ? '<a class="btn ghost no-print" href="#/plansetup">แก้ไขปรับปรุง</a>' : ''}<button class="btn ghost" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red" data-act="beoSend" ${g.Approval.state(b) === 'approved' ? '' : 'disabled title="ต้องได้รับอนุมัติก่อน"'}>${b.status === 'draft' ? 'ส่งให้ ' + Object.keys(D.DEPTS).length + ' แผนก' : 'ส่งฉบับแก้ไข'}</button></div></div>
+      <div class="row wrap"><a class="btn ghost no-print" href="#/fn/${encodeURIComponent(b.id)}">รายละเอียดฟังก์ชัน</a><a class="btn ghost no-print" href="#/plan/${encodeURIComponent(b.id)}/${ui.day}">ออกแบบผังงาน</a>${App.me() && App.me().role === 'admin' ? '<a class="btn ghost no-print" href="#/plansetup">แก้ไขปรับปรุง</a>' : ''}<button class="btn ghost" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red" data-act="beoSend" ${g.Approval.state(b) === 'approved' ? '' : 'disabled title="ต้องได้รับอนุมัติก่อน"'}>${b.status === 'draft' ? 'ส่งให้ ' + Object.keys(D.DEPTS).length + ' แผนก' : 'ส่งฉบับแก้ไข'}</button></div></div>
     ${apprBanner(b)}
     <section class="card facts" style="margin-bottom:16px">
       <div><div class="k">วันงาน</div><div class="v">${U.fmtRange(q.start, q.end)}</div></div>
@@ -136,6 +136,10 @@
       const ka = new Set(A.map(key)), kb = new Set(B.map(key));
       B.filter(r => !ka.has(key(r))).forEach(r => add(`วันที่ ${d} · เพิ่ม ${H(r.time)} ${H(r.task)} (${H(dept(r.dept).short)}${r.place ? ' · ' + H(r.place) : ''})`, 'plus'));
       A.filter(r => !kb.has(key(r))).forEach(r => add(`วันที่ ${d} · ลบ ${H(r.time)} ${H(r.task)} (${H(dept(r.dept).short)})`, 'minus'));
+    }
+    if (JSON.stringify(base.fn || {}) !== JSON.stringify(cur.fn || {})) {
+      const A = base.fn || {}, B = cur.fn || {}, keys = [...new Set([...Object.keys(A), ...Object.keys(B)])].filter(k => JSON.stringify(A[k]) !== JSON.stringify(B[k]));
+      add(`รายละเอียดฟังก์ชัน · แก้ไข ${keys.length} ช่อง${B.no !== A.no ? ' (Function No. ' + H(A.no || '—') + ' → <b>' + H(B.no || '—') + '</b>)' : ''}`, 'chg');
     }
     for (const d of new Set([...Object.keys(base.plans || {}), ...Object.keys(cur.plans || {})])) {
       const A = (base.plans || {})[d], B = (cur.plans || {})[d];
