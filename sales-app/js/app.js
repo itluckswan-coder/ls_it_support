@@ -23,7 +23,7 @@
 
   const NAV = [
     ['home', 'หน้าหลัก', '#/home'], ['meet', 'ห้องประชุม', '#/meet'], ['room', 'ห้องพัก', '#/rooms'], ['food', 'จัดเลี้ยง', '#/food'], ['quote', 'ใบเสนอราคา', '#/quotes'],
-    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users'], ['dash', 'Dashboard', '#/dash']
+    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users'], ['tasks', 'Assignment & Approve', '#/tasks'], ['dash', 'Dashboard', '#/dash']
   ];
 
   const App = {
@@ -126,13 +126,14 @@
   <a class="brand" href="#/home"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort"><span class="sep"></span><span class="t">ลักษวรรณ รีสอร์ต<small>ฝ่ายขาย</small></span></a>
   <nav class="nav">${nav.map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}">${n[1]}</a>`).join('')}</nav>
   <div class="tb-right">
+    ${App.bellButton ? App.bellButton() : ''}
     <button class="search-btn" data-act="toggleSearch" aria-label="ค้นหา">${ICON.search}</button>
     <div class="search" id="searchBox"><input type="search" placeholder="ค้นหาลูกค้า, ใบเสนอราคา…" data-input="search" aria-label="ค้นหา" autocomplete="off"><div class="search-res hidden" id="searchRes"></div></div>
     <button class="avatar" data-act="userMenu" aria-label="บัญชีผู้ใช้">${H(U.initials(me && me.name))}</button>
   </div>
 </header>
 <main class="${view && view.bleed ? 'bleed' : ''}">${body}</main>
-<nav class="tabbar">${tabs.map(t => `<a href="${t[2]}" class="${t[0] === active ? 'on' : ''}">${t[3]}<span>${t[1]}</span></a>`).join('')}<a href="#" data-act="drawer" class="${['food', 'meet', 'room', 'staff', 'users', 'dash'].includes(active) ? 'on' : ''}">${ICON.more}<span>เพิ่มเติม</span></a></nav>`;
+<nav class="tabbar">${tabs.map(t => `<a href="${t[2]}" class="${t[0] === active ? 'on' : ''}">${t[3]}<span>${t[1]}</span></a>`).join('')}<a href="#" data-act="drawer" class="${['food', 'meet', 'room', 'staff', 'users', 'tasks', 'dash'].includes(active) ? 'on' : ''}">${ICON.more}<span>เพิ่มเติม</span></a></nav>`;
     },
 
     /* ---------- ui helpers ---------- */
@@ -503,7 +504,7 @@
     const cloud = g.API ? await g.API.detect() : false;
     if (cloud) {
       try { const raw = localStorage.getItem(Store.KEY); Store.db = raw ? JSON.parse(raw) : null; } catch (e) { Store.db = null; }
-      if (!Store.db) Store.db = { v: 1, settings: Store.seedData().settings, users: [], quotes: [], beos: [], employees: [], staff: {}, seq: {} };
+      if (!Store.db) Store.db = { v: 1, settings: Store.seedData().settings, users: [], quotes: [], beos: [], employees: [], staff: {}, tasks: [], seq: {} };
       g.DATA.applyCatalog(Store.db.catalog && Store.db.catalog.food);
       g.API.rememberBeos();
       if (g.API.token && !g.API.setup) {
