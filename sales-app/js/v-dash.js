@@ -14,19 +14,28 @@
 
   /* ---- periods: weeks start Monday; revenue counts on the event's start date ---- */
   function weekStart(iso) { const d = U.d(iso), dow = (d.getDay() + 6) % 7; return U.addDays(iso, -dow); }
-  function periods(mode) {
-    const t = U.today(), out = [];
-    if (mode === 'week') {
-      const w0 = weekStart(t);
-      for (let i = -8; i <= 7; i++) {
-        const a = U.addDays(w0, i * 7), b = U.addDays(a, 6), da = U.d(a), db = U.d(b);
-        out.push({ a, b, cur: i === 0, label: da.getDate() + (da.getMonth() !== db.getMonth() ? ' ' + U.MS[da.getMonth()] : '') + '–' + db.getDate() + ' ' + U.MS[db.getMonth()], tick: da.getDate() + ' ' + U.MS[da.getMonth()] });
-      }
+  const UNIT = { day: 'วัน', week: 'สัปดาห์', month: 'เดือน' };
+  // selected range: a calendar year, or one month of it
+  function range(ui) {
+    if (ui.month == null) return { a: ui.year + '-01-01', b: ui.year + '-12-31', label: 'ปี ' + U.be(ui.year) };
+    const m = new Date(ui.year, ui.month, 1), e = new Date(ui.year, ui.month + 1, 0);
+    return { a: U.iso(m), b: U.iso(e), label: U.ML[ui.month] + ' ' + U.be(ui.year) };
+  }
+  function prevRange(ui) { return range(ui.month == null ? { year: ui.year - 1, month: null } : { year: ui.month ? ui.year : ui.year - 1, month: ui.month ? ui.month - 1 : 11 }); }
+  // year → by month or week; month → by day or week
+  const modesFor = ui => ui.month == null ? ['week', 'month'] : ['day', 'week'];
+  function periods(ui) {
+    const t = U.today(), r = range(ui), out = [];
+    const push = (a, b, label, tick) => out.push({ a, b, label, tick, cur: t >= a && t <= b });
+    if (ui.mode === 'month') {
+      for (let m = 0; m < 12; m++) { const x = new Date(ui.year, m, 1); push(U.iso(x), U.iso(new Date(ui.year, m + 1, 0)), U.MS[m] + ' ' + U.be(ui.year), U.MS[m]); }
+    } else if (ui.mode === 'day') {
+      for (const d of U.daysOf(r.a, r.b)) { const x = U.d(d); push(d, d, U.fmtD(d, { dow: true }), String(x.getDate())); }
     } else {
-      const d = U.d(t);
-      for (let i = -6; i <= 5; i++) {
-        const m = new Date(d.getFullYear(), d.getMonth() + i, 1), e = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-        out.push({ a: U.iso(m), b: U.iso(e), cur: i === 0, label: U.MS[m.getMonth()] + ' ' + U.be(m.getFullYear()), tick: U.MS[m.getMonth()] + (m.getMonth() === 0 || i === -6 ? ' ' + String(U.be(m.getFullYear())).slice(2) : '') });
+      // Monday-start weeks, clipped to the selected range
+      for (let a = weekStart(r.a); a <= r.b; a = U.addDays(a, 7)) {
+        const s0 = a < r.a ? r.a : a, e0 = U.addDays(a, 6) > r.b ? r.b : U.addDays(a, 6), ds = U.d(s0), de = U.d(e0);
+        push(s0, e0, ds.getDate() + (ds.getMonth() !== de.getMonth() ? ' ' + U.MS[ds.getMonth()] : '') + '–' + de.getDate() + ' ' + U.MS[de.getMonth()], ds.getDate() + ' ' + U.MS[ds.getMonth()]);
       }
     }
     return out;
@@ -84,8 +93,9 @@
     render() {
       const me = App.me();
       if (!me || me.role !== 'admin') return '<div class="card pad" style="max-width:520px;margin:40px auto;text-align:center"><h2>เฉพาะผู้ดูแลระบบ</h2><p class="muted">หน้า Dashboard เปิดดูได้เฉพาะบทบาทผู้ดูแลระบบ</p><a class="btn ghost" href="#/home">กลับหน้าหลัก</a></div>';
-      const ui = App.state.ui.dash || (App.state.ui.dash = { mode: 'month', table: false });
-      const db = Store.db, ps = periods(ui.mode), from = ps[0].a, to = ps[ps.length - 1].b;
+      const ui = App.state.ui.dash || (App.state.ui.dash = { year: U.d(U.today()).getFullYear(), month: null, mode: 'month', table: false });
+      if (!modesFor(ui).includes(ui.mode)) ui.mode = ui.month == null ? 'month' : 'week';
+      const db = Store.db, ps = periods(ui), rg = range(ui), pr = prevRange(ui), from = rg.a, to = rg.b;
       const live = db.quotes.filter(q => q.status !== 'cancelled');
       const inRange = q => q.start >= from && q.start <= to;
       const idx = q => ps.findIndex(p => q.start >= p.a && q.start <= p.b);
@@ -94,9 +104,9 @@
       const cq = live.filter(q => q.status === 'confirmed' && inRange(q));
       const total = conf.reduce((a, v) => a + v, 0), pipe = pend.reduce((a, v) => a + v, 0);
       const pax = cq.reduce((a, q) => a + (Number(q.pax) || 0), 0);
-      const ci = ps.findIndex(p => p.cur), curV = conf[ci] || 0, prevV = ci > 0 ? conf[ci - 1] : 0;
-      const delta = prevV ? Math.round((curV - prevV) / prevV * 100) : null;
-      const unit = ui.mode === 'week' ? 'สัปดาห์' : 'เดือน';
+      const prevV = live.filter(q => q.status === 'confirmed' && q.start >= pr.a && q.start <= pr.b).reduce((a, q) => a + App.calc(q).net, 0);
+      const delta = prevV ? Math.round((total - prevV) / prevV * 100) : null;
+      const unit = UNIT[ui.mode], thisY = U.d(U.today()).getFullYear(), thisM = U.d(U.today()).getMonth();
       // revenue by section (before discount, service charge and VAT)
       const bySec = SEC.map(([k, name, color]) => ({ name, color, v: cq.reduce((a, q) => a + (App.calc(q).by[k] || 0), 0) }));
       // quote status mix (count + value) for events in range
@@ -107,21 +117,28 @@
       const people = {};
       for (const q of cq) people[q.owner] = (people[q.owner] || 0) + App.calc(q).net;
       const team = Object.entries(people).map(([id, v]) => ({ name: (db.users.find(u => u.id === id) || {}).name || 'ไม่ระบุ', v, color: C.teal })).sort((a, b) => b.v - a.v);
-      const rangeTxt = U.fmtD(from, { year: false }) + ' – ' + U.fmtD(to);
+      const rangeTxt = rg.label + ' (' + U.fmtD(from, { year: false }) + ' – ' + U.fmtD(to) + ')';
       return `
 <div class="page-hd"><div><h1>Dashboard</h1><div class="small muted">ช่วง ${H(rangeTxt)} · นับรายรับตามวันจัดงาน · เฉพาะผู้ดูแลระบบ</div></div>
-  <div class="row wrap"><div class="seg white" role="group" aria-label="ช่วงเวลา"><button class="${ui.mode === 'week' ? 'on' : ''}" data-act="dashMode" data-v="week" aria-pressed="${ui.mode === 'week'}">รายสัปดาห์</button><button class="${ui.mode === 'month' ? 'on' : ''}" data-act="dashMode" data-v="month" aria-pressed="${ui.mode === 'month'}">รายเดือน</button></div>
+  <div class="row wrap"><div class="seg white" role="group" aria-label="แสดงเป็น">${modesFor(ui).map(m => `<button class="${ui.mode === m ? 'on' : ''}" data-act="dashMode" data-v="${m}" aria-pressed="${ui.mode === m}">ราย${UNIT[m]}</button>`).join('')}</div>
   <button class="btn ghost" data-act="dashCsv">ดาวน์โหลด CSV</button></div></div>
+<section class="card dash-pick" aria-label="เลือกช่วงเวลา">
+  <div class="dash-year"><button class="icon-btn" data-act="dashYear" data-v="-1" aria-label="ปีก่อน">${App.ICON.left}</button><b>ปี ${U.be(ui.year)}</b><button class="icon-btn" data-act="dashYear" data-v="1" aria-label="ปีถัดไป">${App.ICON.right}</button></div>
+  <div class="dash-months" role="group" aria-label="เลือกเดือน">
+    <button class="chip ${ui.month == null ? 'on' : ''}" data-act="dashMonth" data-v="" aria-pressed="${ui.month == null}">ทั้งปี</button>
+    ${U.MS.map((m, i) => `<button class="chip ${ui.month === i ? 'on' : ''} ${ui.year === thisY && i === thisM ? 'now' : ''}" data-act="dashMonth" data-v="${i}" aria-pressed="${ui.month === i}">${m}</button>`).join('')}
+  </div>
+</section>
 <div class="grid g4" style="margin-bottom:16px">
   <div class="card kpi" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="small" style="color:#C9CFCC">รายรับยืนยันทั้งช่วง</div><div class="v" style="color:var(--yellow)">${baht(total)}</div><div class="small" style="color:#C9CFCC">${cq.length} งาน · ${U.n(pax)} ท่าน</div></div>
-  <div class="card kpi"><div class="small muted">${unit}นี้ (${H(ps[ci] ? ps[ci].label : '')})</div><div class="v">${baht(curV)}</div><div class="small ${delta == null ? 'muted' : delta >= 0 ? 'teal' : 'red'}">${delta == null ? 'ไม่มีข้อมูล' + unit + 'ก่อน' : (delta >= 0 ? '▲ ' : '▼ ') + Math.abs(delta) + '% จาก' + unit + 'ก่อน'}</div></div>
+  <div class="card kpi"><div class="small muted">เทียบกับ${H(pr.label)}</div><div class="v ${delta == null ? '' : delta >= 0 ? 'teal' : 'red'}">${delta == null ? '—' : (delta >= 0 ? '▲ ' : '▼ ') + Math.abs(delta) + '<small>%</small>'}</div><div class="small muted">${H(pr.label)} ${baht(prevV)}${delta == null ? ' · ไม่มีงานยืนยันให้เทียบ' : ''}</div></div>
   <div class="card kpi"><div class="small muted">รอยืนยัน (ส่งแล้ว + จองชั่วคราว)</div><div class="v" style="color:var(--yellow-d)">${baht(pipe)}</div><div class="small muted">ถ้าปิดได้ทั้งหมด รวม ${baht(total + pipe)}</div></div>
   <div class="card kpi"><div class="small muted">ปิดการขายได้</div><div class="v">${sent.length ? Math.round(won.length / sent.length * 100) : 0}<small>%</small></div><div class="small muted">ยืนยัน ${won.length} จาก ${sent.length} ใบที่ส่ง · เฉลี่ย ${baht(cq.length ? total / cq.length : 0)}/งาน</div></div>
 </div>
 <section class="card" style="margin-bottom:16px;overflow:hidden">
-  <div class="card-hd"><div><h2>รายรับ${unit === 'สัปดาห์' ? 'รายสัปดาห์' : 'รายเดือน'}</h2><div class="small muted">ชี้หรือแตะที่กราฟเพื่อดูตัวเลข</div></div>
+  <div class="card-hd"><div><h2>รายรับราย${unit} · ${H(rg.label)}</h2><div class="small muted">ชี้หรือแตะที่กราฟเพื่อดูตัวเลข</div></div>
     <div class="row wrap" style="gap:14px"><span class="dash-key"><i style="background:${C.teal}"></i>ยืนยันแล้ว</span><span class="dash-key"><i class="dash" style="border-color:${C.amber}"></i>รอยืนยัน</span><button class="link" data-act="dashTable">${ui.table ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง'}</button></div></div>
-  <div class="pad dash-chart">${ui.table ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>${unit}</th><th class="r">ยืนยันแล้ว (฿)</th><th class="r">รอยืนยัน (฿)</th></tr></thead><tbody>${ps.map((p, i) => `<tr${p.cur ? ' style="font-weight:600"' : ''}><td>${H(p.label)}${p.cur ? ' (ปัจจุบัน)' : ''}</td><td class="r num">${U.n(Math.round(conf[i]))}</td><td class="r num">${U.n(Math.round(pend[i]))}</td></tr>`).join('')}</tbody></table></div>`
+  <div class="pad dash-chart">${ui.table ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>${unit}</th><th class="r">ยืนยันแล้ว (฿)</th><th class="r">รอยืนยัน (฿)</th></tr></thead><tbody>${ps.map((p, i) => `<tr${p.cur ? ' style="font-weight:600"' : ''}><td>${H(p.label)}${p.cur ? ' (วันนี้อยู่ในช่วงนี้)' : ''}</td><td class="r num">${U.n(Math.round(conf[i]))}</td><td class="r num">${U.n(Math.round(pend[i]))}</td></tr>`).join('')}</tbody></table></div>`
       : lineChart(ps, [{ name: 'ยืนยันแล้ว', vals: conf, color: C.teal }, { name: 'รอยืนยัน', vals: pend, color: C.amber, dash: true }])}</div>
 </section>
 <div class="split" style="margin-bottom:16px">
@@ -167,15 +184,17 @@
 
   Object.assign(App.ACT, {
     dashMode(el) { App.state.ui.dash.mode = el.dataset.v; App.render(); },
+    dashYear(el) { App.state.ui.dash.year += Number(el.dataset.v); App.render(); },
+    dashMonth(el) { const ui = App.state.ui.dash; ui.month = el.dataset.v === '' ? null : Number(el.dataset.v); App.render(); },
     dashTable() { App.state.ui.dash.table = !App.state.ui.dash.table; App.render(); },
     dashCsv() {
-      const ui = App.state.ui.dash, ps = periods(ui.mode), db = Store.db;
+      const ui = App.state.ui.dash, ps = periods(ui), db = Store.db;
       const rows = ps.map(p => {
         const qs = db.quotes.filter(q => q.start >= p.a && q.start <= p.b);
         const sum = st => Math.round(qs.filter(q => st.includes(q.status)).reduce((a, q) => a + App.calc(q).net, 0));
         return [p.label, p.a, p.b, sum(['confirmed']), sum(PENDING), qs.filter(q => q.status === 'confirmed').length].join(',');
       });
-      U.download('dashboard-' + ui.mode + '-' + U.today() + '.csv', '﻿' + ['ช่วง,ตั้งแต่,ถึง,รายรับยืนยัน (บาท),รอยืนยัน (บาท),จำนวนงานยืนยัน'].concat(rows).join('\n'), 'text/csv');
+      U.download('dashboard-' + range(ui).a.slice(0, ui.month == null ? 4 : 7) + '-' + ui.mode + '.csv', '﻿' + ['ช่วง,ตั้งแต่,ถึง,รายรับยืนยัน (บาท),รอยืนยัน (บาท),จำนวนงานยืนยัน'].concat(rows).join('\n'), 'text/csv');
     }
   });
 })(window);
