@@ -73,7 +73,7 @@
     <div class="page-hd" style="align-items:flex-start;margin-bottom:16px"><div>
       <div class="row wrap small" style="gap:8px"><span class="mono muted">${H(b.id)}</span><a class="link" href="#/quote/${encodeURIComponent(q.id)}">อ้างอิง ${H(q.id)}</a>${b.rev ? `<span class="badge st-tentative">แก้ไขครั้งที่ ${b.rev}${b.revNote ? ' · ' + H(b.revNote) : ''}</span>` : ''}</div>
       <h1 style="margin-top:6px">${H(q.title)} · ${H(q.client)}</h1></div>
-      <div class="row"><button class="btn ghost" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red" data-act="beoSend" ${g.Approval.state(b) === 'approved' ? '' : 'disabled title="ต้องได้รับอนุมัติก่อน"'}>${b.status === 'draft' ? 'ส่งให้ ' + Object.keys(D.DEPTS).length + ' แผนก' : 'ส่งฉบับแก้ไข'}</button></div></div>
+      <div class="row wrap"><a class="btn ghost no-print" href="#/plan/${encodeURIComponent(b.id)}/${ui.day}">ออกแบบผังงาน</a>${App.me() && App.me().role === 'admin' ? '<a class="btn ghost no-print" href="#/plansetup">แก้ไขปรับปรุง</a>' : ''}<button class="btn ghost" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red" data-act="beoSend" ${g.Approval.state(b) === 'approved' ? '' : 'disabled title="ต้องได้รับอนุมัติก่อน"'}>${b.status === 'draft' ? 'ส่งให้ ' + Object.keys(D.DEPTS).length + ' แผนก' : 'ส่งฉบับแก้ไข'}</button></div></div>
     ${apprBanner(b)}
     <section class="card facts" style="margin-bottom:16px">
       <div><div class="k">วันงาน</div><div class="v">${U.fmtRange(q.start, q.end)}</div></div>
@@ -88,6 +88,9 @@
         <div class="row">${days.length > 1 ? `<div class="seg">${days.map((d, i) => `<button class="${ui.day === i + 1 ? 'on' : ''}" data-act="beoDay" data-v="${i + 1}">วันที่ ${i + 1}</button>`).join('')}</div>` : ''}<button class="btn ghost sm no-print" data-act="beoImport">นำเข้าจากไฟล์</button><button class="btn ghost sm no-print" data-act="beoRow" data-i="-1">+ เพิ่ม</button></div></div>
       <table class="tbl sched resp"><tbody>${sched.map(s => { const i = b.schedule[ui.day].indexOf(s); return `<tr class="click" data-act="beoRow" data-i="${i}"><td class="b num" style="width:80px">${H(s.time)}</td><td>${H(s.task)}</td><td class="muted hide-m">${H(s.place)}</td><td class="r">${tag(s.dept)}</td></tr>`; }).join('') || '<tr><td><div class="empty small">ยังไม่มีกำหนดการ — กด “+ เพิ่ม”</div></td></tr>'}</tbody></table>
     </section>
+    ${(() => { const pl = b.plans && b.plans[ui.day]; if (!pl) return ''; const seats = App.planSeats(pl); return `<section class="card" style="margin-bottom:16px;overflow:hidden">
+      <div class="card-hd"><div><h2>ผังงาน · วันที่ ${ui.day}</h2><div class="small muted">ที่นั่งรวม ${seats} ที่${q.pax && seats !== Number(q.pax) ? ' · ใบเสนอ ' + q.pax + ' ท่าน' : ''}</div></div><a class="btn ghost sm no-print" href="#/plan/${encodeURIComponent(b.id)}/${ui.day}">แก้ไขผัง</a></div>
+      <a href="#/plan/${encodeURIComponent(b.id)}/${ui.day}" class="fp-thumb" aria-label="เปิดผังงานวันที่ ${ui.day}">${App.planSvg(pl)}</a></section>`; })()}
     <div class="dcards" style="margin-bottom:16px">${D.DEPTS.map(dp => {
       const x = b.depts[dp.id] || { items: [], owner: '', ack: false };
       return `<section class="card dcard"><div class="between"><div class="row"><span class="dot" style="background:${dp.color};border-radius:3px;width:11px;height:11px"></span><h3 style="font-size:15px">${H(dp.name)}</h3></div>
@@ -133,6 +136,13 @@
       const ka = new Set(A.map(key)), kb = new Set(B.map(key));
       B.filter(r => !ka.has(key(r))).forEach(r => add(`วันที่ ${d} · เพิ่ม ${H(r.time)} ${H(r.task)} (${H(dept(r.dept).short)}${r.place ? ' · ' + H(r.place) : ''})`, 'plus'));
       A.filter(r => !kb.has(key(r))).forEach(r => add(`วันที่ ${d} · ลบ ${H(r.time)} ${H(r.task)} (${H(dept(r.dept).short)})`, 'minus'));
+    }
+    for (const d of new Set([...Object.keys(base.plans || {}), ...Object.keys(cur.plans || {})])) {
+      const A = (base.plans || {})[d], B = (cur.plans || {})[d];
+      if (JSON.stringify(A || null) === JSON.stringify(B || null)) continue;
+      if (!A) add(`วันที่ ${H(d)} · เพิ่มผังงาน (${App.planSeats(B)} ที่นั่ง)`, 'plus');
+      else if (!B) add(`วันที่ ${H(d)} · ลบผังงาน`, 'minus');
+      else add(`วันที่ ${H(d)} · แก้ไขผังงาน (ที่นั่ง <s>${App.planSeats(A)}</s> → <b>${App.planSeats(B)}</b>)`, 'chg');
     }
     for (const dp of D.DEPTS) {
       const A = (base.depts || {})[dp.id] || { items: [], owner: '' }, B = (cur.depts || {})[dp.id] || { items: [], owner: '' };
