@@ -7,17 +7,26 @@
 
   // room sizes in metres (width × depth)
   const ROOM_DIM = { kinnaree: [24, 18], thikhampon: [13.9, 12.1], ruenhong: [20, 7], prayamengrai: [10, 7], pool: [30, 20] };
-  const NAMES = { round: 'โต๊ะกลม', rect: 'โต๊ะยาว', chairrow: 'แถวเก้าอี้', class: 'โต๊ะห้องเรียน', stage: 'เวที', screen: 'จอ', podium: 'โพเดียม', lect: 'โต๊ะบรรยาย', sound: 'คุมเสียง', buffet: 'บุฟเฟ่ต์', reg: 'ลงทะเบียน', sofa: 'โซฟา', carpet: 'พรมแดง', door: 'ประตู' };
+  const NAMES = { round: 'โต๊ะกลม', rect: 'โต๊ะยาว', chairrow: 'แถวเก้าอี้', class: 'โต๊ะห้องเรียน', stage: 'เวที', screen: 'จอ', podium: 'โพเดียม', lect: 'โต๊ะบรรยาย', sound: 'คุมเสียง', buffet: 'บุฟเฟ่ต์', reg: 'ลงทะเบียน', sofa: 'โซฟา', carpet: 'พรมแดง', door: 'ประตู', pillar: 'เสา', block: 'บล็อก/ป้าย' };
+  // default sizes in metres (w × d); a round table is its diameter. Tables sized by seat count keep their own length.
+  const DEF_SIZE = { round: [2.9, 2.9], stage: [7, 2.4], buffet: [3, 0.8], screen: [3, 0.25], sound: [1.5, 0.8], podium: [0.6, 0.6], sofa: [2, 0.8], reg: [2.4, 0.7], lect: [2.4, 0.9], carpet: [2.4, 14.4], door: [1, 0.3], pillar: [0.6, 0.6], block: [2, 1] };
+  const SIZED = Object.keys(DEF_SIZE);
+  const floor = () => (Store.db.settings && Store.db.settings.floor) || {};
+  // room size and locked fixtures from แก้ไขปรับปรุง, else the built-in size
+  const roomDim = id => { const r = (floor().rooms || {})[id]; return r && r.W && r.H ? [r.W, r.H] : ROOM_DIM[id] || [20, 14]; };
+  const fixedOf = id => (id && ((floor().rooms || {})[id] || {}).fixed) || [];
+  const sizeOf = t => (floor().sizes || {})[t] || DEF_SIZE[t] || [1, 0.3];
+  const roomName = id => { const r = D.MEETING_ROOMS.find(x => x.id === id); return r ? r.th || r.name : id; };
   const SEATED = ['round', 'rect', 'chairrow', 'class'];
-  const FILL = { stage: '#c9d6e8', buffet: '#e8d3b9', screen: '#555', door: '#fff', sound: '#ddd', podium: '#e6d5ef', sofa: '#f0c9c0', reg: '#d6e8d0', lect: '#f1e2b8', carpet: '#c0392b' };
+  const FILL = { stage: '#c9d6e8', buffet: '#e8d3b9', screen: '#555', door: '#fff', sound: '#ddd', podium: '#e6d5ef', sofa: '#f0c9c0', reg: '#d6e8d0', lect: '#f1e2b8', carpet: '#c0392b', pillar: '#9a9a9a', block: '#e4e2da' };
   const rlen = i => Math.max(1.5, Math.ceil(i.seats / 2) * 0.75);
   function dims(i) {
-    switch (i.type) {
-      case 'round': return [2.9, 2.9]; case 'rect': return [rlen(i) + 0.2, 2.1]; case 'chairrow': return [i.seats * 0.55, 0.5];
-      case 'stage': return [7, 2.4]; case 'buffet': return [3, 0.8]; case 'screen': return [3, 0.25]; case 'sound': return [1.5, 0.8];
-      case 'podium': return [0.6, 0.6]; case 'sofa': return [2, 0.8]; case 'reg': return [2.4, 0.7]; case 'class': return [i.seats * 0.6, 1.1];
-      case 'lect': return [2.4, 0.9]; case 'carpet': return [2.4, 14.4]; default: return [1, 0.3];
-    }
+    if (i.type === 'rect') return [rlen(i) + 0.2, 2.1];
+    if (i.type === 'chairrow') return [i.seats * 0.55, 0.5];
+    if (i.type === 'class') return [i.seats * 0.6, 1.1];
+    // a size set on this one object wins over the standard size
+    const d = i.w && i.h ? [i.w, i.h] : sizeOf(i.type);
+    return i.type === 'round' ? [d[0], d[0]] : d;
   }
   const seatsDefault = t => ({ round: 10, rect: 8, chairrow: 10, class: 3 }[t] || 0);
 
@@ -25,10 +34,24 @@
   const curBeo = () => Store.db.beos.find(b => b.id === App.state.params[0]);
   const dayOf = () => Math.max(1, Number(App.state.params[1]) || 1);
   const canEdit = () => App.can('create_quote') || App.can('staff');
+  const isAdmin = () => { const me = App.me(); return !!me && me.role === 'admin'; };
   function planOf(b, day) { return b && b.plans && b.plans[day]; }
+  // bounding box of an item in metres (rotation rounded to the nearest quarter turn, other angles use the longer side)
+  function box(i) {
+    const [w, h] = dims(i), q = ((Math.round(i.rot / 90) % 2) + 2) % 2, odd = i.rot % 90 !== 0;
+    const bw = odd ? Math.max(w, h) : q ? h : w, bh = odd ? Math.max(w, h) : q ? w : h;
+    return { x0: i.x - bw / 2, x1: i.x + bw / 2, y0: i.y - bh / 2, y1: i.y + bh / 2 };
+  }
+  const overlaps = (a, b) => a.x0 < b.x1 - 0.05 && b.x0 < a.x1 - 0.05 && a.y0 < b.y1 - 0.05 && b.y0 < a.y1 - 0.05;
   function mk(p, type, x, y, rot = 0, seats) {
     const id = (p.items.reduce((m, i) => Math.max(m, i.id), 0) || 0) + 1;
     const it = { id, type, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, rot, seats: seats == null ? seatsDefault(type) : seats };
+    if (p._auto) {
+      // generated plans work around the room's locked fixtures and do not repeat them (a fixed stage means no second stage)
+      const fixed = fixedOf(p.room);
+      if (!SEATED.includes(type) && fixed.some(f => f.type === type)) return null;
+      const b = box(it); if (fixed.some(f => overlaps(box(f), b))) return null;
+    }
     p.items.push(it); return it;
   }
   const seatsOf = p => p.items.reduce((a, i) => a + (SEATED.includes(i.type) ? i.seats : 0), 0);
@@ -44,11 +67,11 @@
   function addFront(p, w, withScreen = true) { mk(p, 'stage', w / 2, 1.5); if (withScreen) mk(p, 'screen', w / 2, 0.3); }
   function genBanquet(p, w, h, pax, per = 10) {
     addFront(p, w); mk(p, 'sound', Math.max(1, w - 2), 1.4);
-    const sx = 3.2, sy = 2.9, nc = Math.max(1, Math.floor((w - 0.4) / sx)); let n = Math.ceil(pax / per);
+    const d = sizeOf('round')[0], sx = d + 0.3, sy = d, nc = Math.max(1, Math.floor((w - 0.4) / sx)); let n = Math.ceil(pax / per);
     for (let r = 0; n > 0; r++) {
-      const y = 4.6 + r * sy; if (y + 1.45 > h - 1) break;
+      const y = 3.15 + d / 2 + r * sy; if (y + d / 2 > h - 1) break;
       const c = r % 2 ? Math.max(1, nc - 1) : nc;
-      for (let k = 0; k < c && n > 0; k++, n--) mk(p, 'round', w / 2 + (k - (c - 1) / 2) * sx, y, 0, per);
+      for (let k = 0; k < c && n > 0; k++) if (mk(p, 'round', w / 2 + (k - (c - 1) / 2) * sx, y, 0, per)) n--;
     }
     mk(p, 'buffet', 2, h - 0.8); mk(p, 'door', w - 1.5, h);
     return n; // tables that did not fit
@@ -57,7 +80,7 @@
     addFront(p, w); mk(p, 'podium', w / 2 + 4, 1.4);
     const per = Math.max(4, Math.min(30, Math.floor((w - 2.4) / 0.55)));
     let left = pax, r = 0;
-    for (; left > 0; r++) { const y = 4.2 + r * 0.9; if (y > h - 1.2) break; const n = Math.min(per, left); mk(p, 'chairrow', w / 2, y, 0, n); left -= n; }
+    for (; left > 0; r++) { const y = 4.2 + r * 0.9; if (y > h - 1.2) break; const n = Math.min(per, left); if (mk(p, 'chairrow', w / 2, y, 0, n)) left -= n; }
     mk(p, 'door', 1.5, h);
     return Math.ceil(left / per);
   }
@@ -69,9 +92,9 @@
     P('stage', lw / 2, 1.5); P('podium', wide ? lw / 2 + 4.5 : lw - 0.8, wide ? 1.4 : 3.5); P('lect', wide ? lw / 2 - 4.8 : lw / 2, wide ? 1.4 : 3.5);
     if (vip) P('sofa', lw >= 20 ? 1.6 : 1.3, lw >= 20 ? 1.4 : 3.5);
     let left = pax, r = 0;
-    for (; r < rows && left > 0; r++) {
-      const y = y0 + r * 1.3; if (y > lh - 0.8) break;
-      for (let t = 0; t < tpr && left > 0; t++) { const s = Math.min(3, left); P('class', x0 + t * 1.8 + 0.9 + (ais && t >= tpr / 2 ? ais : 0), y, s); left -= s; }
+    for (; left > 0; r++) {
+      const y = y0 + r * 1.3; if (y > lh - 0.8 || (!p._auto && r >= rows)) break;
+      for (let t = 0; t < tpr && left > 0; t++) { const s = Math.min(3, left); if (P('class', x0 + t * 1.8 + 0.9 + (ais && t >= tpr / 2 ? ais : 0), y, s)) left -= s; }
     }
     if (!rot) mk(p, 'door', 1.5, h);
     return Math.ceil(left / 3);
@@ -91,10 +114,10 @@
     return 0;
   }
   function autoPlan(q, day, layout) {
-    const rf = roomFor(q, day), [w, h] = ROOM_DIM[rf.id] || [20, 14], pax = Number(q.pax) || 0;
-    const p = { title: (q.title || '') + ' · ' + ((rf.room && (rf.room.th || rf.room.name)) || 'ห้องจัดงาน') + ' · ' + pax + ' ท่าน', W: w, H: h, items: [] };
+    const rf = roomFor(q, day), [w, h] = roomDim(rf.id), pax = Number(q.pax) || 0;
+    const p = { title: (q.title || '') + ' · ' + ((rf.room && (rf.room.th || rf.room.name)) || 'ห้องจัดงาน') + ' · ' + pax + ' ท่าน', room: rf.room ? rf.id : undefined, W: w, H: h, items: [] };
     const lay = layout || rf.layout, gen = { theatre: genTheatre, classroom: genClass, ushape: genUshape, banquet: genBanquet, cocktail: (p2, a, b2, n) => genBanquet(p2, a, b2, n, 8) }[lay] || genBanquet;
-    p.missing = gen(p, w, h, pax) || 0;
+    p._auto = true; p.missing = gen(p, w, h, pax) || 0; delete p._auto;
     return p;
   }
 
@@ -122,9 +145,9 @@
     { r: 'เรือนหงส์', d: '26', l: 'Classroom', p: 30, g: 'class', note: '5 แถว แถวละ 6 ที่' }
   ];
   function histPlan(h) {
-    const [w, hh] = ROOM_DIM[HIST_ROOM[h.r]] || [20, 14];
-    const p = { title: h.r + ' · ' + h.l + ' ' + h.p + ' ท่าน', W: w, H: hh, items: [] };
-    p.missing = (h.g === 'class' ? genClass(p, w, hh, h.p) : genBanquet(p, w, hh, h.p)) || 0;
+    const [w, hh] = roomDim(HIST_ROOM[h.r]);
+    const p = { title: h.r + ' · ' + h.l + ' ' + h.p + ' ท่าน', room: HIST_ROOM[h.r], W: w, H: hh, items: [] };
+    p._auto = true; p.missing = (h.g === 'class' ? genClass(p, w, hh, h.p) : genBanquet(p, w, hh, h.p)) || 0; delete p._auto;
     return p;
   }
   function template(t, w, h) {
@@ -133,11 +156,11 @@
     if (t === 'theatre') genTheatre(p, w, h, Math.floor((w - 2.4) / 0.55) * Math.floor((h - 5.4) / 0.9));
     if (t === 'board') { mk(p, 'screen', w / 2, 0.3); mk(p, 'rect', w / 2, h / 2, 0, 14); mk(p, 'door', 1.5, h); }
     if (t === 'kin') {
-      p.W = 24; p.H = 18; [7, 6, 6, 6].forEach((n, r) => { for (let c = 0; c < n; c++) mk(p, 'round', 12 + (c - (n - 1) / 2) * 3.3, 5.4 + r * 3.2); });
+      p.W = 24; p.H = 18; p.room = 'kinnaree'; [7, 6, 6, 6].forEach((n, r) => { for (let c = 0; c < n; c++) mk(p, 'round', 12 + (c - (n - 1) / 2) * 3.3, 5.4 + r * 3.2); });
       mk(p, 'stage', 12, 1.5); mk(p, 'podium', 16.4, 1.5); mk(p, 'sound', 19, 1.4); mk(p, 'sofa', 21.6, 1.4); mk(p, 'buffet', 3, 1.2); mk(p, 'buffet', 6.3, 1.2); mk(p, 'reg', 5, 17.4); mk(p, 'door', 2, 18);
     }
     if (t === 'red') {
-      p.W = 24; p.H = 18; mk(p, 'carpet', 12, 10.4);
+      p.W = 24; p.H = 18; p.room = 'kinnaree'; mk(p, 'carpet', 12, 10.4);
       [[2.2, 5.4, 8.6], [3.8, 7], [2.2, 5.4, 8.6], [3.8, 7]].forEach((r, i) => r.forEach(x => { mk(p, 'round', x, 5 + i * 2.9); mk(p, 'round', 24 - x, 5 + i * 2.9); }));
       mk(p, 'stage', 12, 1.5); mk(p, 'podium', 16.4, 1.5); mk(p, 'sound', 19, 1.4); mk(p, 'sofa', 21.6, 1.4); mk(p, 'buffet', 3, 1.2); mk(p, 'buffet', 6.3, 1.2); mk(p, 'reg', 5, 17.4); mk(p, 'door', 12, 18);
     }
@@ -150,8 +173,9 @@
     const T = (t, sz = 12, c = '#333') => `<text text-anchor="middle" dominant-baseline="middle" font-size="${sz}" fill="${c}">${t}</text>`;
     let s = '';
     if (i.type === 'round') {
-      for (let k = 0; k < i.seats; k++) { const a = 2 * Math.PI * k / i.seats; s += chair(Math.cos(a) * 1.2 * S, Math.sin(a) * 1.2 * S, a * 180 / Math.PI + 90); }
-      return s + `<circle r="${0.9 * S}" fill="#f3ece0" stroke="#8a7650" stroke-width="2"/>` + T(i.seats + ' ที่');
+      const d = dims(i)[0];
+      for (let k = 0; k < i.seats; k++) { const a = 2 * Math.PI * k / i.seats; s += chair(Math.cos(a) * d * 0.414 * S, Math.sin(a) * d * 0.414 * S, a * 180 / Math.PI + 90); }
+      return s + `<circle r="${d * 0.31 * S}" fill="#f3ece0" stroke="#8a7650" stroke-width="2"/>` + T(i.seats + ' ที่');
     }
     if (i.type === 'rect') {
       const L = rlen(i) * S, n = Math.ceil(i.seats / 2), m = i.seats - n;
@@ -169,16 +193,22 @@
     const [w, h] = dims(i);
     s = `<rect x="${-w * S / 2}" y="${-h * S / 2}" width="${w * S}" height="${h * S}" rx="3" fill="${FILL[i.type]}" stroke="#555" stroke-width="${i.type === 'door' ? 2 : 1.5}"/>`;
     if (i.type === 'door') s += `<path d="M${-S / 2} 0 A${S} ${S} 0 0 1 ${S / 2} ${S * 0.9}" fill="none" stroke="#999" stroke-dasharray="4 3"/>`;
-    if (!['screen', 'door'].includes(i.type)) s += T(NAMES[i.type], w > 2 ? 13 : 9, i.type === 'carpet' ? '#fff' : '#333');
+    if (!['screen', 'door', 'pillar'].includes(i.type)) s += T(H(i.type === 'block' && i.label ? i.label : NAMES[i.type]), w > 2 ? 13 : 9, i.type === 'carpet' ? '#fff' : '#333');
     return s;
   }
   // full drawing; sel = selected item id (left out of exports)
-  function build(p, sel) {
-    const w = p.W, h = p.H, vw = (w + 2) * S, vh = (h + 3) * S;
+  // a plan tied to a room takes the room's size and locked fixtures from แก้ไขปรับปรุง
+  const geom = p => p.room ? { W: roomDim(p.room)[0], H: roomDim(p.room)[1], fixed: fixedOf(p.room) } : { W: p.W, H: p.H, fixed: [] };
+  function build(p, sel, noFixed) {
+    const G = noFixed ? { W: p.W, H: p.H, fixed: [] } : geom(p), w = G.W, h = G.H, vw = (w + 2) * S, vh = (h + 3) * S;
     let gr = '';
     for (let x = 0; x <= w; x++) gr += `<line x1="${x * S}" y1="0" x2="${x * S}" y2="${h * S}" stroke="#eee"/>`;
     for (let y = 0; y <= h; y++) gr += `<line x1="0" y1="${y * S}" x2="${w * S}" y2="${y * S}" stroke="#eee"/>`;
     gr += `<rect width="${w * S}" height="${h * S}" fill="none" stroke="#333" stroke-width="4"/>`;
+    for (const i of G.fixed) {
+      const [dw, dh] = dims(i);
+      gr += `<g transform="translate(${i.x * S} ${i.y * S}) rotate(${i.rot})" opacity=".9">${shape(i)}<rect x="${-dw * S / 2 - 3}" y="${-dh * S / 2 - 3}" width="${dw * S + 6}" height="${dh * S + 6}" fill="none" stroke="#6B716E" stroke-width="1.5" stroke-dasharray="2 3"/></g>`;
+    }
     for (const i of p.items) {
       const [dw, dh] = dims(i);
       gr += `<g data-id="${i.id}" transform="translate(${i.x * S} ${i.y * S}) rotate(${i.rot})" style="cursor:move">${shape(i)}` +
@@ -203,7 +233,7 @@
       const p = planOf(b, day), edit = canEdit();
       const head = `<div class="page-hd"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>ออกแบบผังงาน</h1><div class="small muted">${H(q.title)} · ${H(q.client)} · ${U.fmtRange(q.start, q.end)} · ${U.n(q.pax)} ท่าน</div></div>
         <div class="row wrap">${days.length > 1 ? `<div class="seg white">${days.map((d, i) => `<a class="${day === i + 1 ? 'on' : ''}" href="#/plan/${encodeURIComponent(b.id)}/${i + 1}">วันที่ ${i + 1}</a>`).join('')}</div>` : ''}
-        ${p ? '<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button>' : ''}</div></div>`;
+        ${isAdmin() ? `<a class="btn ghost" href="#/plansetup${p && p.room ? '/' + encodeURIComponent(p.room) : ''}">แก้ไขปรับปรุง</a>` : ''}${p ? '<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button>' : ''}</div></div>`;
       if (!p) {
         const rf = roomFor(q, day), lay = (D.LAYOUTS.find(l => l.id === rf.layout) || {}).name || '';
         return head + `<div class="card pad" style="text-align:center;max-width:620px;margin:20px auto">
@@ -217,7 +247,9 @@
   <aside class="fp-side">
     <section class="card pad"><h3>ชื่อผัง / ขนาดห้อง (ม.)</h3>
       <input class="input" value="${H(p.title || '')}" data-change="fpTitle" aria-label="ชื่อผัง" ${edit ? '' : 'disabled'} style="margin-bottom:8px">
-      <div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${p.W}" data-change="fpW" aria-label="กว้าง (เมตร)" ${edit ? '' : 'disabled'}><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${p.H}" data-change="fpH" aria-label="ลึก (เมตร)" ${edit ? '' : 'disabled'}></div></section>
+      ${p.room ? `<div class="small"><b>${H(roomName(p.room))}</b> ${geom(p).W} × ${geom(p).H} ม.${fixedOf(p.room).length ? ' · ของที่ห้ามย้าย ' + fixedOf(p.room).length + ' ชิ้น (เส้นประ)' : ''}</div>
+        <div class="xs muted" style="margin-top:4px">ขนาดห้องและของที่ห้ามย้ายแก้ได้ที่ ${isAdmin() ? `<a href="#/plansetup/${encodeURIComponent(p.room)}">แก้ไขปรับปรุง</a>` : 'แก้ไขปรับปรุง (ผู้ดูแลระบบ)'}</div>`
+      : `<div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${p.W}" data-change="fpW" aria-label="กว้าง (เมตร)" ${edit ? '' : 'disabled'}><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${p.H}" data-change="fpH" aria-label="ลึก (เมตร)" ${edit ? '' : 'disabled'}></div>`}</section>
     ${edit ? `<section class="card pad"><h3>เทมเพลต</h3><div class="fp-grid">
       <button class="btn ghost sm" data-act="fpAuto">ตามใบเสนอราคา</button><button class="btn ghost sm" data-act="fpTpl" data-v="banquet">โต๊ะกลม</button>
       <button class="btn ghost sm" data-act="fpTpl" data-v="theatre">Theatre</button><button class="btn ghost sm" data-act="fpTpl" data-v="board">ห้องประชุม</button>
@@ -238,11 +270,67 @@
     },
     after() { drawSvg(); bindSvg(); const hs = document.getElementById('fpHist'); if (hs) hs.onchange = () => { document.getElementById('fpHistInfo').textContent = histInfo(Number(hs.value)); }; }
   };
-  function histInfo(i) { const h = HIST[i], d = ROOM_DIM[HIST_ROOM[h.r]]; return (h.p && d ? 'พื้นที่ต่อคน ≈ ' + (d[0] * d[1] / h.p).toFixed(2) + ' ตร.ม. · ' : '') + h.note + (h.g ? '' : ' · (ยังไม่มีพิกัดพอจะโหลดเป็นผัง)'); }
+  /* ---------- แก้ไขปรับปรุง: room sizes, locked fixtures, standard item sizes (admins) ---------- */
+  const setupRoom = () => { const id = App.state.params[0]; return D.MEETING_ROOMS.some(r => r.id === id) ? id : D.MEETING_ROOMS[0].id; };
+  function setupDoc() {
+    const ui = App.state.ui, id = setupRoom();
+    if (!ui.fpSetup || ui.fpSetup.room !== id) { const [w, h] = roomDim(id); ui.fpSetup = { room: id, title: 'ห้อง' + roomName(id).replace(/^ห้อง/, '') + ' · ของที่ห้ามย้าย', W: w, H: h, items: JSON.parse(JSON.stringify(fixedOf(id))) }; }
+    return ui.fpSetup;
+  }
+  function saveSetup() {
+    const d = App.state.ui.fpSetup, st = Store.db.settings, f = st.floor = Object.assign({ rooms: {}, sizes: {} }, st.floor);
+    f.rooms = Object.assign({}, f.rooms, { [d.room]: { W: d.W, H: d.H, fixed: d.items.map(i => Object.assign({}, i)) } });
+    Store.save();
+  }
+  App.V.plansetup = {
+    title: 'แก้ไขปรับปรุง', nav: 'beo',
+    render() {
+      if (!isAdmin()) return '<div class="card pad" style="max-width:520px;margin:40px auto;text-align:center"><h2>เฉพาะผู้ดูแลระบบ</h2><p class="muted">หน้าแก้ไขปรับปรุงผังห้องเปิดได้เฉพาะผู้ดูแลระบบ</p><a class="btn ghost" href="#/beo">กลับ</a></div>';
+      App.state.ui.fpSetup = null; // rebuild from the shared settings on every render
+      const d = setupDoc(), id = d.room, sizes = floor().sizes || {};
+      return `<div class="page-hd"><div><div class="small"><a class="link" href="#/beo">← ใบฟังก์ชัน</a></div><h1>แก้ไขปรับปรุง</h1><div class="small muted">ขนาดห้อง ของในห้องที่ห้ามย้าย และขนาดมาตรฐานของสิ่งของ — ใช้กับทุกผังงานของห้องนั้น</div></div>
+        <button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button></div>
+<div class="row wrap" style="margin-bottom:14px">${D.MEETING_ROOMS.map(r => `<a class="chip ${r.id === id ? 'on' : ''}" href="#/plansetup/${r.id}">${H(r.th || r.name)}</a>`).join('')}</div>
+<div class="fp">
+  <aside class="fp-side">
+    <section class="card pad"><h3>ขนาดห้อง${H(roomName(id).replace(/^ห้อง/, ''))} (ม.)</h3>
+      <div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${d.W}" data-change="fsW" aria-label="กว้าง (เมตร)"><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${d.H}" data-change="fsH" aria-label="ลึก (เมตร)"></div>
+      <div class="xs muted" style="margin-top:6px">พื้นที่ ${(d.W * d.H).toFixed(1)} ตร.ม.${(D.MEETING_ROOMS.find(r => r.id === id) || {}).area ? ' · ข้อมูลห้อง ' + D.MEETING_ROOMS.find(r => r.id === id).area + ' ตร.ม.' : ''}</div></section>
+    <section class="card pad"><h3>เพิ่มของที่ห้ามย้าย</h3><div class="xs muted" style="margin-bottom:8px">เช่น เวทีถาวร เสา ประตู จอ — จะแสดงเป็นเส้นประในทุกผังของห้องนี้ และย้ายในผังงานไม่ได้</div>
+      <div class="fp-grid">${['stage', 'screen', 'door', 'pillar', 'block', 'sound', 'buffet', 'carpet', 'podium', 'reg'].map(t => `<button class="btn ghost sm" data-act="fpAdd" data-v="${t}">+ ${NAMES[t]}</button>`).join('')}</div></section>
+    <section class="card pad" id="fpSel">${selPanel(d)}</section>
+  </aside>
+  <div class="fp-main">
+    <div class="fp-paper"><svg id="fpSvg" viewBox="0 0 10 10" font-family="IBM Plex Sans Thai, Tahoma, sans-serif"></svg></div>
+    <div class="small muted" style="margin-top:8px">ของที่ห้ามย้าย ${d.items.length} ชิ้น · คลิกเพื่อเลือก ลากเพื่อย้าย · Delete ลบ · R หมุน · บันทึกอัตโนมัติ</div>
+    <section class="card" style="margin-top:16px;overflow:hidden">
+      <div class="card-hd"><div><h2>ขนาดมาตรฐานของสิ่งของ</h2><div class="small muted">ใช้กับของที่ไม่ได้ตั้งขนาดเฉพาะชิ้น ในทุกห้อง (เมตร) · โต๊ะยาว แถวเก้าอี้ และโต๊ะห้องเรียน ยาวตามจำนวนที่นั่ง</div></div></div>
+      <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>สิ่งของ</th><th>กว้าง</th><th>ลึก</th><th class="r"></th></tr></thead><tbody>
+      ${SIZED.map(t => { const v = sizeOf(t), custom = !!sizes[t]; return `<tr><td>${H(NAMES[t])}${t === 'round' ? ' <span class="xs muted">(เส้นผ่านศูนย์กลาง)</span>' : ''}</td>
+        <td><input class="input" style="width:90px;height:36px" type="number" min="0.1" max="40" step="0.1" value="${v[0]}" data-change="fsSize" data-t="${t}" data-k="0" aria-label="${H(NAMES[t])} กว้าง"></td>
+        <td>${t === 'round' ? '—' : `<input class="input" style="width:90px;height:36px" type="number" min="0.1" max="40" step="0.1" value="${v[1]}" data-change="fsSize" data-t="${t}" data-k="1" aria-label="${H(NAMES[t])} ลึก">`}</td>
+        <td class="r">${custom ? `<button class="link" data-act="fsReset" data-t="${t}">คืนค่าเดิม (${DEF_SIZE[t][0]}${t === 'round' ? '' : '×' + DEF_SIZE[t][1]})</button>` : '<span class="xs muted">ค่าเดิม</span>'}</td></tr>`; }).join('')}
+      </tbody></table></div>
+    </section>
+  </div>
+</div>`;
+    },
+    after() { drawSvg(); bindSvg(); }
+  };
+  function setSizes(fn) { const st = Store.db.settings, f = st.floor = Object.assign({ rooms: {}, sizes: {} }, st.floor); f.sizes = Object.assign({}, f.sizes); fn(f.sizes); Store.save(); App.render(); }
+  Object.assign(App.CHG, {
+    fsW(el) { const d = setupDoc(); d.W = Math.max(4, Math.min(80, Number(el.value) || d.W)); saveSetup(); App.render(); },
+    fsH(el) { const d = setupDoc(); d.H = Math.max(4, Math.min(80, Number(el.value) || d.H)); saveSetup(); App.render(); },
+    fsSize(el) { const t = el.dataset.t, k = Number(el.dataset.k), v = Math.max(0.1, Math.min(40, Number(el.value) || 0.1)); setSizes(z => { const cur = sizeOf(t).slice(); cur[k] = v; if (t === 'round') cur[1] = v; z[t] = cur; }); }
+  });
+  App.ACT.fsReset = el => setSizes(z => { delete z[el.dataset.t]; });
+
+  function histInfo(i) { const h = HIST[i], d = HIST_ROOM[h.r] && roomDim(HIST_ROOM[h.r]); return (h.p && d ? 'พื้นที่ต่อคน ≈ ' + (d[0] * d[1] / h.p).toFixed(2) + ' ตร.ม. · ' : '') + h.note + (h.g ? '' : ' · (ยังไม่มีพิกัดพอจะโหลดเป็นผัง)'); }
   function warn(p, pax) {
     const seats = seatsOf(p), out = [];
     if (pax && seats && seats !== pax) out.push(seats < pax ? `ที่นั่งน้อยกว่าจำนวนท่าน ${pax - seats} ที่` : `ที่นั่งมากกว่าจำนวนท่าน ${seats - pax} ที่`);
-    if (p.items.some(i => i.x < 0 || i.y < 0 || i.x > p.W || i.y > p.H)) out.push('มีของวางเกินขอบห้อง');
+    const G = geom(p);
+    if (p.items.some(i => i.x < 0 || i.y < 0 || i.x > G.W || i.y > G.H)) out.push('มีของวางเกินขอบห้อง');
     if (p.missing) out.push(`วางไม่พอ ${p.missing} โต๊ะในห้องขนาดนี้ — ลองลดขนาดโต๊ะ ขยายห้อง หรือจัดชิดขึ้น`);
     return out.length ? `<div class="note" style="margin-top:8px">${out.map(H).join(' · ')}</div>` : '';
   }
@@ -251,21 +339,26 @@
     if (!it) return '<h3>ที่เลือกอยู่</h3><div class="small muted">แตะที่โต๊ะหรือของในผังเพื่อเลือก</div>';
     return `<h3>ที่เลือกอยู่ · ${H(NAMES[it.type])}</h3>
       ${SEATED.includes(it.type) ? `<div class="row" style="margin-bottom:8px"><span style="flex:1">ที่นั่ง: <b>${it.seats}</b></span><button class="icon-btn" data-act="fpSeat" data-v="-1" aria-label="ลดที่นั่ง">−</button><button class="icon-btn" data-act="fpSeat" data-v="1" aria-label="เพิ่มที่นั่ง">+</button></div>` : ''}
+      ${SIZED.includes(it.type) ? `<div class="small muted" style="margin-bottom:4px">${it.type === 'round' ? 'เส้นผ่านศูนย์กลาง (ม.)' : 'ขนาด กว้าง × ลึก (ม.)'}</div>
+        <div class="row" style="gap:6px;margin-bottom:8px"><input class="input" type="number" min="0.1" max="40" step="0.1" value="${dims(it)[0]}" data-change="fpSize" data-k="w" aria-label="กว้าง">${it.type === 'round' ? '' : `<span>×</span><input class="input" type="number" min="0.1" max="40" step="0.1" value="${dims(it)[1]}" data-change="fpSize" data-k="h" aria-label="ลึก">`}</div>` : ''}
+      ${it.type === 'block' ? `<input class="input" value="${H(it.label || '')}" placeholder="ข้อความบนบล็อก เช่น ห้องควบคุม" data-change="fpLabel" aria-label="ข้อความบนบล็อก" style="margin-bottom:8px">` : ''}
       <div class="fp-grid"><button class="btn ghost sm" data-act="fpRot">⟳ หมุน 15°</button><button class="btn ghost sm" data-act="fpDup">คัดลอก</button><button class="btn ghost sm fp-wide" data-act="fpDel" style="color:var(--red)">ลบ</button></div>`;
   }
-  const P = () => planOf(curBeo(), dayOf());
+  const setupMode = () => App.state.route === 'plansetup';
+  const P = () => setupMode() ? setupDoc() : planOf(curBeo(), dayOf());
   function drawSvg() {
     const p = P(), s = document.getElementById('fpSvg'); if (!p || !s) return;
-    const b = build(p, sel); s.setAttribute('viewBox', `0 0 ${b.vw} ${b.vh}`); s.innerHTML = b.svg;
+    const b = build(p, sel, setupMode()); s.setAttribute('viewBox', `0 0 ${b.vw} ${b.vh}`); s.innerHTML = b.svg;
     const t = document.getElementById('fpTot'); if (t) t.textContent = seatsOf(p);
   }
   function refreshSide() {
-    const p = P(), q = Store.quote(curBeo().quoteId), el = document.getElementById('fpSel'), w = document.getElementById('fpWarn');
-    if (el) el.innerHTML = selPanel(p); if (w) w.innerHTML = warn(p, Number(q.pax) || 0);
+    const p = P(), el = document.getElementById('fpSel'), w = document.getElementById('fpWarn');
+    if (el) el.innerHTML = selPanel(p);
+    if (w && !setupMode()) w.innerHTML = warn(p, Number(Store.quote(curBeo().quoteId).pax) || 0);
   }
-  function save() { const p = P(); if (p) delete p.missing; Store.save(); }
+  function save() { const p = P(); if (p) delete p.missing; if (setupMode()) saveSetup(); else Store.save(); }
   function bindSvg() {
-    const s = document.getElementById('fpSvg'); if (!s || !canEdit()) return;
+    const s = document.getElementById('fpSvg'); if (!s || !(setupMode() ? isAdmin() : canEdit())) return;
     const pos = e => { const pt = s.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(s.getScreenCTM().inverse()); return [(q.x - S) / S, (q.y - 2 * S) / S]; };
     s.addEventListener('pointerdown', e => {
       const gEl = e.target.closest('[data-id]'), p = P();
@@ -282,7 +375,7 @@
   }
   // Delete / R while the editor is open (not while typing or in a dialog)
   document.addEventListener('keydown', e => {
-    if (App.state.route !== 'plan' || !canEdit() || sel == null || document.getElementById('modalBg')) return;
+    if (!(App.state.route === 'plan' ? canEdit() : setupMode() && isAdmin()) || sel == null || document.getElementById('modalBg')) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); App.ACT.fpDel(); }
     if (e.key === 'r' || e.key === 'R') App.ACT.fpRot();
@@ -295,10 +388,10 @@
   const step = fn => { const p = P(), it = p && p.items.find(i => i.id === sel); if (!it) return; fn(it, p); save(); drawSvg(); refreshSide(); };
   Object.assign(App.ACT, {
     fpAuto() { const b = curBeo(), q = Store.quote(b.quoteId); const go = () => setPlan(autoPlan(q, dayOf())); if (P() && P().items.length) App.confirm('แทนที่ผังปัจจุบันด้วยผังจากใบเสนอราคา?', go, 'แทนที่'); else go(); },
-    fpBlank() { const b = curBeo(), q = Store.quote(b.quoteId), rf = roomFor(q, dayOf()), [w, h] = ROOM_DIM[rf.id] || [20, 14]; setPlan({ title: q.title || '', W: w, H: h, items: [] }); },
+    fpBlank() { const b = curBeo(), q = Store.quote(b.quoteId), rf = roomFor(q, dayOf()), [w, h] = roomDim(rf.id); setPlan({ title: q.title || '', room: rf.room ? rf.id : undefined, W: w, H: h, items: [] }); },
     fpTpl(el) {
       const p = P(), t = el.dataset.v;
-      const go = () => { const n = t === 'blank' ? Object.assign({}, p, { items: [] }) : Object.assign(template(t, p.W, p.H), { title: p.title }); if (t === 'kin' || t === 'red') n.title = t === 'kin' ? 'งานเลี้ยง 250 ท่าน · ห้องกินรี' : 'งานเลี้ยง 200 ท่าน · ห้องกินรี · พรมแดงกลางห้อง'; setPlan(n); };
+      const G = geom(p), go = () => { const n = t === 'blank' ? Object.assign({}, p, { items: [] }) : Object.assign({ room: p.room }, template(t, G.W, G.H), { title: p.title }); if (t === 'kin' || t === 'red') n.title = t === 'kin' ? 'งานเลี้ยง 250 ท่าน · ห้องกินรี' : 'งานเลี้ยง 200 ท่าน · ห้องกินรี · พรมแดงกลางห้อง'; setPlan(n); };
       if (p.items.length) App.confirm(t === 'blank' ? 'ล้างของทั้งหมดในผังนี้?' : 'แทนที่ผังปัจจุบันด้วยเทมเพลตนี้?', go, t === 'blank' ? 'ล้าง' : 'แทนที่'); else go();
     },
     fpHist() {
@@ -307,20 +400,24 @@
       const go = () => setPlan(histPlan(h));
       if (P().items.length) App.confirm('แทนที่ผังปัจจุบันด้วยแปลน “' + h.r + ' · ' + h.l + '”?', go, 'แทนที่'); else go();
     },
-    fpAdd(el) { const p = P(), n = p.items.length % 5; sel = mk(p, el.dataset.v, p.W / 2 + n * 0.4, p.H / 2 + n * 0.4).id; save(); drawSvg(); refreshSide(); },
+    fpAdd(el) { const p = P(), G = setupMode() ? p : geom(p), n = p.items.length % 5; sel = mk(p, el.dataset.v, G.W / 2 + n * 0.4, G.H / 2 + n * 0.4).id; save(); drawSvg(); refreshSide(); },
     fpRot() { step(it => { it.rot = (it.rot + 15) % 360; }); },
     fpDup() { step((it, p) => { const n = mk(p, it.type, it.x + 1, it.y + 1, it.rot, it.seats); sel = n.id; }); },
     fpDel() { const p = P(); if (!p) return; p.items = p.items.filter(i => i.id !== sel); sel = null; save(); drawSvg(); refreshSide(); },
     fpSeat(el) { step(it => { it.seats = Math.max(1, Math.min(it.type === 'chairrow' ? 40 : 16, it.seats + Number(el.dataset.v))); }); },
     fpPng() {
       const p = P(); if (!p) return;
-      const b = build(p), sc = 2, x = `<svg xmlns="http://www.w3.org/2000/svg" width="${b.vw * sc}" height="${b.vh * sc}" viewBox="0 0 ${b.vw} ${b.vh}" font-family="IBM Plex Sans Thai, Tahoma, sans-serif">${b.svg}</svg>`;
+      const b = build(p, null, setupMode()), sc = 2, x = `<svg xmlns="http://www.w3.org/2000/svg" width="${b.vw * sc}" height="${b.vh * sc}" viewBox="0 0 ${b.vw} ${b.vh}" font-family="IBM Plex Sans Thai, Tahoma, sans-serif">${b.svg}</svg>`;
       const img = new Image();
-      img.onload = () => { const c = document.createElement('canvas'); c.width = b.vw * sc; c.height = b.vh * sc; c.getContext('2d').drawImage(img, 0, 0); const a = document.createElement('a'); a.download = 'floorplan-' + curBeo().id + '-day' + dayOf() + '.png'; a.href = c.toDataURL('image/png'); a.click(); };
+      img.onload = () => { const c = document.createElement('canvas'); c.width = b.vw * sc; c.height = b.vh * sc; c.getContext('2d').drawImage(img, 0, 0); const a = document.createElement('a'); a.download = setupMode() ? 'room-' + setupRoom() + '.png' : 'floorplan-' + curBeo().id + '-day' + dayOf() + '.png'; a.href = c.toDataURL('image/png'); a.click(); };
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(x);
     }
   });
   Object.assign(App.CHG, {
+    fpSize(el) {
+      step(it => { const d = dims(it), v = Math.max(0.1, Math.min(40, Number(el.value) || 0.1)); if (it.type === 'round') { it.w = it.h = v; } else { it.w = el.dataset.k === 'w' ? v : d[0]; it.h = el.dataset.k === 'h' ? v : d[1]; } });
+    },
+    fpLabel(el) { step(it => { it.label = el.value.slice(0, 40); }); },
     fpTitle(el) { P().title = el.value.slice(0, 120); save(); drawSvg(); },
     fpW(el) { P().W = Math.max(4, Math.min(80, Number(el.value) || 20)); save(); drawSvg(); refreshSide(); },
     fpH(el) { P().H = Math.max(4, Math.min(80, Number(el.value) || 14)); save(); drawSvg(); refreshSide(); }
