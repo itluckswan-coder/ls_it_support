@@ -398,6 +398,13 @@
       beos: seedBEO(),
       employees,
       staff: seedStaffPlan(employees),
+      tasks: [
+        { id: 'TK-1', title: 'โทรยืนยันจำนวนผู้เข้าร่วม SCG ภาคเหนือ', detail: 'ลูกค้าแจ้งว่าอาจเพิ่มเป็น 200 ท่าน ให้สอบถามและอัปเดตใบเสนอราคา', quoteId: 'QT-2611-033', due: '2026-10-20', priority: 'high',
+          to: { type: 'user', id: 'u1', name: 'นภัสสร ใจดี' }, by: 'u3', byName: 'ลักษิกา เตชะธีราวัฒน์', at: '2026-10-14T09:10:00', status: 'open' },
+        { id: 'TK-2', title: 'เตรียมเมนูชิมอาหารงานแต่งคุณเมย์ & คุณบอส', detail: 'ชิมอาหาร 6 ท่าน วันเสาร์ 24 ต.ค. 11:00', quoteId: 'QT-2610-024', due: '2026-10-24', priority: 'normal',
+          to: { type: 'dept', dept: 'kitchen', name: 'ครัว / อาหารและเครื่องดื่ม', emps: ['e1', 'e2'] }, by: 'u3', byName: 'ลักษิกา เตชะธีราวัฒน์', at: '2026-10-13T15:30:00', status: 'done',
+          doneBy: 'u4', doneByName: 'สมชาย กิตติ', doneAt: '2026-10-14T08:20:00', doneNote: 'จัดเตรียมแล้ว' }
+      ],
       seq: { QT: 47, FS: 22 }
     };
   }
@@ -411,7 +418,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { applyCatalog(this.db && this.db.catalog && this.db.catalog.food); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },

@@ -602,3 +602,24 @@ main.bleed{padding:0;max-width:none}
 .dash-months .chip.now:not(.on){border-color:var(--yellow);box-shadow:inset 0 -3px 0 var(--yellow)}
 .dash-year .icon-btn:disabled{opacity:.35;cursor:default}
 .dash-reset{margin-left:auto;display:inline-flex;align-items:center;gap:6px;height:40px}
+
+/* ---------- notifications & assignment ---------- */
+.bell-btn{position:relative;width:40px;height:40px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:#fff;color:var(--ink);flex:none}
+.bell-btn:hover{border-color:#cfccc2}
+.bell-n{position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--red);color:#fff;font:600 11px/18px var(--fb);text-align:center;border:2px solid #fff;box-sizing:content-box}
+.notif-list{display:flex;flex-direction:column;max-height:60vh;overflow:auto;margin:0 -8px}
+.notif{display:flex;gap:12px;align-items:flex-start;padding:12px 8px;border-radius:10px;color:var(--ink);text-decoration:none;border-bottom:1px solid var(--line2)}
+.notif:hover{background:var(--bg)}
+.notif i{flex:none;width:10px;height:10px;border-radius:50%;margin-top:6px}
+.notif>span:nth-child(2){flex:1;min-width:0;display:flex;flex-direction:column}
+.notif b{font-weight:500}.notif.new b{font-weight:700}
+.notif.new{background:var(--red-tint)}
+.seg a{height:32px;padding:0 14px;border-radius:999px;font-size:13px;color:var(--ink2);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+.seg a.on{background:var(--ink);color:#fff}
+.seg-n{background:var(--red);color:#fff;border-radius:999px;font-size:11px;padding:0 6px;line-height:16px}
+.tk-emps{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow:auto}
+.tk-emp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
+.tk-card{display:flex;flex-direction:column}
+/* the menu has 11 entries: tighten it on laptop widths so every entry stays visible */
+@media (min-width:1101px) and (max-width:1500px){.nav a{padding:8px 8px;font-size:13px}.topbar .brand .t{display:none}.topbar .brand .sep{display:none}}
+@media (min-width:1101px) and (max-width:1239px){.nav{display:none}.menu-btn{display:grid}}

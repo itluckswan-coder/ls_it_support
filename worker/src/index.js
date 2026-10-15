@@ -5,7 +5,7 @@ const RANK = { sales: 1, acc: 1, head: 2, manager: 3, admin: 4 };
 const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices'];
 const PBKDF2_ITER = 10000; // kept modest so login fits the Workers free-plan CPU budget
 const SESSION_DAYS = { remember: 30, normal: 1 };
-const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog'];
+const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task'];
 const MAX_IMAGE_BYTES = 1500000;
 
 /* ---------------- helpers ---------------- */
@@ -113,10 +113,14 @@ async function state(env, since) {
 
 /* ---------------- business rules ---------------- */
 const beoContent = b => {
-  const { approval, status, rev, revNote, ...c } = b || {};
+  const { approval, status, rev, revNote, signoff, ...c } = b || {};
   c.depts = Object.fromEntries(Object.entries((b && b.depts) || {}).map(([k, v]) => [k, { items: v.items || [], owner: v.owner || '' }]));
   return c;
 };
+// department of a user, from the free-text dept on their account (mirrors DEPT_WORDS in js/v-tasks.js)
+const DEPT_WORDS = { kitchen: ['ครัว', 'f&b'], banquet: ['จัดเลี้ยง', 'banquet'], av: ['ช่าง', 'av'], front: ['ส่วนหน้า', 'front'], hk: ['แม่บ้าน', 'housekeeping'], acc: ['บัญชี', 'account'] };
+const deptOf = u => { const d = String((u && u.dept) || '').toLowerCase(); return Object.keys(DEPT_WORDS).find(k => DEPT_WORDS[k].some(w => d.includes(w))) || null; };
+const isAssignee = (t, u) => !!t && !!t.to && (t.to.type === 'user' ? t.to.id === u.id : t.to.type === 'dept' && t.to.dept === deptOf(u));
 const lineTotal = it => (Number(it.price) || 0) * (Number(it.q1) || 0) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1);
 
 async function applyRules(env, user, kind, id, data, prev) {
@@ -139,6 +143,9 @@ async function applyRules(env, user, kind, id, data, prev) {
         base: prevAppr && prevAppr.state === 'approved' ? beoContent(prev) : (prevAppr ? prevAppr.base || null : null)
       };
     } else data.approval = prevAppr || data.approval || { state: 'approved' };
+    // admin sign-off: only admins set it, and any change to the content clears it
+    if (user.role !== 'admin') { if (prev && prev.signoff) data.signoff = prev.signoff; else delete data.signoff; }
+    if (changed) delete data.signoff;
     const sending = data.status === 'sent' && (!prev || prev.status !== 'sent' || (data.rev || 0) > (prev.rev || 0));
     if (sending && data.approval.state !== 'approved') fail(409, 'ใบฟังก์ชันนี้ต้องได้รับอนุมัติก่อนส่งให้แผนก');
   }
@@ -149,6 +156,19 @@ async function applyRules(env, user, kind, id, data, prev) {
       const was = prevOt[o.id] && prevOt[o.id].status;
       if ((o.status === 'approved' || o.status === 'rejected') && was !== o.status && !can(user, 'staff')) o.status = 'pending';
     }
+  }
+  if (kind === 'task') {
+    if (user.role !== 'admin') {
+      // assignees may only confirm their own task; everything else stays as the admin wrote it
+      if (!prev || !isAssignee(prev, user)) fail(403, 'เฉพาะผู้ดูแลระบบที่มอบหมายงานได้');
+      const keep = ({ status, doneBy, doneByName, doneAt, doneNote, ...rest }) => rest;
+      if (JSON.stringify(keep(prev)) !== JSON.stringify(keep(data))) fail(403, 'แก้ไขได้เฉพาะการยืนยันงานที่ได้รับมอบหมาย');
+      if (prev.status === 'done') fail(409, 'งานนี้ยืนยันแล้ว');
+      if (data.status !== 'done') fail(400, 'สถานะไม่ถูกต้อง');
+      Object.assign(data, { doneBy: user.id, doneByName: user.name, doneAt: now(), doneNote: String(data.doneNote || '').slice(0, 500) });
+    }
+    if (!data.to || !['user', 'dept'].includes(data.to.type)) fail(400, 'ระบุผู้รับมอบหมาย');
+    if (JSON.stringify(data).length > 20000) fail(413, 'รายละเอียดงานยาวเกินไป');
   }
   if (kind === 'catalog') {
     if (!can(user, 'edit_prices')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขเมนูและแพ็กเกจ');
@@ -176,12 +196,13 @@ async function putDoc(req, env, user, kind, id) {
   const v = (row ? row.version : 0) + 1, at = now();
   await env.DB.prepare('INSERT INTO docs (kind, id, data, version, updated_at, updated_by, deleted) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data, version = excluded.version, updated_at = excluded.updated_at, updated_by = excluded.updated_by, deleted = 0')
     .bind(kind, id, JSON.stringify(out), v, at, user.id).run();
-  if (kind === 'beo' || kind === 'quote') await audit(env, user, kind, id, prev ? 'update' : 'create', kind === 'beo' ? out.approval && out.approval.state : '');
+  if (kind === 'beo' || kind === 'quote' || kind === 'task') await audit(env, user, kind, id, prev ? 'update' : 'create', kind === 'beo' ? out.approval && out.approval.state : kind === 'task' ? out.status : '');
   return json({ doc: { kind, id, version: v, data: out } });
 }
 
 async function deleteDoc(env, user, kind, id) {
   if (user.role !== 'admin' && !(RANK[user.role] >= RANK.manager)) fail(403, 'เฉพาะผู้จัดการขึ้นไปที่ลบข้อมูลได้');
+  if (kind === 'task' && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบงานที่มอบหมายได้');
   await env.DB.prepare('UPDATE docs SET deleted = 1, version = version + 1, updated_at = ?, updated_by = ? WHERE kind = ? AND id = ?').bind(now(), user.id, kind, id).run();
   await audit(env, user, kind, id, 'delete');
   return json({ ok: true });
