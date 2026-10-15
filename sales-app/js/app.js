@@ -23,7 +23,7 @@
 
   const NAV = [
     ['home', 'หน้าหลัก', '#/home'], ['meet', 'ห้องประชุม', '#/meet'], ['room', 'ห้องพัก', '#/rooms'], ['food', 'จัดเลี้ยง', '#/food'], ['quote', 'ใบเสนอราคา', '#/quotes'],
-    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users']
+    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users'], ['dash', 'Dashboard', '#/dash']
   ];
 
   const App = {
@@ -110,10 +110,15 @@
       App._pendingRender = false; App.render();
     },
 
+    // menu entries this user may see (Dashboard is for admins only)
+    navItems() {
+      const me = App.me();
+      return NAV.filter(n => (n[0] !== 'users' || App.can('users') || App.can('view_beo')) && (n[0] !== 'dash' || (me && me.role === 'admin')));
+    },
     /* ---------- shell ---------- */
     shell(active, body, view) {
       const me = App.me();
-      const nav = NAV.filter(n => n[0] !== 'users' || App.can('users') || App.can('view_beo'));
+      const nav = App.navItems();
       const tabs = [['home', 'หน้าหลัก', '#/home', ICON.home], ['quote', 'ใบเสนอ', '#/quotes', ICON.doc], ['cal', 'ปฏิทิน', '#/cal', ICON.cal], ['beo', 'ใบฟังก์ชัน', '#/beo', ICON.sheet]];
       return `
 <header class="topbar">
@@ -127,7 +132,7 @@
   </div>
 </header>
 <main class="${view && view.bleed ? 'bleed' : ''}">${body}</main>
-<nav class="tabbar">${tabs.map(t => `<a href="${t[2]}" class="${t[0] === active ? 'on' : ''}">${t[3]}<span>${t[1]}</span></a>`).join('')}<a href="#" data-act="drawer" class="${['food', 'meet', 'room', 'staff', 'users'].includes(active) ? 'on' : ''}">${ICON.more}<span>เพิ่มเติม</span></a></nav>`;
+<nav class="tabbar">${tabs.map(t => `<a href="${t[2]}" class="${t[0] === active ? 'on' : ''}">${t[3]}<span>${t[1]}</span></a>`).join('')}<a href="#" data-act="drawer" class="${['food', 'meet', 'room', 'staff', 'users', 'dash'].includes(active) ? 'on' : ''}">${ICON.more}<span>เพิ่มเติม</span></a></nav>`;
     },
 
     /* ---------- ui helpers ---------- */
@@ -245,7 +250,7 @@
       const active = App.state.route === 'quote' || App.state.route === 'quotes' || App.state.route === 'new' || App.state.route === 'doc' ? 'quote' : (App.V[App.state.route] || {}).nav || App.state.route;
       const bg = document.createElement('div'); bg.className = 'drawer-bg'; bg.dataset.act = 'closeDrawer';
       const d = document.createElement('nav'); d.className = 'drawer';
-      d.innerHTML = `<div style="padding:4px 10px 16px"><img src="img/logo-wide-sm.png" alt="" style="width:120px"></div>` + NAV.map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}" data-act="closeDrawer">${n[1]}</a>`).join('');
+      d.innerHTML = `<div style="padding:4px 10px 16px"><img src="img/logo-wide-sm.png" alt="" style="width:120px"></div>` + App.navItems().map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}" data-act="closeDrawer">${n[1]}</a>`).join('');
       document.body.append(bg, d);
     },
     closeDrawer() { document.querySelectorAll('.drawer,.drawer-bg').forEach(x => x.remove()); },

@@ -573,3 +573,23 @@ main.bleed{padding:0;max-width:none}
   .print-only{display:block!important}
 }
 .print-only{display:none}
+
+/* ---------- dashboard ---------- */
+.dash-chart{padding:14px 18px 8px}
+.dash-svg{width:100%;height:auto;display:block;font-family:var(--fb);touch-action:pan-y}
+.dash-pie{display:flex;flex-wrap:wrap;align-items:center;gap:18px}
+.dash-donut{width:180px;height:180px;flex:none}
+.dash-legend{flex:1 1 200px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.dash-legend div{display:flex;align-items:center;gap:8px}
+.dash-legend i{width:12px;height:12px;border-radius:3px;flex:none}
+.dash-legend span{flex:1}
+.dash-legend b{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.dash-key{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)}
+.dash-key i{width:14px;height:3px;border-radius:2px}
+.dash-key i.dash{height:0;border-top:2px dashed}
+.dash-hbar{display:grid;grid-template-columns:minmax(90px,150px) minmax(0,1fr) auto;gap:12px;align-items:center;padding:8px 0;font-size:13px}
+.dash-hbar .t{height:12px;background:var(--line2);border-radius:4px;overflow:hidden}
+.dash-hbar .t i{display:block;height:100%;border-radius:0 4px 4px 0}
+.dash-tip{position:fixed;z-index:200;pointer-events:none;opacity:0;transition:opacity .12s;background:var(--ink);color:#fff;font-size:12px;line-height:1.5;padding:8px 10px;border-radius:8px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+.dash-chart{overflow-x:auto}
+@media (max-width:760px){.dash-svg{min-width:620px}}
