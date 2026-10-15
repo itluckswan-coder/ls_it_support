@@ -639,3 +639,15 @@ main.bleed{padding:0;max-width:none}
 .fp-thumb svg{display:block;width:100%;height:auto;max-height:520px}
 @media (max-width:760px){.fp-side{flex:1 1 100%}}
 @media print{.fp-thumb svg{max-height:none}}
+.fp-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.fp-h h3{margin:0}
+.fp-plus{width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);font:600 18px/1 var(--fb);display:grid;place-items:center;flex:none;cursor:pointer}
+.fp-plus:hover{border-color:var(--red);color:var(--red)}
+.fp-lib{display:flex;gap:4px;align-items:stretch;min-width:0}
+.fp-lib .btn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fp-x{flex:none;width:28px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:16px;cursor:pointer}
+.fp-x:hover{color:var(--red);border-color:var(--red)}
+.fp-sw{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+.fp-sw.on{outline:2px solid var(--ink);outline-offset:2px}
+#fpUndo{display:inline-flex;align-items:center;gap:6px}
+#fpUndo:disabled{opacity:.45;cursor:default}
