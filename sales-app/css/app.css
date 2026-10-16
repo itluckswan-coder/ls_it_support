@@ -664,7 +664,25 @@ main.bleed{padding:0;max-width:none}
 .fnf-no{font:700 18px var(--fh)}
 .fnf-org{display:flex;justify-content:space-between;gap:20px;margin:4px 0 8px;font-size:13px}
 .fnf-t{width:100%;border-collapse:collapse;margin-top:-1px;table-layout:fixed}
-.fnf-t th,.fnf-t td{border:1px solid #333;padding:6px 8px;vertical-align:top;word-wrap:break-word}
+.fnf-t th,.fnf-t td{--py:6px;--px:8px;border:1px solid #333;padding:var(--py) var(--px);vertical-align:top;word-wrap:break-word;position:relative}
+/* cells divided with “วาดตาราง” */
+.fnf-sp{display:flex;margin:calc(-1 * var(--py)) calc(-1 * var(--px));position:relative}
+.fnf-sp.h{flex-direction:column}
+.fnf-c{padding:var(--py) var(--px);position:relative;min-width:0}
+.fnf-sp.h>.fnf-c.hb{border-top:1px solid #333}
+.fnf-spl{position:absolute;display:block}
+.fnf-spl.v{top:0;bottom:0;width:0;border-left:1px solid #333;margin-left:-.5px}
+.fnf-spl.h{left:0;right:0;top:-1px;height:0}
+.fnf-lf{min-height:18px}
+.tdraw-pen .fnf-t td[data-cell],.tdraw-pen .fnf-lf{cursor:crosshair;touch-action:none}
+.tdraw-pen .fnf-in{pointer-events:none}
+.tdraw-erase .fnf-spl::before{content:'';position:absolute;inset:-7px;cursor:pointer}
+.tdraw-erase .fnf-spl.v{border-left-color:#b3262e;border-left-width:2px}
+.tdraw-erase .fnf-sp.h>.fnf-c.hb{border-top-color:#b3262e;border-top-width:2px}
+.fnf-tdpv{position:absolute;z-index:6;pointer-events:none;border:0 dashed #127a6e}
+.fnf-tdpv.v{top:0;bottom:0;border-left-width:2px}
+.fnf-tdpv.h{left:0;right:0;border-top-width:2px}
+.fnf-tdnote{margin-bottom:10px}
 .fnf-t th{font-weight:600;text-align:right;width:130px;background:#fafafa}
 .fnf-t th.sec{text-align:center;width:auto;background:#f1f0eb}
 .fnf-t td.c{text-align:center;vertical-align:middle}
@@ -736,7 +754,7 @@ main.bleed{padding:0;max-width:none}
 @media print{
   .fnf-wrap{background:#fff;padding:0;overflow:visible}
   .fnf-paper{box-shadow:none;width:auto;padding:0;margin:0;font-size:11px}
-  .fnf-t th,.fnf-t td{padding:4px 6px}
+  .fnf-t th,.fnf-t td{--py:4px;--px:6px}
   .fnf-t{break-inside:avoid}
 }
 
