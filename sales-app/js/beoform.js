@@ -69,9 +69,17 @@
     return { v, a };
   }
 
+  /* ---------- extra details added with "+" (b.fn.extra) ---------- */
+  const XSEC = [['event', 'ข้อมูลงาน'], ['banquet', 'แผนกจัดเลี้ยง / ห้องอาหาร'], ['hk', 'แผนกแม่บ้าน'], ['av', 'แผนกช่างเครื่องเสียง'], ['acc', 'แผนกบัญชี / การเงิน'], ['front', 'แผนกต้อนรับ'], ['other', 'รายละเอียดเพิ่มเติม']];
+  const xName = k => (XSEC.find(x => x[0] === k) || XSEC[XSEC.length - 1])[1];
+
   /* ---------- the paper form ---------- */
-  function paper(v) {
+  function paper(v, extra = []) {
     const cell = (t, cls = '') => `<td class="${cls}">${nl(t)}</td>`;
+    const xs = k => extra.filter(x => (XSEC.some(s => s[0] === x.sec) ? x.sec : 'other') === k);
+    const xth = x => `<th>${H(x.label || '')}${x.label ? ' :' : ''}</th>`;
+    const xIn = k => xs(k).map(x => `<div class="fnf-x">${x.label ? `<b>${H(x.label)} :</b> ` : ''}${nl(x.text)}</div>`).join('');
+    const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
     const menuCols = v.menu.length ? v.menu.map(m => `<td class="fnf-menu"><div class="fnf-mt">${H(m.time)}</div><div class="fnf-mh">${H(m.title)}</div>${nl(m.items)}</td>`).join('') : '<td class="fnf-menu">-</td>';
     return `<div class="fnf-paper" id="fnPaper">
   <div class="fnf-head">
@@ -83,22 +91,26 @@
   <table class="fnf-t">
     <tr><th>วันที่จัดงาน :</th>${cell(v.date, 'c')}<th>สถานที่จัดงาน :</th>${cell(v.venue, 'c')}<th>ประเภทงาน :</th>${cell(v.type, 'c')}</tr>
     <tr><th>จำนวนการันตี :</th>${cell(v.pax, 'c')}<td colspan="4" class="c">${nl(v.pricing)}</td></tr>
+    ${xs('event').map(x => `<tr>${xth(x)}<td colspan="5">${nl(x.text)}</td></tr>`).join('')}
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec">แผนกจัดเลี้ยง / ห้องอาหาร</th><th colspan="${Math.max(1, v.menu.length)}" class="sec">เมนูอาหาร</th></tr>
     <tr><th>รูปแบบการจัดห้อง :</th><td>${nl(v.layout)}${v.fyi ? `<div class="fnf-fyi"><b>FYI</b><br>${nl(v.fyi)}</div>` : ''}</td>${menuCols}</tr>
-    <tr><th>ข้อความบนเวที :${v.vinyl ? `<div class="fnf-small">${nl(v.vinyl)}</div>` : ''}</th><td class="c">${nl(v.stage || '-')}</td><td colspan="${Math.max(1, v.menu.length)}" class="fnf-small">${v.kitchen ? '<b>ครัว:</b> ' + nl(v.kitchen) : ''}</td></tr>
+    <tr><th>ข้อความบนเวที :${v.vinyl ? `<div class="fnf-small">${nl(v.vinyl)}</div>` : ''}</th><td class="c">${nl(v.stage || '-')}</td><td colspan="${mc}" class="fnf-small">${v.kitchen ? '<b>ครัว:</b> ' + nl(v.kitchen) : ''}</td></tr>
+    ${xs('banquet').map(x => `<tr>${xth(x)}<td colspan="${1 + mc}">${nl(x.text)}</td></tr>`).join('')}
   </table>
   <table class="fnf-t">
     <tr><th class="sec" style="width:50%">แผนกแม่บ้าน</th><th class="sec">แผนกช่างเครื่องเสียง</th></tr>
-    <tr>${cell(v.hk || '-', 'c')}${cell(v.av || '-')}</tr>
+    <tr><td class="c">${nl(v.hk || '-')}${xIn('hk')}</td><td>${nl(v.av || '-')}${xIn('av')}</td></tr>
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec" style="width:50%">แผนกบัญชี / การเงิน</th><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
     <tr><th>ยอดรวม :</th><td class="c fnf-total">${H(v.total)}</td><th>Check-in :</th>${cell(v.checkin, 'c')}<th>Check-out :</th>${cell(v.checkout, 'c')}</tr>
     <tr><th>รายละเอียดค่าใช้จ่าย :</th><td class="c">${nl(v.cost)}</td><th>ห้องพัก (ประเภท) :</th>${cell(v.roomType, 'c')}<th>จำนวนห้อง :</th>${cell(v.roomQty, 'c')}</tr>
     <tr><th>ที่อยู่ออกบิล :</th>${cell(v.bill, 'c')}<td colspan="4" class="c">${nl(v.front)}</td></tr>
+    ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + `<td>${nl(acc[i].text)}</td>` : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + `<td colspan="3">${nl(front[i].text)}</td>` : '<td colspan="4"></td>'}</tr>`).join('')}
   </table>
+  ${xs('other').length ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}<td>${nl(x.text)}</td></tr>`).join('')}</table>` : ''}
   <div class="fnf-sign">
     <div><span>ออกโดย :</span><div class="fnf-line"></div><div>(${H(v.by || '................................')})</div><div>${H(v.byTitle)}</div></div>
     <div><span>อนุมัติโดย :</span><div class="fnf-line"></div><div>(${H(v.appr || '................................')})</div><div>${H(v.apprTitle || 'ยังไม่อนุมัติ')}</div></div>
@@ -126,8 +138,9 @@
       const head = `<div class="page-hd no-print"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>รายละเอียดฟังก์ชัน</h1>
         <div class="small muted">${H(q.title)} · ${H(q.client)} · ${H(v.no || 'ยังไม่มี Function No.')}${b.signoff ? ' · อนุมัติแล้ว' : ''}</div></div>
         <div class="row wrap">${edit ? `<div class="seg white"><button class="${tab === 'preview' ? 'on' : ''}" data-act="fnTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${tab === 'form' ? 'on' : ''}" data-act="fnTab" data-v="form">แก้ไขข้อมูล</button></div>` : ''}
+        ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button></div></div>`;
-      if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v)}</div>`;
+      if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
       const field = ([k, label, kind]) => {
         const val = v[k] == null ? '' : v[k], mine = own[k] != null && own[k] !== a[k];
         const reset = mine ? `<button class="link xs" data-act="fnReset" data-k="${k}">ใช้ค่าจากระบบ</button>` : `<span class="xs muted">${a[k] ? 'จากระบบ' : ''}</span>`;
@@ -140,8 +153,11 @@
           <label class="f" style="margin-top:8px">รายการอาหาร (บรรทัดละรายการ)</label><textarea class="input" rows="4" style="height:auto;padding-top:10px" data-change="fnMenu" data-i="${i}" data-k="items">${H(m.items)}</textarea>
           <button class="link red small" data-act="fnMenuDel" data-i="${i}">ลบช่วงนี้</button></div>`).join('')}
         <button class="btn ghost sm" data-act="fnMenuAdd">+ เพิ่มช่วงเวลา</button></section>`;
+      const xEd = `<section class="card pad"><div class="between"><h3>รายละเอียดที่เพิ่มเอง</h3><button class="btn ghost sm" data-act="fnX">＋ เพิ่ม</button></div>
+        ${(own.extra || []).length ? own.extra.map((x, i) => `<div class="fnf-mrow"><div class="xs muted">${H(xName(x.sec))}</div><b>${H(x.label || '(ไม่มีหัวข้อ)')}</b><div class="small">${nl(x.text)}</div>
+          <button class="link small" data-act="fnX" data-i="${i}">แก้ไข</button> · <button class="link red small" data-act="fnXDel" data-i="${i}">ลบ</button></div>`).join('') : '<div class="small muted">ยังไม่มี — กด “＋ เพิ่ม” เพื่อเพิ่มหัวข้อ/รายละเอียดลงในแผนกที่ต้องการ</div>'}</section>`;
       return head + `<div class="note" style="margin-bottom:14px">ทุกช่องดึงจากใบเสนอราคาและใบฟังก์ชันให้แล้ว แก้ได้เลย — ช่องที่แก้เองจะมีปุ่ม “ใช้ค่าจากระบบ” เพื่อกลับไปใช้ค่าอัตโนมัติ · “อนุมัติโดย” มาจากผู้ดูแลระบบที่กดอนุมัติในหน้า Approve</div>
-        <div class="fnf-form">${FIELDS.map(([t, fs]) => `<section class="card pad"><h3>${H(t)}</h3>${fs.map(field).join('')}</section>`).join('')}${menuEd}</div>`;
+        <div class="fnf-form">${FIELDS.map(([t, fs]) => `<section class="card pad"><h3>${H(t)}</h3>${fs.map(field).join('')}</section>`).join('')}${menuEd}${xEd}</div>`;
     }
   };
 
@@ -158,6 +174,33 @@
     fnNo() { setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },
     fnReset(el) { setFn(f => { delete f[el.dataset.k]; }); },
     fnMenuAdd() { setFn((f, b) => { f.menu = menuOf(f, b).concat({ time: '', title: '', items: '' }); }); },
+    // "+": a small form laid out like the paper sheet — pick the department, give a heading and the details
+    fnX(el) {
+      const b = curB(); if (!b || !canEdit()) return;
+      const i = el.dataset.i != null ? Number(el.dataset.i) : -1, x = i >= 0 ? (b.fn.extra || [])[i] : { sec: 'banquet', label: '', text: '' };
+      if (!x) return;
+      App.modal(`<h2>${i >= 0 ? 'แก้ไขรายละเอียด' : 'เพิ่มรายละเอียด'}</h2>
+        <div class="field"><label class="f" for="fnxSec">เพิ่มลงในส่วน</label><select class="input" id="fnxSec">${XSEC.map(([k, t]) => `<option value="${k}" ${k === x.sec ? 'selected' : ''}>${H(t)}</option>`).join('')}</select></div>
+        <div class="fnf-xform"><table class="fnf-t"><tr><th colspan="2" class="sec" id="fnxHd">${H(xName(x.sec))}</th></tr>
+          <tr><th><input class="input" id="fnxLabel" maxlength="80" placeholder="หัวข้อ เช่น ดอกไม้" value="${H(x.label)}"></th>
+          <td><textarea class="input" id="fnxText" rows="5" maxlength="2000" placeholder="รายละเอียด (ขึ้นบรรทัดใหม่ได้)">${H(x.text)}</textarea></td></tr></table></div>
+        <div class="small red" id="fnxErr"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="fnxOk">${i >= 0 ? 'บันทึก' : 'เพิ่มลงใบ'}</button></div>`, bg => {
+        bg.classList.add('wide');
+        const sec = bg.querySelector('#fnxSec');
+        sec.onchange = () => { bg.querySelector('#fnxHd').textContent = xName(sec.value); };
+        bg.querySelector('#fnxOk').onclick = () => {
+          const label = bg.querySelector('#fnxLabel').value.trim(), text = bg.querySelector('#fnxText').value.trim();
+          if (!label && !text) { bg.querySelector('#fnxErr').textContent = 'กรอกหัวข้อหรือรายละเอียดอย่างน้อยหนึ่งช่อง'; return; }
+          App.closeModal();
+          setFn(f => { const list = (f.extra || []).map(o => Object.assign({}, o)), item = { sec: sec.value, label, text }; if (i >= 0) list[i] = item; else list.push(item); f.extra = list; });
+          App.toast(i >= 0 ? 'บันทึกแล้ว' : 'เพิ่มลงใบรายละเอียดฟังก์ชันแล้ว');
+        };
+      });
+    },
+    fnXDel(el) {
+      App.confirm('ลบรายละเอียดนี้?', () => setFn(f => { const list = (f.extra || []).slice(); list.splice(Number(el.dataset.i), 1); f.extra = list.length ? list : undefined; }), 'ลบ');
+    },
     fnMenuDel(el) { setFn((f, b) => { const m = menuOf(f, b); m.splice(Number(el.dataset.i), 1); f.menu = m; }); }
   });
   Object.assign(App.CHG, {
