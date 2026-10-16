@@ -64,6 +64,7 @@
     const a = auto(b, q), f = b.fn || {}, v = {};
     for (const k of Object.keys(a)) v[k] = f[k] != null ? f[k] : a[k];
     v.menu = Array.isArray(f.menu) ? f.menu : a.menu;
+    v.split = f.split || {}; // cells divided with “วาดตาราง”: { field: node }, node = { o:1 } | { text } | { d:'v'|'h', at, a, b }
     v.rich = f.rich || {}; // formatted copies of fields where only part of the text is styled
     v.sty = f.sty || {}; // text style per field (size, colour, weight…) from the edit toolbar
     v.more = f.more || {}; // lines added inside a cell with its corner "+": { field: [{ t: 'h'|'d', text }] }
@@ -130,6 +131,26 @@
   // an editable box on the sheet
   const ce = (attr, text, rich, ph, cls = '', st) => `<div class="fnf-in ${cls}" contenteditable="true" spellcheck="false" ${attr} data-ph="${H(ph)}"${sa(st)}>${rtx(text, rich)}</div>`;
 
+  /* ---------- “วาดตาราง”: dividing a cell into smaller cells, like Word's Draw Table ----------
+   * A cell's tree: a leaf is the cell's original content ({ o: 1 }) or a new cell ({ text }); a split holds two parts
+   * side by side (d:'v', the first part is `at`% wide) or one above the other (d:'h'). Paths are strings of a/b. */
+  const nodeAt = (n, path) => { for (const c of path) { if (!n || !n.d) return null; n = n[c]; } return n || null; };
+  const hasOrig = n => !!n && (n.o ? true : !!n.d && (hasOrig(n.a) || hasOrig(n.b)));
+  const hasText = n => !!n && (n.d ? hasText(n.a) || hasText(n.b) : !n.o && !!String(n.text || '').trim());
+  function cleanSplit(n, depth = 0) { // rebuilt on every render/save: only the shapes above, at most 6 levels deep
+    if (!n || typeof n !== 'object') return null;
+    if (n.d === 'v' || n.d === 'h') {
+      if (depth >= 6) return { o: 1 };
+      const a = cleanSplit(n.a, depth + 1), b = cleanSplit(n.b, depth + 1);
+      if (!a || !b) return a || b;
+      return { d: n.d, at: Math.max(10, Math.min(90, Math.round(Number(n.at) || 50))), a, b };
+    }
+    if (n.o) return { o: 1 };
+    const leaf = { text: String(n.text || '').slice(0, 2000) };
+    if (n.rich) leaf.rich = String(n.rich); if (n.sty && typeof n.sty === 'object') leaf.sty = n.sty;
+    return leaf;
+  }
+
   /* ---------- the paper form ----------
    * ed = the system values while editing: every value cell becomes a box you type into, right on the sheet */
   function paper(v, extra = [], ed = null) {
@@ -144,14 +165,28 @@
       const val = v[k] == null ? '' : String(v[k]), rv = ed[k] != null && val !== String(ed[k]);
       return `<div class="fnf-ed${plus ? ' fnf-cell' : ''}">${rv ? `<button class="fnf-rv" data-act="fnDRv" data-k="${k}" title="ใช้ค่าจากระบบ">↺</button>` : ''}${ce(`data-input="fnD" data-k="${k}" aria-label="${H(ph || k)}"`, val, rich[k], ph, '', sty[k])}${plus ? more(k, mv[k]) : ''}</div>`;
     };
-    const cell = (k, cls = '', dash = '', ph = '') => `<td class="${cls}">${T(k, dash, ph)}</td>`;
+    // a value cell of the form; when it has been divided, its parts are drawn inside it
+    const splitOf = key => { const m = /^(menu|x)\.(\d+)$/.exec(key), o = m ? (m[1] === 'menu' ? v.menu : extra)[Number(m[2])] : null; return cleanSplit(m ? o && o.split : (v.split || {})[key]); };
+    const da = (key, path) => ed ? ` data-cell="${key}" data-path="${path}"` : '';
+    const spHtml = (key, n, orig, path, top) => {
+      if (!n.d) return `<div class="fnf-lf"${da(key, path)}>${n.o ? orig : ed ? ce(`data-input="fnDS" data-key="${key}" data-path="${path}"`, n.text, n.rich, 'พิมพ์ข้อความ', '', n.sty) : wrapS(n.sty, rtx(n.text, n.rich))}</div>`;
+      const A = spHtml(key, n.a, orig, path + 'a'), B = spHtml(key, n.b, orig, path + 'b');
+      const line = `<i class="fnf-spl ${n.d}"${n.d === 'v' ? ` style="left:${n.at}%"` : ''}${da(key, path)}></i>`;
+      if (n.d === 'v') return `<div class="fnf-sp v${top ? ' top' : ''}"><div class="fnf-c" style="flex:0 0 ${n.at}%">${A}</div><div class="fnf-c" style="flex:1 1 0">${B}</div>${top ? '' : line}</div>${top ? line : ''}`;
+      return `<div class="fnf-sp h${top ? ' top' : ''}"><div class="fnf-c">${A}</div><div class="fnf-c hb">${line}${B}</div></div>`;
+    };
+    const tdc = (key, cls, inner, span = 1) => {
+      const n = splitOf(key);
+      return `<td class="${cls}${n ? ' fnf-hasp' : ''}"${span > 1 ? ` colspan="${span}"` : ''}${da(key, '')}>${n ? spHtml(key, n, inner, '', true) : inner}</td>`;
+    };
+    const cell = (k, cls = '', dash = '', ph = '') => tdc(k, cls, T(k, dash, ph));
     const box = (attr, val, ph, cls = '', st, rc) => ce(attr, val, rc, ph, cls, st);
     const xs = k => extra.map((x, i) => Object.assign({ i }, x)).filter(x => (XSEC.some(s => s[0] === x.sec) ? x.sec : 'other') === k);
     const xdel = x => `<button class="fnf-rv red" data-act="fnDXDel" data-i="${x.i}" title="ลบรายการนี้">✕</button>`;
     const xst = (x, k) => (x.sty || {})[k], xr = (x, k) => (x.rich || {})[k];
     const xth = x => ed ? `<th><div class="fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', '', xst(x, 'label'), xr(x, 'label'))}</div></th>`
       : `<th>${wrapS(xst(x, 'label'), rtx(x.label, xr(x, 'label')) + (x.label ? ' :' : ''), 'span')}</th>`;
-    const xtd = (x, span = 1) => `<td${span > 1 ? ` colspan="${span}"` : ''}>${ed ? `<div class="fnf-ed fnf-cell">${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด', '', xst(x, 'text'), xr(x, 'text'))}${more('x.' + x.i, x.more)}</div>` : wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text'))) + more('x.' + x.i, x.more)}</td>`;
+    const xtd = (x, span = 1) => tdc('x.' + x.i, '', ed ? `<div class="fnf-ed fnf-cell">${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด', '', xst(x, 'text'), xr(x, 'text'))}${more('x.' + x.i, x.more)}</div>` : wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text'))) + more('x.' + x.i, x.more), span);
     const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b', xst(x, 'label'), xr(x, 'label'))}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด', '', xst(x, 'text'), xr(x, 'text'))}</div>`
       : `<div class="fnf-x">${x.label ? `<b${sa(xst(x, 'label'))}>${rtx(x.label, xr(x, 'label'))} :</b> ` : ''}${wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text')), 'span')}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
@@ -159,8 +194,8 @@
     const add = sec => ed ? `<button class="fnf-add" data-act="fnDXAdd" data-sec="${sec}" title="เพิ่มหัวข้อ/ช่องข้อมูลในส่วนนี้">＋ เพิ่มช่อง</button>` : '';
     const addRow = (sec, span) => ed ? `<tr class="fnf-addrow"><td colspan="${span}">${add(sec)}</td></tr>` : '';
     const menuCols = v.menu.length ? v.menu.map((m, i) => ed
-      ? `<td class="fnf-menu"><div class="fnf-ed"><button class="fnf-rv red" data-act="fnDMDel" data-i="${i}" title="ลบช่วงนี้">✕</button>${box(`data-input="fnDM" data-i="${i}" data-k="time"`, m.time, 'ช่วงเวลา', 'b', (m.sty || {}).time, (m.rich || {}).time)}</div>${box(`data-input="fnDM" data-i="${i}" data-k="title"`, m.title, 'หัวข้อ', 'b', (m.sty || {}).title, (m.rich || {}).title)}${box(`data-input="fnDM" data-i="${i}" data-k="items"`, m.items, 'รายการอาหาร (บรรทัดละรายการ)', '', (m.sty || {}).items, (m.rich || {}).items)}<div class="fnf-ed fnf-cell">${more('menu.' + i, m.more)}</div></td>`
-      : `<td class="fnf-menu"><div class="fnf-mt"${sa((m.sty || {}).time)}>${rtx(m.time, (m.rich || {}).time)}</div><div class="fnf-mh"${sa((m.sty || {}).title)}>${rtx(m.title, (m.rich || {}).title)}</div>${wrapS((m.sty || {}).items, rtx(m.items, (m.rich || {}).items))}${more('menu.' + i, m.more)}</td>`).join('') : '<td class="fnf-menu">-</td>';
+      ? tdc('menu.' + i, 'fnf-menu', `<div class="fnf-ed"><button class="fnf-rv red" data-act="fnDMDel" data-i="${i}" title="ลบช่วงนี้">✕</button>${box(`data-input="fnDM" data-i="${i}" data-k="time"`, m.time, 'ช่วงเวลา', 'b', (m.sty || {}).time, (m.rich || {}).time)}</div>${box(`data-input="fnDM" data-i="${i}" data-k="title"`, m.title, 'หัวข้อ', 'b', (m.sty || {}).title, (m.rich || {}).title)}${box(`data-input="fnDM" data-i="${i}" data-k="items"`, m.items, 'รายการอาหาร (บรรทัดละรายการ)', '', (m.sty || {}).items, (m.rich || {}).items)}<div class="fnf-ed fnf-cell">${more('menu.' + i, m.more)}</div>`)
+      : tdc('menu.' + i, 'fnf-menu', `<div class="fnf-mt"${sa((m.sty || {}).time)}>${rtx(m.time, (m.rich || {}).time)}</div><div class="fnf-mh"${sa((m.sty || {}).title)}>${rtx(m.title, (m.rich || {}).title)}</div>${wrapS((m.sty || {}).items, rtx(m.items, (m.rich || {}).items))}${more('menu.' + i, m.more)}`)).join('') : '<td class="fnf-menu">-</td>';
     const kv = (k, ph) => ed ? `<span class="fnf-kvin">${T(k, '', ph, false)}</span>` : wrapS(sty[k], rtx(v[k], rich[k]), 'span');
     return `<div class="fnf-paper${ed ? ' editing' : ''}" id="fnPaper">
   <div class="fnf-head">
@@ -171,26 +206,26 @@
   <div class="fnf-org"><span><b>สำนักงาน/องค์กร :</b> ${kv('org', 'ชื่อสำนักงาน / องค์กร')}</span><span><b>ผู้ประสานงาน :</b> ${kv('coord', 'ชื่อ / เบอร์โทร')}</span></div>
   <table class="fnf-t">
     <tr><th>วันที่จัดงาน :</th>${cell('date', 'c')}<th>สถานที่จัดงาน :</th>${cell('venue', 'c')}<th>ประเภทงาน :</th>${cell('type', 'c')}</tr>
-    <tr><th>จำนวนการันตี :</th>${cell('pax', 'c')}<td colspan="4" class="c">${T('pricing', '', 'ราคาต่อหน่วย (บรรทัดละรายการ)')}</td></tr>
+    <tr><th>จำนวนการันตี :</th>${cell('pax', 'c')}${tdc('pricing', 'c', T('pricing', '', 'ราคาต่อหน่วย (บรรทัดละรายการ)'), 4)}</tr>
     ${xs('event').map(x => `<tr>${xth(x)}${xtd(x, 5)}</tr>`).join('')}
     ${addRow('event', 6)}
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec">แผนกจัดเลี้ยง / ห้องอาหาร</th><th colspan="${mc}" class="sec">เมนูอาหาร${ed ? ' <button class="link xs" data-act="fnDMAdd">+ เพิ่มช่วงเวลา</button>' : ''}</th></tr>
-    <tr><th>รูปแบบการจัดห้อง :</th><td>${T('layout', '', 'รูปแบบการจัดห้อง')}${v.fyi || ed ? `<div class="fnf-fyi"><b>FYI</b><br>${T('fyi', '', 'กำหนดการ / หมายเหตุ')}</div>` : ''}</td>${menuCols}</tr>
-    <tr><th>ข้อความบนเวที :${v.vinyl || ed ? `<div class="fnf-small">${T('vinyl', '', 'ไวนิล / ป้าย')}</div>` : ''}</th><td class="c">${T('stage', '-', 'ข้อความบนเวที')}</td><td colspan="${mc}" class="fnf-small">${v.kitchen || ed ? '<b>ครัว:</b> ' + T('kitchen', '', 'หมายเหตุครัว') : ''}</td></tr>
+    <tr><th>รูปแบบการจัดห้อง :</th>${tdc('layout', '', T('layout', '', 'รูปแบบการจัดห้อง') + (v.fyi || ed ? `<div class="fnf-fyi"><b>FYI</b><br>${T('fyi', '', 'กำหนดการ / หมายเหตุ')}</div>` : ''))}${menuCols}</tr>
+    <tr><th>ข้อความบนเวที :${v.vinyl || ed ? `<div class="fnf-small">${T('vinyl', '', 'ไวนิล / ป้าย')}</div>` : ''}</th>${tdc('stage', 'c', T('stage', '-', 'ข้อความบนเวที'))}${tdc('kitchen', 'fnf-small', v.kitchen || ed ? '<b>ครัว:</b> ' + T('kitchen', '', 'หมายเหตุครัว') : '', mc)}</tr>
     ${xs('banquet').map(x => `<tr>${xth(x)}${xtd(x, 1 + mc)}</tr>`).join('')}
     ${addRow('banquet', 2 + mc)}
   </table>
   <table class="fnf-t">
     <tr><th class="sec" style="width:50%">แผนกแม่บ้าน</th><th class="sec">แผนกช่างเครื่องเสียง</th></tr>
-    <tr><td class="c">${T('hk', '-', 'แผนกแม่บ้าน')}${xIn('hk')}${add('hk')}</td><td>${T('av', '-', 'แผนกช่างเครื่องเสียง')}${xIn('av')}${add('av')}</td></tr>
+    <tr>${tdc('hk', 'c', T('hk', '-', 'แผนกแม่บ้าน') + xIn('hk') + add('hk'))}${tdc('av', '', T('av', '-', 'แผนกช่างเครื่องเสียง') + xIn('av') + add('av'))}</tr>
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec" style="width:50%">แผนกบัญชี / การเงิน</th><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
-    <tr><th>ยอดรวม :</th><td class="c fnf-total">${ed ? T('total') : wrapS(sty.total, rtx(v.total, rich.total), 'span')}</td><th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
+    <tr><th>ยอดรวม :</th>${tdc('total', 'c fnf-total', ed ? T('total') : wrapS(sty.total, rtx(v.total, rich.total), 'span'))}<th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
     <tr><th>รายละเอียดค่าใช้จ่าย :</th>${cell('cost', 'c')}<th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
-    <tr><th>ที่อยู่ออกบิล :</th>${cell('bill', 'c')}<td colspan="4" class="c">${T('front', '', 'หมายเหตุต้อนรับ')}</td></tr>
+    <tr><th>ที่อยู่ออกบิล :</th>${cell('bill', 'c')}${tdc('front', 'c', T('front', '', 'หมายเหตุต้อนรับ'), 4)}</tr>
     ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + xtd(acc[i]) : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + xtd(front[i], 3) : '<td colspan="4"></td>'}</tr>`).join('')}
     ${ed ? `<tr class="fnf-addrow"><td colspan="2">${add('acc')}</td><td colspan="4">${add('front')}</td></tr>` : ''}
   </table>
@@ -210,7 +245,7 @@
   function draft(b) {
     const ui = fnUi();
     if (!ui.draft || ui.draft.bid !== b.id) {
-      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []), more: clone(v.more), sty: clone(v.sty), rich: clone(v.rich) };
+      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []), more: clone(v.more), sty: clone(v.sty), rich: clone(v.rich), split: clone(v.split) };
       for (const k of EDIT_KEYS) d.v[k] = v[k] == null ? '' : String(v[k]);
       ui.draft = d; ui.dirty = false;
     }
@@ -231,12 +266,15 @@
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
-      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, appr: v.appr, apprTitle: v.apprTitle });
+      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, appr: v.appr, apprTitle: v.apprTitle });
+      const tdMode = ui.td ? ' tdraw-' + ui.td : '';
       return head + `<div class="fnf-bar no-print"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ<div id="fnDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
         <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div>${tools()}</div>
-        <div class="fnf-wrap">${paper(dv, d.extra, a)}</div>`;
+        ${ui.td ? `<div class="note no-print fnf-tdnote">${ui.td === 'pen' ? '✏️ <b>วาดตาราง</b>: ลากเส้นแนวตั้งในช่องเพื่อแบ่งซ้าย-ขวา หรือแนวนอนเพื่อแบ่งบน-ล่าง แล้วพิมพ์ในช่องใหม่ได้เลย' : '⌫ <b>ยางลบเส้น</b>: แตะเส้นที่วาดไว้เพื่อลบและรวมช่องกลับ'} — กดปุ่มเดิมอีกครั้งเพื่อเลิกวาด</div>` : ''}
+        <div class="fnf-wrap${tdMode}">${paper(dv, d.extra, a)}</div>`;
     },
     after() {
+      if (fnUi().tab === 'form' && fnUi().td) wireTD();
       const tb = document.getElementById('fnTools'), pp = document.getElementById('fnPaper');
       if (tb && pp) {
         tb.addEventListener('mousedown', e => { if (e.target.closest('.fnt-b')) e.preventDefault(); });
@@ -247,6 +285,7 @@
         selEl = null; savedRange = null; showTools();
       }
       const ui = fnUi();
+      if (ui.focusS) { const t = document.querySelector(`[data-input="fnDS"][data-key="${ui.focusS.key}"][data-path="${ui.focusS.path}"]`); ui.focusS = null; if (t) t.focus(); }
       if (ui.focusC) { const t = document.querySelector(`[data-input="fnDC"][data-key="${ui.focusC.key}"][data-j="${ui.focusC.j}"]`); ui.focusC = null; if (t) t.focus(); }
       if (ui.focusX != null) { const t = document.querySelector(`[data-input="fnDX"][data-i="${ui.focusX}"][data-k="label"]`); ui.focusX = null; if (t) t.focus(); }
     }
@@ -261,9 +300,64 @@
       <span class="fnt-g"><span class="xs muted">สี</span>${Object.entries(COLORS).map(([k, [t, c]]) => b('c', k, `<i style="background:${c}"></i>`, 'สี' + t, 'sw')).join('')}</span>
       <span class="fnt-g">${b('al', 'l', '⯇', 'ชิดซ้าย')}${b('al', 'c', '≡', 'กึ่งกลาง')}${b('al', 'r', '⯈', 'ชิดขวา')}</span>
       ${b('clear', 1, 'ล้างรูปแบบ', 'ล้างรูปแบบของช่องนี้', 'clr')}
+      <span class="fnt-g fnt-td"><button class="fnt-b${fnUi().td === 'pen' ? ' on' : ''}" data-act="fnTD" data-v="pen" title="วาดเส้นในช่องเพื่อแบ่งเป็นช่องย่อย (เหมือนวาดตารางใน Word)">✏️ วาดตาราง</button><button class="fnt-b${fnUi().td === 'erase' ? ' on' : ''}" data-act="fnTD" data-v="erase" title="แตะเส้นที่วาดเพื่อลบ (รวมช่องกลับ)">⌫ ยางลบเส้น</button></span>
     </div>`;
   }
   // where a box's text, part-formatting and whole-box style live in the draft (make = create containers)
+  // drawing: drag inside a cell (or a part of one) — mostly up-down divides it left|right, mostly sideways divides it top/bottom
+  function wireTD() {
+    const pp = document.getElementById('fnPaper'); if (!pp) return;
+    const ui = fnUi();
+    let st = null;
+    const target = e => { const lf = e.target.closest('.fnf-lf[data-cell]'); if (lf) return { el: lf, box: lf.parentElement }; const td = e.target.closest('td[data-cell]'); return td && !td.classList.contains('fnf-hasp') ? { el: td, box: td } : null; };
+    pp.addEventListener('pointerdown', e => {
+      if (e.target.closest('button')) return;
+      if (ui.td === 'erase') {
+        const ln = e.target.closest('.fnf-spl[data-cell]'); if (!ln) return;
+        e.preventDefault(); mergeAt(ln.dataset.cell, ln.dataset.path); return;
+      }
+      const t = target(e); if (!t) return;
+      e.preventDefault(); pp.setPointerCapture(e.pointerId);
+      const r = t.box.getBoundingClientRect(), pv = document.createElement('i'); pv.className = 'fnf-tdpv'; t.box.appendChild(pv);
+      st = { key: t.el.dataset.cell, path: t.el.dataset.path, r, x: e.clientX, y: e.clientY, pv, box: t.box };
+    });
+    pp.addEventListener('pointermove', e => {
+      if (!st) return;
+      const dx = e.clientX - st.x, dy = e.clientY - st.y, v = Math.abs(dy) >= Math.abs(dx), k = st.box.offsetWidth / st.r.width;
+      st.pv.className = 'fnf-tdpv ' + (v ? 'v' : 'h');
+      st.pv.style.cssText = v ? `left:${(st.x - st.r.left) * k}px` : `top:${(Math.max(st.y, e.clientY) - st.r.top) * k}px`;
+    });
+    const end = e => {
+      if (!st) return; const s0 = st; st = null; s0.pv.remove();
+      const dx = e.clientX - s0.x, dy = e.clientY - s0.y; if (Math.max(Math.abs(dx), Math.abs(dy)) < 12) return;
+      const d = Math.abs(dy) >= Math.abs(dx) ? 'v' : 'h', at = d === 'v' ? ((s0.x + e.clientX) / 2 - s0.r.left) / s0.r.width * 100 : 50;
+      splitAt(s0.key, s0.path, d, at);
+    };
+    pp.addEventListener('pointerup', end); pp.addEventListener('pointercancel', () => { if (st) { st.pv.remove(); st = null; } });
+  }
+  function splitAt(key, path, d, at) {
+    const r = splitRef(key); if (!r) return;
+    const root = r.get() || { o: 1 }, leaf = nodeAt(root, path); if (!leaf || leaf.d) return;
+    if (path.length >= 6) { App.toast('แบ่งช่องย่อยได้ไม่เกิน 6 ชั้น'); return; }
+    const node = { d, at: Math.max(10, Math.min(90, Math.round(at))), a: leaf, b: { text: '' } };
+    const nr = path ? root : node;
+    if (path) { const parent = nodeAt(root, path.slice(0, -1)); parent[path.slice(-1)] = node; }
+    r.set(nr); fnUi().dirty = true; fnUi().focusS = null; App.render();
+  }
+  function mergeAt(key, path) {
+    const r = splitRef(key), root = r && r.get(), n = root && nodeAt(root, path); if (!n || !n.d) return;
+    const keep = hasOrig(n.b) && !hasOrig(n.a) ? n.b : n.a, drop = keep === n.a ? n.b : n.a;
+    const go = () => { if (!path) r.set(keep); else { nodeAt(root, path.slice(0, -1))[path.slice(-1)] = keep; r.set(root); } fnUi().dirty = true; App.render(); };
+    if (hasText(drop)) App.confirm('ลบเส้นนี้? ข้อความในช่องที่ถูกรวมจะหายไป', go, 'ลบเส้น'); else go();
+  }
+  // the tree of a divided cell in the draft, and replacing it
+  function splitRef(key) {
+    const d = fnUi().draft; if (!d) return null;
+    const m = /^(menu|x)\.(\d+)$/.exec(key), o = m ? (m[1] === 'menu' ? d.menu : d.extra)[Number(m[2])] : (d.split || (d.split = {}));
+    if (!o) return null;
+    const k = m ? 'split' : key;
+    return { get: () => cleanSplit(o[k]), set: n => { if (n && n.d) o[k] = n; else delete o[k]; } };
+  }
   function slot(el, make) {
     const d = fnUi().draft; if (!d || !el) return null;
     const ds = el.dataset, sub = (o, n) => { if (!o[n] && make) o[n] = {}; return o[n]; };
@@ -272,12 +366,14 @@
       const o = (ds.input === 'fnDM' ? d.menu : d.extra)[Number(ds.i)]; if (!o) return null;
       return { o, k: ds.k, r: sub(o, 'rich'), rk: ds.k, s: sub(o, 'sty'), sk: ds.k, max: ds.k === 'label' ? 80 : 2000 };
     }
+    if (ds.input === 'fnDS') { const r = splitRef(ds.key), root = r && r.get(); if (!root) return null; const lf = nodeAt(root, ds.path); if (!lf || lf.d || lf.o) return null; return { o: lf, k: 'text', r: lf, rk: 'rich', s: lf, sk: 'sty', max: 2000, done: () => r.set(root) }; }
     if (ds.input === 'fnDC') { const it = (cellList(ds.key) || [])[Number(ds.j)]; return it ? { o: it, k: 'text', r: it, rk: 'rich', s: it, sk: 'sty', max: 2000 } : null; }
     return null;
   }
   function styleOf(el, make) {
     const t = slot(el, make); if (!t || !t.s) return null;
     if (!t.s[t.sk] && make) t.s[t.sk] = {};
+    if (t.done) t.done(); // a divided cell's part lives in a rebuilt tree: store it back (same objects)
     return t.s[t.sk] || null;
   }
   // typing in a box: keep its plain text, plus a formatted copy when part of it is styled
@@ -286,6 +382,7 @@
     const w = walk(el, { h: '', t: '' }), text = tidyText(w.t).slice(0, t.max);
     t.o[t.k] = text;
     if (t.r) { if (/<span /.test(w.h) && text) t.r[t.rk] = w.h.replace(/(<br>)+$/, ''); else delete t.r[t.rk]; }
+    if (t.done) t.done();
     markDirty();
   }
   // the highlighted part of the selected box (null when nothing is highlighted)
@@ -335,7 +432,7 @@
       size.value = own ? String(own) : '';
       size.options[0].textContent = on && !own ? (lk.part ? lk.pt + ' (ไม่อยู่ในรายการ)' : 'ปกติ (' + lk.pt + ')') : 'ปกติ';
     }
-    document.querySelectorAll('#fnTools .fnt-b').forEach(x => {
+    document.querySelectorAll('#fnTools .fnt-b[data-act="fnSty"]').forEach(x => {
       const p = x.dataset.p, v = x.dataset.v;
       x.disabled = !on || (lk.part && p === 'al');
       x.classList.toggle('on', on && (p === 'pt' || p === 'clear' ? false : p === 'c' ? lk.c === v : p === 'al' ? lk.al === v : !!lk[p]));
@@ -352,7 +449,7 @@
   }
   Object.assign(App.ACT, {
     fnTab(el) {
-      const ui = fnUi(), go = () => { if (el.dataset.v === 'preview') dropDraft(); ui.tab = el.dataset.v; App.render(); };
+      const ui = fnUi(), go = () => { if (el.dataset.v === 'preview') dropDraft(); ui.td = null; ui.tab = el.dataset.v; App.render(); };
       if (ui.tab === 'form' && el.dataset.v === 'preview' && ui.dirty) App.confirm('ทิ้งการแก้ไขที่ยังไม่บันทึก?', go, 'ทิ้งการแก้ไข'); else go();
     },
     fnDCancel() { App.ACT.fnTab({ dataset: { v: 'preview' } }); },
@@ -374,14 +471,19 @@
         f.menu = JSON.stringify(menu) === JSON.stringify(a.menu) ? undefined : menu;
         const mo = {}; for (const k of Object.keys(d.more)) { const l = keep(d.more[k]); if (l.length) mo[k] = l; }
         f.more = Object.keys(mo).length ? mo : undefined;
+        const tidyTree = n => { if (!n) return n; if (n.d) { tidyTree(n.a); tidyTree(n.b); } else if (!n.o) { if (n.sty && !css(n.sty)) delete n.sty; if (n.rich && (!n.text || richPlain(n.rich) !== n.text)) delete n.rich; else if (n.rich) n.rich = richSan(n.rich); } return n; };
+        const sp = {}; for (const k of Object.keys(d.split || {})) { const n = tidyTree(cleanSplit(d.split[k])); if (n && n.d) sp[k] = n; }
+        f.split = Object.keys(sp).length ? sp : undefined;
+        d.menu.forEach(m => { const n = tidyTree(cleanSplit(m.split)); if (n && n.d) m.split = n; else delete m.split; });
+        d.extra.forEach(x => { const n = tidyTree(cleanSplit(x.split)); if (n && n.d) x.split = n; else delete x.split; });
         const rc = {}; for (const k of Object.keys(d.rich || {})) if (d.rich[k] && d.v[k] && richPlain(d.rich[k]) === d.v[k]) rc[k] = richSan(d.rich[k]);
         f.rich = Object.keys(rc).length ? rc : undefined;
         const sy = {}; for (const k of Object.keys(d.sty || {})) if (css(d.sty[k])) sy[k] = d.sty[k];
         f.sty = Object.keys(sy).length ? sy : undefined;
-        const ex = d.extra.filter(x => (x.label || '').trim() || (x.text || '').trim() || keep(x.more).length).map(x => { const o = Object.assign({}, x), l = keep(x.more); if (l.length) o.more = l; else delete o.more; return o; });
+        const ex = d.extra.filter(x => (x.label || '').trim() || (x.text || '').trim() || keep(x.more).length || x.split).map(x => { const o = Object.assign({}, x), l = keep(x.more); if (l.length) o.more = l; else delete o.more; return o; });
         f.extra = ex.length ? ex : undefined;
       });
-      dropDraft(); fnUi().tab = 'preview'; App.render(); App.toast('บันทึกแก้ไขข้อมูลแล้ว');
+      dropDraft(); fnUi().td = null; fnUi().tab = 'preview'; App.render(); App.toast('บันทึกแก้ไขข้อมูลแล้ว');
     },
     fnDRv(el) { const b = curB(), d = fnUi().draft; if (!b || !d) return; const a = auto(b, Store.quote(b.quoteId)); d.v[el.dataset.k] = a[el.dataset.k] == null ? '' : String(a[el.dataset.k]); if (d.rich) delete d.rich[el.dataset.k]; fnUi().dirty = true; App.render(); },
     fnDMAdd() { const d = fnUi().draft; if (!d) return; d.menu.push({ time: '', title: '', items: '' }); fnUi().dirty = true; App.render(); },
@@ -422,6 +524,7 @@
       else { if (st[p]) delete st[p]; else { st[p] = 1; if (p === 'b') delete st.w; if (p === 'w') delete st.b; } }
       selEl.style.cssText = css(st); selEl.focus(); markDirty(); showTools();
     },
+    fnTD(el) { const ui = fnUi(); ui.td = ui.td === el.dataset.v ? null : el.dataset.v; App.render(); },
     fnDXDel(el) { const d = fnUi().draft; if (!d) return; d.extra.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
     fnPrint() { const ui = fnUi(); if (ui.tab === 'form' && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนพิมพ์'); return; } if (ui.tab !== 'preview') { dropDraft(); ui.tab = 'preview'; App.render(); } setTimeout(() => window.print(), 50); },
     fnNo() { const d = fnUi().tab === 'form' && fnUi().draft; if (d) { d.v.no = nextNo(); fnUi().dirty = true; App.render(); return; } setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },
@@ -473,5 +576,5 @@
     delete st.sz; if (el.value) st.pt = Number(el.value); else delete st.pt;
     selEl.style.cssText = css(st); selEl.focus(); markDirty(); showTools();
   };
-  Object.assign(App.INP, { fnD: readBox, fnDM: readBox, fnDX: readBox, fnDC: readBox });
+  Object.assign(App.INP, { fnD: readBox, fnDM: readBox, fnDX: readBox, fnDC: readBox, fnDS: readBox });
 })(window);
