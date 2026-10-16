@@ -1,5 +1,5 @@
 /* Luck Swan Sales — offline cache */
-const CACHE = 'ls-sales-v41';
+const CACHE = 'ls-sales-v42';
 const ASSETS = [
   'css/app.css',
   'fonts.css',
@@ -9,6 +9,8 @@ const ASSETS = [
   'fonts/BaiJamjuree-600-thai.woff2',
   'fonts/BaiJamjuree-700-latin.woff2',
   'fonts/BaiJamjuree-700-thai.woff2',
+  'fonts/IBMPlexSansThai-300-latin.woff2',
+  'fonts/IBMPlexSansThai-300-thai.woff2',
   'fonts/IBMPlexSansThai-400-latin.woff2',
   'fonts/IBMPlexSansThai-400-thai.woff2',
   'fonts/IBMPlexSansThai-500-latin.woff2',
