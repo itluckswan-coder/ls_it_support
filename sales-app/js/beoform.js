@@ -64,6 +64,7 @@
     const a = auto(b, q), f = b.fn || {}, v = {};
     for (const k of Object.keys(a)) v[k] = f[k] != null ? f[k] : a[k];
     v.menu = Array.isArray(f.menu) ? f.menu : a.menu;
+    v.more = f.more || {}; // lines added inside a cell with its corner "+": { field: [{ t: 'h'|'d', text }] }
     v.appr = a.appr; v.apprTitle = a.apprTitle; // always the real sign-off
     return { v, a };
   }
@@ -75,10 +76,16 @@
   /* ---------- the paper form ----------
    * ed = the system values while editing: every value cell becomes a box you type into, right on the sheet */
   function paper(v, extra = [], ed = null) {
-    const T = (k, dash = '', ph = '') => {
-      if (!ed) return nl(v[k] || dash);
+    // lines added inside a cell (heading or detail) + the cell's corner "+" that adds them
+    const more = (key, list = []) => ed
+      ? list.map((it, j) => `<div class="fnf-ed fnf-more"><button class="fnf-rv red" data-act="fnDCDel" data-key="${key}" data-j="${j}" title="ลบบรรทัดนี้">✕</button><textarea class="fnf-in${it.t === 'h' ? ' b' : ''}" rows="1" data-input="fnDC" data-key="${key}" data-j="${j}" placeholder="${it.t === 'h' ? 'หัวข้อ' : 'รายละเอียดข้อมูล'}">${H(it.text || '')}</textarea></div>`).join('')
+        + `<button class="fnf-cplus" data-act="fnCPlus" data-key="${key}" title="เพิ่มหัวข้อ หรือ รายละเอียดข้อมูลในช่องนี้">＋</button>`
+      : list.filter(it => (it.text || '').trim()).map(it => it.t === 'h' ? `<div class="fnf-mh2">${H(it.text)}</div>` : `<div class="fnf-md">${nl(it.text)}</div>`).join('');
+    const mv = v.more || {};
+    const T = (k, dash = '', ph = '', plus = true) => {
+      if (!ed) return nl(v[k] || dash) + (plus ? more(k, mv[k]) : '');
       const val = v[k] == null ? '' : String(v[k]), rv = ed[k] != null && val !== String(ed[k]);
-      return `<div class="fnf-ed">${rv ? `<button class="fnf-rv" data-act="fnDRv" data-k="${k}" title="ใช้ค่าจากระบบ">↺</button>` : ''}<textarea class="fnf-in" rows="1" data-input="fnD" data-k="${k}" placeholder="${H(ph)}" aria-label="${H(ph || k)}">${H(val)}</textarea></div>`;
+      return `<div class="fnf-ed${plus ? ' fnf-cell' : ''}">${rv ? `<button class="fnf-rv" data-act="fnDRv" data-k="${k}" title="ใช้ค่าจากระบบ">↺</button>` : ''}<textarea class="fnf-in" rows="1" data-input="fnD" data-k="${k}" placeholder="${H(ph)}" aria-label="${H(ph || k)}">${H(val)}</textarea>${plus ? more(k, mv[k]) : ''}</div>`;
     };
     const cell = (k, cls = '', dash = '', ph = '') => `<td class="${cls}">${T(k, dash, ph)}</td>`;
     const box = (attr, val, ph, cls = '') => `<textarea class="fnf-in ${cls}" rows="1" ${attr} placeholder="${H(ph)}">${H(val || '')}</textarea>`;
@@ -86,7 +93,7 @@
     const xdel = x => `<button class="fnf-rv red" data-act="fnDXDel" data-i="${x.i}" title="ลบรายการนี้">✕</button>`;
     const xth = x => ed ? `<th><div class="fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ')}</div></th>`
       : `<th>${H(x.label || '')}${x.label ? ' :' : ''}</th>`;
-    const xtd = (x, span = 1) => `<td${span > 1 ? ` colspan="${span}"` : ''}>${ed ? box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด') : nl(x.text)}</td>`;
+    const xtd = (x, span = 1) => `<td${span > 1 ? ` colspan="${span}"` : ''}>${ed ? `<div class="fnf-ed fnf-cell">${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด')}${more('x.' + x.i, x.more)}</div>` : nl(x.text) + more('x.' + x.i, x.more)}</td>`;
     const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b')}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด')}</div>`
       : `<div class="fnf-x">${x.label ? `<b>${H(x.label)} :</b> ` : ''}${nl(x.text)}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
@@ -94,14 +101,14 @@
     const add = sec => ed ? `<button class="fnf-add" data-act="fnDXAdd" data-sec="${sec}" title="เพิ่มหัวข้อ/ช่องข้อมูลในส่วนนี้">＋ เพิ่มช่อง</button>` : '';
     const addRow = (sec, span) => ed ? `<tr class="fnf-addrow"><td colspan="${span}">${add(sec)}</td></tr>` : '';
     const menuCols = v.menu.length ? v.menu.map((m, i) => ed
-      ? `<td class="fnf-menu"><div class="fnf-ed"><button class="fnf-rv red" data-act="fnDMDel" data-i="${i}" title="ลบช่วงนี้">✕</button>${box(`data-input="fnDM" data-i="${i}" data-k="time"`, m.time, 'ช่วงเวลา', 'b')}</div>${box(`data-input="fnDM" data-i="${i}" data-k="title"`, m.title, 'หัวข้อ', 'b')}${box(`data-input="fnDM" data-i="${i}" data-k="items"`, m.items, 'รายการอาหาร (บรรทัดละรายการ)')}</td>`
-      : `<td class="fnf-menu"><div class="fnf-mt">${H(m.time)}</div><div class="fnf-mh">${H(m.title)}</div>${nl(m.items)}</td>`).join('') : '<td class="fnf-menu">-</td>';
-    const kv = (k, ph) => ed ? `<span class="fnf-kvin">${T(k, '', ph)}</span>` : H(v[k]);
+      ? `<td class="fnf-menu"><div class="fnf-ed"><button class="fnf-rv red" data-act="fnDMDel" data-i="${i}" title="ลบช่วงนี้">✕</button>${box(`data-input="fnDM" data-i="${i}" data-k="time"`, m.time, 'ช่วงเวลา', 'b')}</div>${box(`data-input="fnDM" data-i="${i}" data-k="title"`, m.title, 'หัวข้อ', 'b')}${box(`data-input="fnDM" data-i="${i}" data-k="items"`, m.items, 'รายการอาหาร (บรรทัดละรายการ)')}<div class="fnf-ed fnf-cell">${more('menu.' + i, m.more)}</div></td>`
+      : `<td class="fnf-menu"><div class="fnf-mt">${H(m.time)}</div><div class="fnf-mh">${H(m.title)}</div>${nl(m.items)}${more('menu.' + i, m.more)}</td>`).join('') : '<td class="fnf-menu">-</td>';
+    const kv = (k, ph) => ed ? `<span class="fnf-kvin">${T(k, '', ph, false)}</span>` : H(v[k]);
     return `<div class="fnf-paper${ed ? ' editing' : ''}" id="fnPaper">
   <div class="fnf-head">
     <img src="img/logo-wide.png" alt="Luck Swan Resort">
     <div class="fnf-title"><b>ลักษวรรณ รีสอร์ท</b><br>Banquet Function Event</div>
-    <table class="fnf-meta"><tr><th>Function No.</th><td class="fnf-no">${ed ? T('no', '', 'RS…/' ) + (!v.no ? `<button class="link xs" data-act="fnNo">ออกเลขอัตโนมัติ (${H(nextNo())})</button>` : '') : H(v.no || '—')}</td></tr><tr><th>วันที่ออกเอกสาร</th><td>${kv('issued', 'วันที่')}</td></tr><tr><th>Quotation No. :</th><td>${kv('quote', 'เลขใบเสนอราคา')}</td></tr></table>
+    <table class="fnf-meta"><tr><th>Function No.</th><td class="fnf-no">${ed ? T('no', '', 'RS…/', false) + (!v.no ? `<button class="link xs" data-act="fnNo">ออกเลขอัตโนมัติ (${H(nextNo())})</button>` : '') : H(v.no || '—')}</td></tr><tr><th>วันที่ออกเอกสาร</th><td>${kv('issued', 'วันที่')}</td></tr><tr><th>Quotation No. :</th><td>${kv('quote', 'เลขใบเสนอราคา')}</td></tr></table>
   </div>
   <div class="fnf-org"><span><b>สำนักงาน/องค์กร :</b> ${kv('org', 'ชื่อสำนักงาน / องค์กร')}</span><span><b>ผู้ประสานงาน :</b> ${kv('coord', 'ชื่อ / เบอร์โทร')}</span></div>
   <table class="fnf-t">
@@ -145,7 +152,7 @@
   function draft(b) {
     const ui = fnUi();
     if (!ui.draft || ui.draft.bid !== b.id) {
-      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []) };
+      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []), more: clone(v.more) };
       for (const k of EDIT_KEYS) d.v[k] = v[k] == null ? '' : String(v[k]);
       ui.draft = d; ui.dirty = false;
     }
@@ -166,14 +173,16 @@
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
-      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, appr: v.appr, apprTitle: v.apprTitle });
+      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, appr: v.appr, apprTitle: v.apprTitle });
       return head + `<div class="fnf-bar no-print"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ<div id="fnDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
         <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div></div>
         <div class="fnf-wrap">${paper(dv, d.extra, a)}</div>`;
     },
     after() {
       document.querySelectorAll('.fnf-in').forEach(fit);
-      const ui = fnUi(); if (ui.focusX != null) { const t = document.querySelector(`[data-input="fnDX"][data-i="${ui.focusX}"][data-k="label"]`); ui.focusX = null; if (t) t.focus(); }
+      const ui = fnUi();
+      if (ui.focusC) { const t = document.querySelector(`[data-input="fnDC"][data-key="${ui.focusC.key}"][data-j="${ui.focusC.j}"]`); ui.focusC = null; if (t) t.focus(); }
+      if (ui.focusX != null) { const t = document.querySelector(`[data-input="fnDX"][data-i="${ui.focusX}"][data-k="label"]`); ui.focusX = null; if (t) t.focus(); }
     }
   };
   function fit(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
@@ -195,8 +204,12 @@
       const a = auto(b, Store.quote(b.quoteId));
       setFn(f => {
         for (const k of EDIT_KEYS) { const val = d.v[k]; if (val === (a[k] == null ? '' : String(a[k]))) delete f[k]; else f[k] = val.slice(0, 4000); }
-        f.menu = JSON.stringify(d.menu) === JSON.stringify(a.menu) ? undefined : d.menu;
-        const ex = d.extra.filter(x => (x.label || '').trim() || (x.text || '').trim());
+        const keep = l => (l || []).filter(it => (it.text || '').trim());
+        const menu = d.menu.map(m => { const o = Object.assign({}, m), l = keep(m.more); if (l.length) o.more = l; else delete o.more; return o; });
+        f.menu = JSON.stringify(menu) === JSON.stringify(a.menu) ? undefined : menu;
+        const mo = {}; for (const k of Object.keys(d.more)) { const l = keep(d.more[k]); if (l.length) mo[k] = l; }
+        f.more = Object.keys(mo).length ? mo : undefined;
+        const ex = d.extra.filter(x => (x.label || '').trim() || (x.text || '').trim() || keep(x.more).length).map(x => { const o = Object.assign({}, x), l = keep(x.more); if (l.length) o.more = l; else delete o.more; return o; });
         f.extra = ex.length ? ex : undefined;
       });
       dropDraft(); fnUi().tab = 'preview'; App.render(); App.toast('บันทึกแก้ไขข้อมูลแล้ว');
@@ -205,6 +218,16 @@
     fnDMAdd() { const d = fnUi().draft; if (!d) return; d.menu.push({ time: '', title: '', items: '' }); fnUi().dirty = true; App.render(); },
     fnDMDel(el) { const d = fnUi().draft; if (!d) return; d.menu.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
     fnDXAdd(el) { const d = fnUi().draft; if (!d) return; d.extra.push({ sec: el.dataset.sec, label: '', text: '' }); fnUi().dirty = true; fnUi().focusX = d.extra.length - 1; App.render(); },
+    // a cell's corner "+": choose heading or detail, then a new line appears inside that cell
+    fnCPlus(el) {
+      document.querySelectorAll('.fnf-pick').forEach(x => x.remove());
+      const pk = document.createElement('div'); pk.className = 'fnf-pick';
+      pk.innerHTML = `<div class="xs muted">เพิ่มในช่องนี้</div><button data-act="fnCAdd" data-key="${H(el.dataset.key)}" data-t="h"><b>หัวข้อ</b></button><button data-act="fnCAdd" data-key="${H(el.dataset.key)}" data-t="d">รายละเอียดข้อมูล</button>`;
+      el.parentNode.appendChild(pk);
+      setTimeout(() => document.addEventListener('mousedown', function off(e) { if (!pk.contains(e.target)) { pk.remove(); document.removeEventListener('mousedown', off); } }));
+    },
+    fnCAdd(el) { const l = cellList(el.dataset.key, true); if (!l) return; l.push({ t: el.dataset.t, text: '' }); fnUi().dirty = true; fnUi().focusC = { key: el.dataset.key, j: l.length - 1 }; App.render(); },
+    fnDCDel(el) { const l = cellList(el.dataset.key); if (!l) return; l.splice(Number(el.dataset.j), 1); fnUi().dirty = true; App.render(); },
     fnDXDel(el) { const d = fnUi().draft; if (!d) return; d.extra.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
     fnPrint() { const ui = fnUi(); if (ui.tab === 'form' && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนพิมพ์'); return; } if (ui.tab !== 'preview') { dropDraft(); ui.tab = 'preview'; App.render(); } setTimeout(() => window.print(), 50); },
     fnNo() { const d = fnUi().tab === 'form' && fnUi().draft; if (d) { d.v.no = nextNo(); fnUi().dirty = true; App.render(); return; } setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },
@@ -236,9 +259,19 @@
     }
   });
   App.fnNo = b => (b.fn && b.fn.no) || '';
+  // the list of added lines for a cell key: a field name, "menu.<i>" or "x.<i>" (an added row)
+  function cellList(key, make) {
+    const d = fnUi().draft; if (!d) return null;
+    const m = /^(menu|x)\.(\d+)$/.exec(key), o = m ? (m[1] === 'menu' ? d.menu : d.extra)[Number(m[2])] : d.more;
+    if (!o) return null;
+    const k = m ? 'more' : key;
+    if (!Array.isArray(o[k])) { if (!make) return null; o[k] = []; }
+    return o[k];
+  }
   Object.assign(App.INP, {
     fnD(el) { const d = fnUi().draft; if (!d) return; d.v[el.dataset.k] = el.value.slice(0, 4000); fit(el); markDirty(); },
     fnDM(el) { const d = fnUi().draft, m = d && d.menu[Number(el.dataset.i)]; if (!m) return; m[el.dataset.k] = el.value.slice(0, 2000); fit(el); markDirty(); },
+    fnDC(el) { const l = cellList(el.dataset.key), it = l && l[Number(el.dataset.j)]; if (!it) return; it.text = el.value.slice(0, 2000); fit(el); markDirty(); },
     fnDX(el) { const d = fnUi().draft, x = d && d.extra[Number(el.dataset.i)]; if (!x) return; x[el.dataset.k] = el.value.slice(0, el.dataset.k === 'label' ? 80 : 2000); fit(el); markDirty(); }
   });
 })(window);
