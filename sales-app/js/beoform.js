@@ -7,7 +7,6 @@
 
   const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]);
   const canEdit = () => App.can('create_quote') || App.can('staff');
-  const lines = t => String(t || '').split('\n').map(s => s.trim()).filter(Boolean);
   const nl = t => H(t || '').replace(/\n/g, '<br>');
   const money = v => U.n(Math.round(Number(v) || 0));
 
@@ -73,67 +72,87 @@
   const XSEC = [['event', 'ข้อมูลงาน'], ['banquet', 'แผนกจัดเลี้ยง / ห้องอาหาร'], ['hk', 'แผนกแม่บ้าน'], ['av', 'แผนกช่างเครื่องเสียง'], ['acc', 'แผนกบัญชี / การเงิน'], ['front', 'แผนกต้อนรับ'], ['other', 'รายละเอียดเพิ่มเติม']];
   const xName = k => (XSEC.find(x => x[0] === k) || XSEC[XSEC.length - 1])[1];
 
-  /* ---------- the paper form ---------- */
-  function paper(v, extra = []) {
-    const cell = (t, cls = '') => `<td class="${cls}">${nl(t)}</td>`;
-    const xs = k => extra.filter(x => (XSEC.some(s => s[0] === x.sec) ? x.sec : 'other') === k);
-    const xth = x => `<th>${H(x.label || '')}${x.label ? ' :' : ''}</th>`;
-    const xIn = k => xs(k).map(x => `<div class="fnf-x">${x.label ? `<b>${H(x.label)} :</b> ` : ''}${nl(x.text)}</div>`).join('');
+  /* ---------- the paper form ----------
+   * ed = the system values while editing: every value cell becomes a box you type into, right on the sheet */
+  function paper(v, extra = [], ed = null) {
+    const T = (k, dash = '', ph = '') => {
+      if (!ed) return nl(v[k] || dash);
+      const val = v[k] == null ? '' : String(v[k]), rv = ed[k] != null && val !== String(ed[k]);
+      return `<div class="fnf-ed">${rv ? `<button class="fnf-rv" data-act="fnDRv" data-k="${k}" title="ใช้ค่าจากระบบ">↺</button>` : ''}<textarea class="fnf-in" rows="1" data-input="fnD" data-k="${k}" placeholder="${H(ph)}" aria-label="${H(ph || k)}">${H(val)}</textarea></div>`;
+    };
+    const cell = (k, cls = '', dash = '', ph = '') => `<td class="${cls}">${T(k, dash, ph)}</td>`;
+    const box = (attr, val, ph, cls = '') => `<textarea class="fnf-in ${cls}" rows="1" ${attr} placeholder="${H(ph)}">${H(val || '')}</textarea>`;
+    const xs = k => extra.map((x, i) => Object.assign({ i }, x)).filter(x => (XSEC.some(s => s[0] === x.sec) ? x.sec : 'other') === k);
+    const xdel = x => `<button class="fnf-rv red" data-act="fnDXDel" data-i="${x.i}" title="ลบรายการนี้">✕</button>`;
+    const xth = x => ed ? `<th><div class="fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ')}</div></th>`
+      : `<th>${H(x.label || '')}${x.label ? ' :' : ''}</th>`;
+    const xtd = (x, span = 1) => `<td${span > 1 ? ` colspan="${span}"` : ''}>${ed ? box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด') : nl(x.text)}</td>`;
+    const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b')}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด')}</div>`
+      : `<div class="fnf-x">${x.label ? `<b>${H(x.label)} :</b> ` : ''}${nl(x.text)}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
-    const menuCols = v.menu.length ? v.menu.map(m => `<td class="fnf-menu"><div class="fnf-mt">${H(m.time)}</div><div class="fnf-mh">${H(m.title)}</div>${nl(m.items)}</td>`).join('') : '<td class="fnf-menu">-</td>';
-    return `<div class="fnf-paper" id="fnPaper">
+    const menuCols = v.menu.length ? v.menu.map((m, i) => ed
+      ? `<td class="fnf-menu"><div class="fnf-ed"><button class="fnf-rv red" data-act="fnDMDel" data-i="${i}" title="ลบช่วงนี้">✕</button>${box(`data-input="fnDM" data-i="${i}" data-k="time"`, m.time, 'ช่วงเวลา', 'b')}</div>${box(`data-input="fnDM" data-i="${i}" data-k="title"`, m.title, 'หัวข้อ', 'b')}${box(`data-input="fnDM" data-i="${i}" data-k="items"`, m.items, 'รายการอาหาร (บรรทัดละรายการ)')}</td>`
+      : `<td class="fnf-menu"><div class="fnf-mt">${H(m.time)}</div><div class="fnf-mh">${H(m.title)}</div>${nl(m.items)}</td>`).join('') : '<td class="fnf-menu">-</td>';
+    const kv = (k, ph) => ed ? `<span class="fnf-kvin">${T(k, '', ph)}</span>` : H(v[k]);
+    return `<div class="fnf-paper${ed ? ' editing' : ''}" id="fnPaper">
   <div class="fnf-head">
     <img src="img/logo-wide.png" alt="Luck Swan Resort">
     <div class="fnf-title"><b>ลักษวรรณ รีสอร์ท</b><br>Banquet Function Event</div>
-    <table class="fnf-meta"><tr><th>Function No.</th><td class="fnf-no">${H(v.no || '—')}</td></tr><tr><th>วันที่ออกเอกสาร</th><td>${H(v.issued)}</td></tr><tr><th>Quotation No. :</th><td>${H(v.quote || '-')}</td></tr></table>
+    <table class="fnf-meta"><tr><th>Function No.</th><td class="fnf-no">${ed ? T('no', '', 'RS…/' ) + (!v.no ? `<button class="link xs" data-act="fnNo">ออกเลขอัตโนมัติ (${H(nextNo())})</button>` : '') : H(v.no || '—')}</td></tr><tr><th>วันที่ออกเอกสาร</th><td>${kv('issued', 'วันที่')}</td></tr><tr><th>Quotation No. :</th><td>${kv('quote', 'เลขใบเสนอราคา')}</td></tr></table>
   </div>
-  <div class="fnf-org"><span><b>สำนักงาน/องค์กร :</b> ${H(v.org)}</span><span><b>ผู้ประสานงาน :</b> ${H(v.coord)}</span></div>
+  <div class="fnf-org"><span><b>สำนักงาน/องค์กร :</b> ${kv('org', 'ชื่อสำนักงาน / องค์กร')}</span><span><b>ผู้ประสานงาน :</b> ${kv('coord', 'ชื่อ / เบอร์โทร')}</span></div>
   <table class="fnf-t">
-    <tr><th>วันที่จัดงาน :</th>${cell(v.date, 'c')}<th>สถานที่จัดงาน :</th>${cell(v.venue, 'c')}<th>ประเภทงาน :</th>${cell(v.type, 'c')}</tr>
-    <tr><th>จำนวนการันตี :</th>${cell(v.pax, 'c')}<td colspan="4" class="c">${nl(v.pricing)}</td></tr>
-    ${xs('event').map(x => `<tr>${xth(x)}<td colspan="5">${nl(x.text)}</td></tr>`).join('')}
+    <tr><th>วันที่จัดงาน :</th>${cell('date', 'c')}<th>สถานที่จัดงาน :</th>${cell('venue', 'c')}<th>ประเภทงาน :</th>${cell('type', 'c')}</tr>
+    <tr><th>จำนวนการันตี :</th>${cell('pax', 'c')}<td colspan="4" class="c">${T('pricing', '', 'ราคาต่อหน่วย (บรรทัดละรายการ)')}</td></tr>
+    ${xs('event').map(x => `<tr>${xth(x)}${xtd(x, 5)}</tr>`).join('')}
   </table>
   <table class="fnf-t">
-    <tr><th colspan="2" class="sec">แผนกจัดเลี้ยง / ห้องอาหาร</th><th colspan="${Math.max(1, v.menu.length)}" class="sec">เมนูอาหาร</th></tr>
-    <tr><th>รูปแบบการจัดห้อง :</th><td>${nl(v.layout)}${v.fyi ? `<div class="fnf-fyi"><b>FYI</b><br>${nl(v.fyi)}</div>` : ''}</td>${menuCols}</tr>
-    <tr><th>ข้อความบนเวที :${v.vinyl ? `<div class="fnf-small">${nl(v.vinyl)}</div>` : ''}</th><td class="c">${nl(v.stage || '-')}</td><td colspan="${mc}" class="fnf-small">${v.kitchen ? '<b>ครัว:</b> ' + nl(v.kitchen) : ''}</td></tr>
-    ${xs('banquet').map(x => `<tr>${xth(x)}<td colspan="${1 + mc}">${nl(x.text)}</td></tr>`).join('')}
+    <tr><th colspan="2" class="sec">แผนกจัดเลี้ยง / ห้องอาหาร</th><th colspan="${mc}" class="sec">เมนูอาหาร${ed ? ' <button class="link xs" data-act="fnDMAdd">+ เพิ่มช่วงเวลา</button>' : ''}</th></tr>
+    <tr><th>รูปแบบการจัดห้อง :</th><td>${T('layout', '', 'รูปแบบการจัดห้อง')}${v.fyi || ed ? `<div class="fnf-fyi"><b>FYI</b><br>${T('fyi', '', 'กำหนดการ / หมายเหตุ')}</div>` : ''}</td>${menuCols}</tr>
+    <tr><th>ข้อความบนเวที :${v.vinyl || ed ? `<div class="fnf-small">${T('vinyl', '', 'ไวนิล / ป้าย')}</div>` : ''}</th><td class="c">${T('stage', '-', 'ข้อความบนเวที')}</td><td colspan="${mc}" class="fnf-small">${v.kitchen || ed ? '<b>ครัว:</b> ' + T('kitchen', '', 'หมายเหตุครัว') : ''}</td></tr>
+    ${xs('banquet').map(x => `<tr>${xth(x)}${xtd(x, 1 + mc)}</tr>`).join('')}
   </table>
   <table class="fnf-t">
     <tr><th class="sec" style="width:50%">แผนกแม่บ้าน</th><th class="sec">แผนกช่างเครื่องเสียง</th></tr>
-    <tr><td class="c">${nl(v.hk || '-')}${xIn('hk')}</td><td>${nl(v.av || '-')}${xIn('av')}</td></tr>
+    <tr><td class="c">${T('hk', '-', 'แผนกแม่บ้าน')}${xIn('hk')}</td><td>${T('av', '-', 'แผนกช่างเครื่องเสียง')}${xIn('av')}</td></tr>
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec" style="width:50%">แผนกบัญชี / การเงิน</th><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
-    <tr><th>ยอดรวม :</th><td class="c fnf-total">${H(v.total)}</td><th>Check-in :</th>${cell(v.checkin, 'c')}<th>Check-out :</th>${cell(v.checkout, 'c')}</tr>
-    <tr><th>รายละเอียดค่าใช้จ่าย :</th><td class="c">${nl(v.cost)}</td><th>ห้องพัก (ประเภท) :</th>${cell(v.roomType, 'c')}<th>จำนวนห้อง :</th>${cell(v.roomQty, 'c')}</tr>
-    <tr><th>ที่อยู่ออกบิล :</th>${cell(v.bill, 'c')}<td colspan="4" class="c">${nl(v.front)}</td></tr>
-    ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + `<td>${nl(acc[i].text)}</td>` : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + `<td colspan="3">${nl(front[i].text)}</td>` : '<td colspan="4"></td>'}</tr>`).join('')}
+    <tr><th>ยอดรวม :</th><td class="c fnf-total">${ed ? T('total') : H(v.total)}</td><th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
+    <tr><th>รายละเอียดค่าใช้จ่าย :</th>${cell('cost', 'c')}<th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
+    <tr><th>ที่อยู่ออกบิล :</th>${cell('bill', 'c')}<td colspan="4" class="c">${T('front', '', 'หมายเหตุต้อนรับ')}</td></tr>
+    ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + xtd(acc[i]) : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + xtd(front[i], 3) : '<td colspan="4"></td>'}</tr>`).join('')}
   </table>
-  ${xs('other').length ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}<td>${nl(x.text)}</td></tr>`).join('')}</table>` : ''}
+  ${xs('other').length ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}${xtd(x)}</tr>`).join('')}</table>` : ''}
   <div class="fnf-sign">
-    <div><span>ออกโดย :</span><div class="fnf-line"></div><div>(${H(v.by || '................................')})</div><div>${H(v.byTitle)}</div></div>
+    <div><span>ออกโดย :</span><div class="fnf-line"></div><div>${ed ? T('by', '', 'ชื่อผู้ออกเอกสาร') : `(${H(v.by || '................................')})`}</div><div>${ed ? T('byTitle', '', 'ตำแหน่ง') : H(v.byTitle)}</div></div>
     <div><span>อนุมัติโดย :</span><div class="fnf-line"></div><div>(${H(v.appr || '................................')})</div><div>${H(v.apprTitle || 'ยังไม่อนุมัติ')}</div></div>
   </div>
 </div>`;
   }
 
   /* ---------- the page ---------- */
-  const FIELDS = [
-    ['หัวเอกสาร', [['no', 'Function No.', 'input'], ['issued', 'วันที่ออกเอกสาร', 'date'], ['org', 'สำนักงาน / องค์กร', 'input'], ['coord', 'ผู้ประสานงาน', 'input']]],
-    ['ข้อมูลงาน', [['date', 'วันที่จัดงาน', 'input'], ['venue', 'สถานที่จัดงาน (+ เวลา)', 'input'], ['type', 'ประเภทงาน', 'input'], ['pax', 'จำนวนการันตี', 'input'], ['pricing', 'ราคาต่อหน่วย (บรรทัดละรายการ)', 'area']]],
-    ['แผนกจัดเลี้ยง / ห้องอาหาร', [['layout', 'รูปแบบการจัดห้อง', 'area'], ['fyi', 'FYI (กำหนดการ / หมายเหตุ)', 'area'], ['stage', 'ข้อความบนเวที', 'area'], ['vinyl', 'ไวนิล / ป้าย (ขนาด, ตำแหน่ง)', 'input'], ['kitchen', 'หมายเหตุครัว', 'area']]],
-    ['แม่บ้าน / ช่างเครื่องเสียง', [['hk', 'แผนกแม่บ้าน', 'area'], ['av', 'แผนกช่างเครื่องเสียง', 'area']]],
-    ['บัญชี / การเงิน', [['total', 'ยอดรวม', 'input'], ['cost', 'รายละเอียดค่าใช้จ่าย', 'area'], ['bill', 'ที่อยู่ออกบิล', 'area']]],
-    ['แผนกต้อนรับ', [['checkin', 'Check-in', 'input'], ['checkout', 'Check-out', 'input'], ['roomType', 'ห้องพัก (ประเภท)', 'area'], ['roomQty', 'จำนวนห้อง', 'area'], ['front', 'หมายเหตุต้อนรับ', 'area']]],
-    ['ลงชื่อ', [['by', 'ออกโดย (ชื่อ)', 'input'], ['byTitle', 'ตำแหน่ง', 'input']]]
-  ];
+  const EDIT_KEYS = ['no', 'issued', 'quote', 'org', 'coord', 'date', 'venue', 'type', 'pax', 'pricing', 'layout', 'fyi', 'stage', 'vinyl', 'kitchen', 'hk', 'av', 'total', 'cost', 'bill', 'checkin', 'checkout', 'roomType', 'roomQty', 'front', 'by', 'byTitle'];
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const fnUi = () => App.state.ui.fn || (App.state.ui.fn = { tab: 'preview' });
+  // the unsaved copy being edited on the sheet; nothing is stored until "บันทึกแก้ไขข้อมูล"
+  function draft(b) {
+    const ui = fnUi();
+    if (!ui.draft || ui.draft.bid !== b.id) {
+      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []) };
+      for (const k of EDIT_KEYS) d.v[k] = v[k] == null ? '' : String(v[k]);
+      ui.draft = d; ui.dirty = false;
+    }
+    return ui.draft;
+  }
+  const dropDraft = () => { const ui = fnUi(); ui.draft = null; ui.dirty = false; };
+  const markDirty = () => { fnUi().dirty = true; const s = document.getElementById('fnDirty'); if (s) { s.textContent = 'มีการแก้ไขที่ยังไม่บันทึก'; s.className = 'small red'; } };
   App.V.fn = {
     title: 'รายละเอียดฟังก์ชัน', nav: 'beo',
     render() {
       const b = curB(), q = b && Store.quote(b.quoteId);
       if (!b || !q) return '<div class="empty">ไม่พบใบฟังก์ชัน — <a href="#/beo">กลับ</a></div>';
-      const { v, a } = values(b, q), edit = canEdit(), ui = App.state.ui.fn || (App.state.ui.fn = { tab: 'preview' });
+      const { v, a } = values(b, q), edit = canEdit(), ui = fnUi();
       const tab = edit ? ui.tab : 'preview', own = b.fn || {};
       const head = `<div class="page-hd no-print"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>รายละเอียดฟังก์ชัน</h1>
         <div class="small muted">${H(q.title)} · ${H(q.client)} · ${H(v.no || 'ยังไม่มี Function No.')}${b.signoff ? ' · อนุมัติแล้ว' : ''}</div></div>
@@ -141,25 +160,14 @@
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
-      const field = ([k, label, kind]) => {
-        const val = v[k] == null ? '' : v[k], mine = own[k] != null && own[k] !== a[k];
-        const reset = mine ? `<button class="link xs" data-act="fnReset" data-k="${k}">ใช้ค่าจากระบบ</button>` : `<span class="xs muted">${a[k] ? 'จากระบบ' : ''}</span>`;
-        const ctl = kind === 'area' ? `<textarea class="input" rows="${Math.min(8, Math.max(2, lines(val).length + 1))}" data-change="fnSet" data-k="${k}" id="fn_${k}" style="height:auto;padding-top:10px">${H(val)}</textarea>`
-          : `<input class="input" ${kind === 'date' ? 'type="date"' : ''} value="${H(val)}" data-change="fnSet" data-k="${k}" id="fn_${k}">`;
-        return `<div class="field"><div class="between"><label class="f" for="fn_${k}">${H(label)}</label>${reset}</div>${ctl}${k === 'no' && !val ? `<button class="link small" data-act="fnNo">ออกเลขอัตโนมัติ (${H(nextNo())})</button>` : ''}</div>`;
-      };
-      const menuEd = `<section class="card pad"><div class="between"><h3>เมนูอาหาร (แยกตามช่วงเวลา)</h3>${Array.isArray(own.menu) ? '<button class="link xs" data-act="fnReset" data-k="menu">ใช้ค่าจากระบบ</button>' : '<span class="xs muted">จากใบเสนอราคา</span>'}</div>
-        ${v.menu.map((m, i) => `<div class="fnf-mrow"><div class="grid g2"><div><label class="f">ช่วงเวลา</label><input class="input" value="${H(m.time)}" data-change="fnMenu" data-i="${i}" data-k="time"></div><div><label class="f">หัวข้อ</label><input class="input" value="${H(m.title)}" data-change="fnMenu" data-i="${i}" data-k="title"></div></div>
-          <label class="f" style="margin-top:8px">รายการอาหาร (บรรทัดละรายการ)</label><textarea class="input" rows="4" style="height:auto;padding-top:10px" data-change="fnMenu" data-i="${i}" data-k="items">${H(m.items)}</textarea>
-          <button class="link red small" data-act="fnMenuDel" data-i="${i}">ลบช่วงนี้</button></div>`).join('')}
-        <button class="btn ghost sm" data-act="fnMenuAdd">+ เพิ่มช่วงเวลา</button></section>`;
-      const xEd = `<section class="card pad"><div class="between"><h3>รายละเอียดที่เพิ่มเอง</h3><button class="btn ghost sm" data-act="fnX">＋ เพิ่ม</button></div>
-        ${(own.extra || []).length ? own.extra.map((x, i) => `<div class="fnf-mrow"><div class="xs muted">${H(xName(x.sec))}</div><b>${H(x.label || '(ไม่มีหัวข้อ)')}</b><div class="small">${nl(x.text)}</div>
-          <button class="link small" data-act="fnX" data-i="${i}">แก้ไข</button> · <button class="link red small" data-act="fnXDel" data-i="${i}">ลบ</button></div>`).join('') : '<div class="small muted">ยังไม่มี — กด “＋ เพิ่ม” เพื่อเพิ่มหัวข้อ/รายละเอียดลงในแผนกที่ต้องการ</div>'}</section>`;
-      return head + `<div class="note" style="margin-bottom:14px">ทุกช่องดึงจากใบเสนอราคาและใบฟังก์ชันให้แล้ว แก้ได้เลย — ช่องที่แก้เองจะมีปุ่ม “ใช้ค่าจากระบบ” เพื่อกลับไปใช้ค่าอัตโนมัติ · “อนุมัติโดย” มาจากผู้ดูแลระบบที่กดอนุมัติในหน้า Approve</div>
-        <div class="fnf-form">${FIELDS.map(([t, fs]) => `<section class="card pad"><h3>${H(t)}</h3>${fs.map(field).join('')}</section>`).join('')}${menuEd}${xEd}</div>`;
-    }
+      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, appr: v.appr, apprTitle: v.apprTitle });
+      return head + `<div class="fnf-bar no-print"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ<div id="fnDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
+        <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div></div>
+        <div class="fnf-wrap">${paper(dv, d.extra, a)}</div>`;
+    },
+    after() { document.querySelectorAll('.fnf-in').forEach(fit); }
   };
+  function fit(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
 
   function setFn(fn) {
     const b = curB(); if (!b || !canEdit()) return;
@@ -167,17 +175,33 @@
     for (const k of Object.keys(b.fn)) if (b.fn[k] === undefined) delete b.fn[k];
     Store.save(); App.render();
   }
-  const menuOf = (f, b) => Array.isArray(f.menu) ? f.menu.map(m => Object.assign({}, m)) : values(b, Store.quote(b.quoteId)).a.menu;
   Object.assign(App.ACT, {
-    fnTab(el) { App.state.ui.fn.tab = el.dataset.v; App.render(); },
-    fnPrint() { const ui = App.state.ui.fn || (App.state.ui.fn = {}); if (ui.tab !== 'preview') { ui.tab = 'preview'; App.render(); } setTimeout(() => window.print(), 50); },
-    fnNo() { setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },
-    fnReset(el) { setFn(f => { delete f[el.dataset.k]; }); },
-    fnMenuAdd() { setFn((f, b) => { f.menu = menuOf(f, b).concat({ time: '', title: '', items: '' }); }); },
+    fnTab(el) {
+      const ui = fnUi(), go = () => { if (el.dataset.v === 'preview') dropDraft(); ui.tab = el.dataset.v; App.render(); };
+      if (ui.tab === 'form' && el.dataset.v === 'preview' && ui.dirty) App.confirm('ทิ้งการแก้ไขที่ยังไม่บันทึก?', go, 'ทิ้งการแก้ไข'); else go();
+    },
+    fnDCancel() { App.ACT.fnTab({ dataset: { v: 'preview' } }); },
+    fnDSave() {
+      const b = curB(), d = fnUi().draft; if (!b || !d || !canEdit()) return;
+      const a = auto(b, Store.quote(b.quoteId));
+      setFn(f => {
+        for (const k of EDIT_KEYS) { const val = d.v[k]; if (val === (a[k] == null ? '' : String(a[k]))) delete f[k]; else f[k] = val.slice(0, 4000); }
+        f.menu = JSON.stringify(d.menu) === JSON.stringify(a.menu) ? undefined : d.menu;
+        const ex = d.extra.filter(x => (x.label || '').trim() || (x.text || '').trim());
+        f.extra = ex.length ? ex : undefined;
+      });
+      dropDraft(); fnUi().tab = 'preview'; App.render(); App.toast('บันทึกแก้ไขข้อมูลแล้ว');
+    },
+    fnDRv(el) { const b = curB(), d = fnUi().draft; if (!b || !d) return; const a = auto(b, Store.quote(b.quoteId)); d.v[el.dataset.k] = a[el.dataset.k] == null ? '' : String(a[el.dataset.k]); fnUi().dirty = true; App.render(); },
+    fnDMAdd() { const d = fnUi().draft; if (!d) return; d.menu.push({ time: '', title: '', items: '' }); fnUi().dirty = true; App.render(); },
+    fnDMDel(el) { const d = fnUi().draft; if (!d) return; d.menu.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
+    fnDXDel(el) { const d = fnUi().draft; if (!d) return; d.extra.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
+    fnPrint() { const ui = fnUi(); if (ui.tab === 'form' && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนพิมพ์'); return; } if (ui.tab !== 'preview') { dropDraft(); ui.tab = 'preview'; App.render(); } setTimeout(() => window.print(), 50); },
+    fnNo() { const d = fnUi().tab === 'form' && fnUi().draft; if (d) { d.v.no = nextNo(); fnUi().dirty = true; App.render(); return; } setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },
     // "+": a small form laid out like the paper sheet — pick the department, give a heading and the details
     fnX(el) {
       const b = curB(); if (!b || !canEdit()) return;
-      const i = el.dataset.i != null ? Number(el.dataset.i) : -1, x = i >= 0 ? (b.fn.extra || [])[i] : { sec: 'banquet', label: '', text: '' };
+      const i = el.dataset.i != null ? Number(el.dataset.i) : -1, x = i >= 0 ? ((b.fn || {}).extra || [])[i] : { sec: 'banquet', label: '', text: '' };
       if (!x) return;
       App.modal(`<h2>${i >= 0 ? 'แก้ไขรายละเอียด' : 'เพิ่มรายละเอียด'}</h2>
         <div class="field"><label class="f" for="fnxSec">เพิ่มลงในส่วน</label><select class="input" id="fnxSec">${XSEC.map(([k, t]) => `<option value="${k}" ${k === x.sec ? 'selected' : ''}>${H(t)}</option>`).join('')}</select></div>
@@ -193,22 +217,18 @@
           const label = bg.querySelector('#fnxLabel').value.trim(), text = bg.querySelector('#fnxText').value.trim();
           if (!label && !text) { bg.querySelector('#fnxErr').textContent = 'กรอกหัวข้อหรือรายละเอียดอย่างน้อยหนึ่งช่อง'; return; }
           App.closeModal();
-          setFn(f => { const list = (f.extra || []).map(o => Object.assign({}, o)), item = { sec: sec.value, label, text }; if (i >= 0) list[i] = item; else list.push(item); f.extra = list; });
+          const item = { sec: sec.value, label, text }, d = fnUi().tab === 'form' && fnUi().draft;
+          if (d) { if (i >= 0) d.extra[i] = item; else d.extra.push(item); fnUi().dirty = true; App.render(); return; }
+          setFn(f => { const list = (f.extra || []).map(o => Object.assign({}, o)); if (i >= 0) list[i] = item; else list.push(item); f.extra = list; });
           App.toast(i >= 0 ? 'บันทึกแล้ว' : 'เพิ่มลงใบรายละเอียดฟังก์ชันแล้ว');
         };
       });
-    },
-    fnXDel(el) {
-      App.confirm('ลบรายละเอียดนี้?', () => setFn(f => { const list = (f.extra || []).slice(); list.splice(Number(el.dataset.i), 1); f.extra = list.length ? list : undefined; }), 'ลบ');
-    },
-    fnMenuDel(el) { setFn((f, b) => { const m = menuOf(f, b); m.splice(Number(el.dataset.i), 1); f.menu = m; }); }
-  });
-  Object.assign(App.CHG, {
-    fnSet(el) {
-      const k = el.dataset.k, val = el.value;
-      setFn((f, b) => { const a = auto(b, Store.quote(b.quoteId)); if (val === a[k]) delete f[k]; else f[k] = val.slice(0, 4000); });
-    },
-    fnMenu(el) { setFn((f, b) => { const m = menuOf(f, b); m[Number(el.dataset.i)][el.dataset.k] = el.value.slice(0, 2000); f.menu = m; }); }
+    }
   });
   App.fnNo = b => (b.fn && b.fn.no) || '';
+  Object.assign(App.INP, {
+    fnD(el) { const d = fnUi().draft; if (!d) return; d.v[el.dataset.k] = el.value.slice(0, 4000); fit(el); markDirty(); },
+    fnDM(el) { const d = fnUi().draft, m = d && d.menu[Number(el.dataset.i)]; if (!m) return; m[el.dataset.k] = el.value.slice(0, 2000); fit(el); markDirty(); },
+    fnDX(el) { const d = fnUi().draft, x = d && d.extra[Number(el.dataset.i)]; if (!x) return; x[el.dataset.k] = el.value.slice(0, el.dataset.k === 'label' ? 80 : 2000); fit(el); markDirty(); }
+  });
 })(window);
