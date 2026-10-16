@@ -684,6 +684,8 @@ main.bleed{padding:0;max-width:none}
 .fnf-bar{position:sticky;top:72px;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#fffbea;border:1px solid #f0e2a8;border-radius:14px;padding:10px 14px;margin-bottom:12px}
 .fnf-ed{position:relative}
 .fnf-in{display:block;width:100%;border:1px dashed #c9c4b5;background:#fffef6;color:inherit;font:inherit;text-align:inherit;line-height:1.4;resize:none;overflow:hidden;padding:3px 6px;border-radius:5px;min-height:26px;margin:1px 0}
+.fnf-in[contenteditable]{white-space:pre-wrap;word-break:break-word;cursor:text;-webkit-user-select:text;user-select:text}
+.fnf-in[contenteditable]:empty::before{content:attr(data-ph);color:#a8a294;font-weight:400;font-style:normal}
 .fnf-in:focus{outline:2px solid var(--teal,#127a6e);background:#fff;border-style:solid}
 .fnf-in.b{font-weight:600}
 .fnf-paper.editing .fnf-no .fnf-in{font:700 16px var(--fh);text-align:center}
@@ -722,6 +724,9 @@ main.bleed{padding:0;max-width:none}
 .fnt-b.sw i{display:block;width:14px;height:14px;border-radius:50%}
 .fnt-b.sw.on{background:#fff;color:inherit;box-shadow:0 0 0 2px #1f2a2a}
 .fnt-b.clr{font-size:12px}
+.fnt-size{height:30px;min-width:92px;border:1px solid #e3dcc0;border-radius:8px;background:#fff;padding:0 6px;font:500 13px var(--fb);color:var(--ink)}
+.fnt-size:disabled{opacity:.45}
+.fnt-b small{font-size:10px;margin-left:1px}
 .modal-bg.wide .modal{max-width:720px}
 .fnf-xform .fnf-t th{width:34%;vertical-align:middle}
 .fnf-xform .fnf-t th.sec{width:auto}

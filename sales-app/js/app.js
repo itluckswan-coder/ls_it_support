@@ -106,7 +106,7 @@
     // re-render after background changes, but never under an open dialog or while someone is typing
     softRender() {
       const a = document.activeElement;
-      if (document.getElementById('modalBg') || (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) { App._pendingRender = true; return; }
+      if (document.getElementById('modalBg') || (a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable))) { App._pendingRender = true; return; }
       App._pendingRender = false; App.render();
     },
 
