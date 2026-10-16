@@ -90,6 +90,9 @@
     const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b')}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด')}</div>`
       : `<div class="fnf-x">${x.label ? `<b>${H(x.label)} :</b> ` : ''}${nl(x.text)}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
+    // "+" inside each section while editing: adds a heading + detail row shaped like the rows above it
+    const add = sec => ed ? `<button class="fnf-add" data-act="fnDXAdd" data-sec="${sec}" title="เพิ่มหัวข้อ/ช่องข้อมูลในส่วนนี้">＋ เพิ่มช่อง</button>` : '';
+    const addRow = (sec, span) => ed ? `<tr class="fnf-addrow"><td colspan="${span}">${add(sec)}</td></tr>` : '';
     const menuCols = v.menu.length ? v.menu.map((m, i) => ed
       ? `<td class="fnf-menu"><div class="fnf-ed"><button class="fnf-rv red" data-act="fnDMDel" data-i="${i}" title="ลบช่วงนี้">✕</button>${box(`data-input="fnDM" data-i="${i}" data-k="time"`, m.time, 'ช่วงเวลา', 'b')}</div>${box(`data-input="fnDM" data-i="${i}" data-k="title"`, m.title, 'หัวข้อ', 'b')}${box(`data-input="fnDM" data-i="${i}" data-k="items"`, m.items, 'รายการอาหาร (บรรทัดละรายการ)')}</td>`
       : `<td class="fnf-menu"><div class="fnf-mt">${H(m.time)}</div><div class="fnf-mh">${H(m.title)}</div>${nl(m.items)}</td>`).join('') : '<td class="fnf-menu">-</td>';
@@ -105,16 +108,18 @@
     <tr><th>วันที่จัดงาน :</th>${cell('date', 'c')}<th>สถานที่จัดงาน :</th>${cell('venue', 'c')}<th>ประเภทงาน :</th>${cell('type', 'c')}</tr>
     <tr><th>จำนวนการันตี :</th>${cell('pax', 'c')}<td colspan="4" class="c">${T('pricing', '', 'ราคาต่อหน่วย (บรรทัดละรายการ)')}</td></tr>
     ${xs('event').map(x => `<tr>${xth(x)}${xtd(x, 5)}</tr>`).join('')}
+    ${addRow('event', 6)}
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec">แผนกจัดเลี้ยง / ห้องอาหาร</th><th colspan="${mc}" class="sec">เมนูอาหาร${ed ? ' <button class="link xs" data-act="fnDMAdd">+ เพิ่มช่วงเวลา</button>' : ''}</th></tr>
     <tr><th>รูปแบบการจัดห้อง :</th><td>${T('layout', '', 'รูปแบบการจัดห้อง')}${v.fyi || ed ? `<div class="fnf-fyi"><b>FYI</b><br>${T('fyi', '', 'กำหนดการ / หมายเหตุ')}</div>` : ''}</td>${menuCols}</tr>
     <tr><th>ข้อความบนเวที :${v.vinyl || ed ? `<div class="fnf-small">${T('vinyl', '', 'ไวนิล / ป้าย')}</div>` : ''}</th><td class="c">${T('stage', '-', 'ข้อความบนเวที')}</td><td colspan="${mc}" class="fnf-small">${v.kitchen || ed ? '<b>ครัว:</b> ' + T('kitchen', '', 'หมายเหตุครัว') : ''}</td></tr>
     ${xs('banquet').map(x => `<tr>${xth(x)}${xtd(x, 1 + mc)}</tr>`).join('')}
+    ${addRow('banquet', 2 + mc)}
   </table>
   <table class="fnf-t">
     <tr><th class="sec" style="width:50%">แผนกแม่บ้าน</th><th class="sec">แผนกช่างเครื่องเสียง</th></tr>
-    <tr><td class="c">${T('hk', '-', 'แผนกแม่บ้าน')}${xIn('hk')}</td><td>${T('av', '-', 'แผนกช่างเครื่องเสียง')}${xIn('av')}</td></tr>
+    <tr><td class="c">${T('hk', '-', 'แผนกแม่บ้าน')}${xIn('hk')}${add('hk')}</td><td>${T('av', '-', 'แผนกช่างเครื่องเสียง')}${xIn('av')}${add('av')}</td></tr>
   </table>
   <table class="fnf-t">
     <tr><th colspan="2" class="sec" style="width:50%">แผนกบัญชี / การเงิน</th><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
@@ -122,8 +127,9 @@
     <tr><th>รายละเอียดค่าใช้จ่าย :</th>${cell('cost', 'c')}<th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
     <tr><th>ที่อยู่ออกบิล :</th>${cell('bill', 'c')}<td colspan="4" class="c">${T('front', '', 'หมายเหตุต้อนรับ')}</td></tr>
     ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + xtd(acc[i]) : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + xtd(front[i], 3) : '<td colspan="4"></td>'}</tr>`).join('')}
+    ${ed ? `<tr class="fnf-addrow"><td colspan="2">${add('acc')}</td><td colspan="4">${add('front')}</td></tr>` : ''}
   </table>
-  ${xs('other').length ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}${xtd(x)}</tr>`).join('')}</table>` : ''}
+  ${xs('other').length || ed ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}${xtd(x)}</tr>`).join('')}${addRow('other', 2)}</table>` : ''}
   <div class="fnf-sign">
     <div><span>ออกโดย :</span><div class="fnf-line"></div><div>${ed ? T('by', '', 'ชื่อผู้ออกเอกสาร') : `(${H(v.by || '................................')})`}</div><div>${ed ? T('byTitle', '', 'ตำแหน่ง') : H(v.byTitle)}</div></div>
     <div><span>อนุมัติโดย :</span><div class="fnf-line"></div><div>(${H(v.appr || '................................')})</div><div>${H(v.apprTitle || 'ยังไม่อนุมัติ')}</div></div>
@@ -165,7 +171,10 @@
         <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div></div>
         <div class="fnf-wrap">${paper(dv, d.extra, a)}</div>`;
     },
-    after() { document.querySelectorAll('.fnf-in').forEach(fit); }
+    after() {
+      document.querySelectorAll('.fnf-in').forEach(fit);
+      const ui = fnUi(); if (ui.focusX != null) { const t = document.querySelector(`[data-input="fnDX"][data-i="${ui.focusX}"][data-k="label"]`); ui.focusX = null; if (t) t.focus(); }
+    }
   };
   function fit(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
 
@@ -195,6 +204,7 @@
     fnDRv(el) { const b = curB(), d = fnUi().draft; if (!b || !d) return; const a = auto(b, Store.quote(b.quoteId)); d.v[el.dataset.k] = a[el.dataset.k] == null ? '' : String(a[el.dataset.k]); fnUi().dirty = true; App.render(); },
     fnDMAdd() { const d = fnUi().draft; if (!d) return; d.menu.push({ time: '', title: '', items: '' }); fnUi().dirty = true; App.render(); },
     fnDMDel(el) { const d = fnUi().draft; if (!d) return; d.menu.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
+    fnDXAdd(el) { const d = fnUi().draft; if (!d) return; d.extra.push({ sec: el.dataset.sec, label: '', text: '' }); fnUi().dirty = true; fnUi().focusX = d.extra.length - 1; App.render(); },
     fnDXDel(el) { const d = fnUi().draft; if (!d) return; d.extra.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
     fnPrint() { const ui = fnUi(); if (ui.tab === 'form' && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนพิมพ์'); return; } if (ui.tab !== 'preview') { dropDraft(); ui.tab = 'preview'; App.render(); } setTimeout(() => window.print(), 50); },
     fnNo() { const d = fnUi().tab === 'form' && fnUi().draft; if (d) { d.v.no = nextNo(); fnUi().dirty = true; App.render(); return; } setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },

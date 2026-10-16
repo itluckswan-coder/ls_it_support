@@ -693,6 +693,10 @@ main.bleed{padding:0;max-width:none}
 .fnf-paper.editing th .fnf-in{text-align:right}
 .fnf-rv{position:absolute;right:-6px;top:-9px;z-index:2;width:20px;height:20px;border-radius:50%;border:1px solid #c9c4b5;background:#fff;font-size:11px;line-height:1;cursor:pointer;padding:0;color:#555}
 .fnf-rv.red{color:#b3262e}
+.fnf-add{display:inline-block;margin:4px 0 0;padding:2px 10px;border:1px dashed #9fb9b4;border-radius:999px;background:#f3faf8;color:#127a6e;font:600 12px var(--fb);cursor:pointer}
+.fnf-add:hover{background:#e3f3ef}
+.fnf-t tr.fnf-addrow td{border-style:dashed;padding:3px 8px;text-align:left;background:#fcfcfa}
+.fnf-t td.c>.fnf-add{display:table;margin:6px auto 0}
 .modal-bg.wide .modal{max-width:720px}
 .fnf-xform .fnf-t th{width:34%;vertical-align:middle}
 .fnf-xform .fnf-t th.sec{width:auto}
