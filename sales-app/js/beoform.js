@@ -78,7 +78,7 @@
   function paper(v, extra = [], ed = null) {
     // lines added inside a cell (heading or detail) + the cell's corner "+" that adds them
     const more = (key, list = []) => ed
-      ? list.map((it, j) => `<div class="fnf-ed fnf-more"><button class="fnf-rv red" data-act="fnDCDel" data-key="${key}" data-j="${j}" title="ลบบรรทัดนี้">✕</button><textarea class="fnf-in${it.t === 'h' ? ' b' : ''}" rows="1" data-input="fnDC" data-key="${key}" data-j="${j}" placeholder="${it.t === 'h' ? 'หัวข้อ' : 'รายละเอียดข้อมูล'}">${H(it.text || '')}</textarea></div>`).join('')
+      ? list.map((it, j) => `<div class="fnf-ed fnf-more${it.t === 'h' ? ' fnf-hbar' : ''}"><button class="fnf-rv red" data-act="fnDCDel" data-key="${key}" data-j="${j}" title="ลบบรรทัดนี้">✕</button><textarea class="fnf-in${it.t === 'h' ? ' b' : ''}" rows="1" data-input="fnDC" data-key="${key}" data-j="${j}" placeholder="${it.t === 'h' ? 'หัวข้อ' : 'รายละเอียดข้อมูล'}">${H(it.text || '')}</textarea></div>`).join('')
         + `<button class="fnf-cplus" data-act="fnCPlus" data-key="${key}" title="เพิ่มหัวข้อ หรือ รายละเอียดข้อมูลในช่องนี้">＋</button>`
       : list.filter(it => (it.text || '').trim()).map(it => it.t === 'h' ? `<div class="fnf-mh2">${H(it.text)}</div>` : `<div class="fnf-md">${nl(it.text)}</div>`).join('');
     const mv = v.more || {};

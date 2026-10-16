@@ -705,7 +705,11 @@ main.bleed{padding:0;max-width:none}
 .fnf-pick .xs{padding:4px 8px}
 .fnf-pick button{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:8px;font-size:13px;background:none;border:0;cursor:pointer;color:var(--ink)}
 .fnf-pick button:hover{background:var(--bg)}
-.fnf-mh2{font-weight:600;margin-top:6px}
+/* a heading added inside a cell looks like the sheet's section header bar (e.g. “เมนูอาหาร”) */
+.fnf-mh2,.fnf-more.fnf-hbar{background:#f1f0eb;border-top:1px solid #333;border-bottom:1px solid #333;margin:8px -8px 6px;padding:6px 8px;text-align:center;font-weight:600}
+.fnf-more.fnf-hbar .fnf-in{text-align:center;font-weight:600;background:#fff}
+.fnf-more.fnf-hbar .fnf-rv{right:2px;top:-10px}
+@media print{.fnf-mh2{margin:6px -6px 4px;padding:4px 6px}}
 .fnf-md{margin-top:2px}
 .modal-bg.wide .modal{max-width:720px}
 .fnf-xform .fnf-t th{width:34%;vertical-align:middle}
