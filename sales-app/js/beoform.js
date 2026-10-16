@@ -75,13 +75,14 @@
   const xName = k => (XSEC.find(x => x[0] === k) || XSEC[XSEC.length - 1])[1];
 
   /* ---------- text styles (edit toolbar): { sz, c, b, w, i, u, al } per box ---------- */
-  const SIZES = { s: ['เล็ก', '.85em'], m: ['ปกติ', ''], l: ['ใหญ่', '1.25em'], xl: ['ใหญ่มาก', '1.6em'] };
+  const PT = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 28, 36, 48, 72]; // font sizes in points, like Word
+  const SIZES = { s: '.85em', l: '1.25em', xl: '1.6em' }; // older named sizes, still shown if saved
   const COLORS = { k: ['ดำ', '#111111'], r: ['แดง', '#b3262e'], b: ['น้ำเงิน', '#1d4ed8'], g: ['เขียว', '#127a6e'], o: ['ส้ม', '#c2410c'], y: ['ทอง', '#a16207'], p: ['ม่วง', '#7e22ce'], s: ['เทา', '#6b7280'] };
   const ALIGN = { l: 'left', c: 'center', r: 'right' };
   function css(st) {
     if (!st) return '';
     const o = [];
-    if (SIZES[st.sz] && SIZES[st.sz][1]) o.push('font-size:' + SIZES[st.sz][1]);
+    if (PT.includes(st.pt)) o.push('font-size:' + st.pt + 'pt'); else if (SIZES[st.sz]) o.push('font-size:' + SIZES[st.sz]);
     if (COLORS[st.c]) o.push('color:' + COLORS[st.c][1]);
     if (st.b) o.push('font-weight:600'); else if (st.w) o.push('font-weight:300');
     if (st.i) o.push('font-style:italic');
@@ -216,7 +217,7 @@
     const b = (p, v, label, title, cls = '') => `<button class="fnt-b ${cls}" data-act="fnSty" data-p="${p}" data-v="${v}" title="${H(title)}">${label}</button>`;
     return `<div class="fnf-tools" id="fnTools">
       <span class="fnt-sel" id="fnSel">คลิกช่องบนใบก่อน แล้วเลือกรูปแบบ</span>
-      <span class="fnt-g"><span class="xs muted">ขนาด</span>${Object.entries(SIZES).map(([k, [t]]) => b('sz', k, t, 'ขนาดตัวอักษร: ' + t)).join('')}</span>
+      <span class="fnt-g"><span class="xs muted">ขนาด</span>${b('pt', '-', 'A<small>−</small>', 'ลดขนาดตัวอักษร')}<select class="fnt-size" id="fnSize" data-change="fnStyPt" title="ขนาดตัวอักษร (pt)"><option value="">ปกติ</option>${PT.map(n => `<option value="${n}">${n}</option>`).join('')}</select>${b('pt', '+', 'A<small>+</small>', 'เพิ่มขนาดตัวอักษร')}</span>
       <span class="fnt-g">${b('b', 1, '<b>B</b>', 'ตัวหนา')}${b('w', 1, '<span style="font-weight:300">บาง</span>', 'ตัวบาง')}${b('i', 1, '<i>I</i>', 'ตัวเอียง')}${b('u', 1, '<u>U</u>', 'ขีดเส้นใต้')}</span>
       <span class="fnt-g"><span class="xs muted">สี</span>${Object.entries(COLORS).map(([k, [t, c]]) => b('c', k, `<i style="background:${c}"></i>`, 'สี' + t, 'sw')).join('')}</span>
       <span class="fnt-g">${b('al', 'l', '⯇', 'ชิดซ้าย')}${b('al', 'c', '≡', 'กึ่งกลาง')}${b('al', 'r', '⯈', 'ชิดขวา')}</span>
@@ -237,12 +238,16 @@
     const st = (selEl && document.body.contains(selEl) && styleOf(selEl)) || {}, on = selEl && document.body.contains(selEl);
     const sel = document.getElementById('fnSel'); if (!sel) return;
     sel.textContent = on ? 'ช่องที่เลือก: ' + (selEl.value.split('\n')[0].slice(0, 24) || selEl.placeholder || '(ว่าง)') : 'คลิกช่องบนใบก่อน แล้วเลือกรูปแบบ';
+    const size = document.getElementById('fnSize');
+    if (size) { size.disabled = !on; size.value = st.pt ? String(st.pt) : ''; size.options[0].textContent = on && !st.pt ? 'ปกติ (' + ptOf(selEl, st) + ')' : 'ปกติ'; }
     document.querySelectorAll('#fnTools .fnt-b').forEach(x => {
       const p = x.dataset.p, v = x.dataset.v;
       x.disabled = !on;
-      x.classList.toggle('on', on && (p === 'sz' ? (st.sz || 'm') === v : p === 'c' ? (st.c || 'k') === v : p === 'al' ? st.al === v : p === 'clear' ? false : !!st[p]));
+      x.classList.toggle('on', on && (p === 'pt' ? false : p === 'c' ? (st.c || 'k') === v : p === 'al' ? st.al === v : p === 'clear' ? false : !!st[p]));
     });
   }
+  // the size a box shows now, in pt (its own setting, else what the sheet gives it)
+  const ptOf = (el, st) => st.pt || Math.round(parseFloat(getComputedStyle(el).fontSize) * 0.75 * 2) / 2;
   function fit(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 2 + 'px'; }
 
   function setFn(fn) {
@@ -298,7 +303,10 @@
       const st = styleOf(selEl, true); if (!st) return;
       const p = el.dataset.p, v = el.dataset.v;
       if (p === 'clear') Object.keys(st).forEach(k => delete st[k]);
-      else if (p === 'sz') { if (v === 'm') delete st.sz; else st.sz = v; }
+      else if (p === 'pt') {
+        const cur = ptOf(selEl, st), next = v === '+' ? PT.find(n => n > cur) : PT.slice().reverse().find(n => n < cur);
+        if (next) { st.pt = next; delete st.sz; }
+      }
       else if (p === 'c') { if (v === 'k') delete st.c; else st.c = v; }
       else if (p === 'al') { if (st.al === v) delete st.al; else st.al = v; }
       else { if (st[p]) delete st[p]; else { st[p] = 1; if (p === 'b') delete st.w; if (p === 'w') delete st.b; } }
@@ -344,6 +352,12 @@
     if (!Array.isArray(o[k])) { if (!make) return null; o[k] = []; }
     return o[k];
   }
+  App.CHG.fnStyPt = el => {
+    if (!selEl || !document.body.contains(selEl)) { App.toast('คลิกช่องที่ต้องการบนใบก่อน'); el.value = ''; return; }
+    const st = styleOf(selEl, true); if (!st) return;
+    delete st.sz; if (el.value) st.pt = Number(el.value); else delete st.pt;
+    selEl.style.cssText = css(st); fit(selEl); selEl.focus(); markDirty(); showTools();
+  };
   Object.assign(App.INP, {
     fnD(el) { const d = fnUi().draft; if (!d) return; d.v[el.dataset.k] = el.value.slice(0, 4000); fit(el); markDirty(); },
     fnDM(el) { const d = fnUi().draft, m = d && d.menu[Number(el.dataset.i)]; if (!m) return; m[el.dataset.k] = el.value.slice(0, 2000); fit(el); markDirty(); },

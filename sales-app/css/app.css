@@ -722,6 +722,9 @@ main.bleed{padding:0;max-width:none}
 .fnt-b.sw i{display:block;width:14px;height:14px;border-radius:50%}
 .fnt-b.sw.on{background:#fff;color:inherit;box-shadow:0 0 0 2px #1f2a2a}
 .fnt-b.clr{font-size:12px}
+.fnt-size{height:30px;min-width:92px;border:1px solid #e3dcc0;border-radius:8px;background:#fff;padding:0 6px;font:500 13px var(--fb);color:var(--ink)}
+.fnt-size:disabled{opacity:.45}
+.fnt-b small{font-size:10px;margin-left:1px}
 .modal-bg.wide .modal{max-width:720px}
 .fnf-xform .fnf-t th{width:34%;vertical-align:middle}
 .fnf-xform .fnf-t th.sec{width:auto}
