@@ -39,6 +39,8 @@
       const v = ((Store.db.settings && Store.db.settings.roles) || {}).views || {}, l = v[App.roleOf(me).id];
       return Array.isArray(l) ? l.filter(x => x !== 'home') : [];
     },
+    // the built-in admin, sales manager and sales roles (not roles added on those levels)
+    salesRole(me) { me = me === undefined ? App.me() : me; return !!me && ['admin', 'manager', 'sales'].includes(me.role) && !(App.roleOf && App.roleOf(me).custom); },
     can(p) { const m = App.me(); return !!(m && m.perms && m.perms[p]); },
     firstName(u) { return (u && u.name || '').split(' ')[0]; },
     restoreSession() {
@@ -489,7 +491,7 @@
     },
     // the quote side of the home page: only the built-in admin, sales manager and sales roles —
     // roles added on top of those levels (e.g. an F&B staff role on the sales level) get the short home page
-    salesHome(me) { return !!me && ['admin', 'manager', 'sales'].includes(me.role) && !(App.roleOf && App.roleOf(me).custom); },
+    salesHome(me) { return App.salesRole(me); },
     followUps() {
       const out = [], today = U.today(), me = App.me();
       for (const b of Store.db.beos) {

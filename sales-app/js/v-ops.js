@@ -65,6 +65,7 @@
       if (!sel) return `<div class="split left">${left}<div class="empty">ยังไม่มีใบฟังก์ชัน — สร้างจากใบเสนอราคาที่ยืนยันแล้ว</div></div>`;
       const { b, q } = sel, days = U.daysOf(q.start, q.end);
       if (ui.day > days.length) ui.day = 1;
+      const schedEdit = App.salesRole(); // only the sales side changes the schedule
       const sched = (b.schedule[ui.day] || []).slice().sort((a, c) => a.time.localeCompare(c.time));
       const owner = Store.db.users.find(u => u.id === q.owner);
       const pending = Object.values(b.depts).filter(d => !d.ack).length;
@@ -85,8 +86,8 @@
     </section>
     <section class="card" style="margin-bottom:16px;overflow:hidden">
       <div class="card-hd"><h2>กำหนดการ · วันที่ ${ui.day} ${U.DS[U.d(days[ui.day - 1]).getDay()]} ${U.fmtD(days[ui.day - 1], { year: false })}</h2>
-        <div class="row">${days.length > 1 ? `<div class="seg">${days.map((d, i) => `<button class="${ui.day === i + 1 ? 'on' : ''}" data-act="beoDay" data-v="${i + 1}">วันที่ ${i + 1}</button>`).join('')}</div>` : ''}<button class="btn ghost sm no-print" data-act="beoImport">นำเข้าจากไฟล์</button><button class="btn ghost sm no-print" data-act="beoRow" data-i="-1">+ เพิ่ม</button></div></div>
-      <table class="tbl sched resp"><tbody>${sched.map(s => { const i = b.schedule[ui.day].indexOf(s); return `<tr class="click" data-act="beoRow" data-i="${i}"><td class="b num" style="width:80px">${H(s.time)}</td><td>${H(s.task)}</td><td class="muted hide-m">${H(s.place)}</td><td class="r">${tag(s.dept)}</td></tr>`; }).join('') || '<tr><td><div class="empty small">ยังไม่มีกำหนดการ — กด “+ เพิ่ม”</div></td></tr>'}</tbody></table>
+        <div class="row">${days.length > 1 ? `<div class="seg">${days.map((d, i) => `<button class="${ui.day === i + 1 ? 'on' : ''}" data-act="beoDay" data-v="${i + 1}">วันที่ ${i + 1}</button>`).join('')}</div>` : ''}${schedEdit ? '<button class="btn ghost sm no-print" data-act="beoImport">นำเข้าจากไฟล์</button><button class="btn ghost sm no-print" data-act="beoRow" data-i="-1">+ เพิ่ม</button>' : ''}</div></div>
+      <table class="tbl sched resp"><tbody>${sched.map(s => { const i = b.schedule[ui.day].indexOf(s); return `<tr ${schedEdit ? `class="click" data-act="beoRow" data-i="${i}"` : ''}><td class="b num" style="width:80px">${H(s.time)}</td><td>${H(s.task)}</td><td class="muted hide-m">${H(s.place)}</td><td class="r">${tag(s.dept)}</td></tr>`; }).join('') || `<tr><td><div class="empty small">ยังไม่มีกำหนดการ${schedEdit ? ' — กด “+ เพิ่ม”' : ''}</div></td></tr>`}</tbody></table>
     </section>
     ${(() => { const pl = b.plans && b.plans[ui.day]; if (!pl) return ''; const seats = App.planSeats(pl); return `<section class="card" style="margin-bottom:16px;overflow:hidden">
       <div class="card-hd"><div><h2>ผังงาน · วันที่ ${ui.day}</h2><div class="small muted">ที่นั่งรวม ${seats} ที่${q.pax && seats !== Number(q.pax) ? ' · ใบเสนอ ' + q.pax + ' ท่าน' : ''}</div></div><a class="btn ghost sm no-print" href="#/plan/${encodeURIComponent(b.id)}/${ui.day}">แก้ไขผัง</a></div>
@@ -283,6 +284,7 @@
     ลำดับคอลัมน์สลับกันได้ ถ้ามีแถวหัวตาราง · รองรับไฟล์ .xlsx และ .csv</div>`;
 
   App.ACT.beoImport = () => {
+    if (!App.salesRole()) { App.toast('เฉพาะฝ่ายขายและผู้ดูแลระบบที่แก้กำหนดการได้'); return; }
     const b = curB(), q = Store.quote(b.quoteId), days = U.daysOf(q.start, q.end), fallback = App.state.ui.beo.day || 1;
     let parsed = null;
     const bg = App.modal(`<h2>นำเข้ากำหนดการจากไฟล์</h2>
@@ -346,6 +348,7 @@
     },
     beoAck(el) { const b = curB(); const d = b.depts[el.dataset.v] || (b.depts[el.dataset.v] = { items: [], owner: '', ack: false }); d.ack = !d.ack; Store.save(); App.render(); },
     beoRow(el) {
+      if (!App.salesRole()) { App.toast('เฉพาะฝ่ายขายและผู้ดูแลระบบที่แก้กำหนดการได้'); return; }
       const b = curB(), ui = App.state.ui.beo, i = Number(el.dataset.i), list = b.schedule[ui.day] = b.schedule[ui.day] || [];
       const s = i >= 0 ? list[i] : { time: '08:00', task: '', place: '', dept: 'banquet' };
       App.modal(`<h2>${i >= 0 ? 'แก้ไข' : 'เพิ่ม'}กำหนดการ</h2>
