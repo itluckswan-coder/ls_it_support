@@ -454,7 +454,7 @@
       // everyone else gets just their follow-ups
       if (!App.V.home.salesHome(me)) return `
 <div class="page-hd"><div><div class="eyebrow">${U.DL[now.getDay()]} ${U.fmtD(today)}</div><h1>${greet} คุณ${H(App.firstName(me))}</h1></div></div>
-<div style="max-width:720px">${fuCard}</div>`;
+<div class="stack" style="max-width:720px">${App.homeTasks ? App.homeTasks() : ''}${fuCard}</div>`;
       return `
 <div class="page-hd"><div><div class="eyebrow">${U.DL[now.getDay()]} ${U.fmtD(today)}</div><h1>${greet} คุณ${H(App.firstName(me))}</h1></div>
   <a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
@@ -482,6 +482,7 @@
       <div style="margin:12px 0 14px"><span style="font:700 30px var(--fh)">฿${U.short(closed)}</span> <span class="muted">/ ${U.short(target)}</span></div>
       <div class="bar"><i style="width:${U.clamp(pct, 0, 100)}%"></i></div>
     </section>
+    ${App.homeTasks ? App.homeTasks() : ''}
     ${fuCard}
   </aside>
 </div>`;

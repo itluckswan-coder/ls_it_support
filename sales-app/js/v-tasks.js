@@ -50,6 +50,45 @@
       <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`, () => { const b = document.querySelector('.bell-btn .bell-n'); if (b) b.remove(); });
   };
 
+  /* ---------------- home page card ----------------
+   * everyone but the admin: "งานที่ได้รับมอบหมายวันนี้" — work still open, plus what they confirmed today;
+   * the admin: "งานที่มอบหมาย" — what was assigned, its status, and when it was confirmed */
+  const badge = t => { const late = t.status !== 'done' && t.due && t.due < U.today(); return t.status === 'done' ? '<span class="badge st-confirmed">ยืนยันแล้ว</span>' : `<span class="badge ${late ? 'st-tentative' : 'st-sent'}">${late ? 'เลยกำหนด' : 'รอดำเนินการ'}</span>`; };
+  App.homeTasks = function () {
+    const me = App.me(); if (!me) return '';
+    const today = U.today(), admin = me.role === 'admin';
+    const row = (t, sub) => `<button class="hm-task" data-act="tkView" data-id="${H(t.id)}"><span style="min-width:0;flex:1;text-align:left"><b>${t.priority === 'high' ? '<span class="badge st-tentative" style="margin-right:4px">ด่วน</span>' : ''}${H(t.title)}</b><span class="small muted">${sub}</span></span>${badge(t)}</button>`;
+    if (admin) {
+      const list = tasks().slice().sort((a, b) => ((b.status === 'done' ? b.doneAt : b.at) || '').localeCompare((a.status === 'done' ? a.doneAt : a.at) || ''));
+      const open = list.filter(t => t.status !== 'done').length;
+      return `<section class="card pad"><div class="between" style="margin-bottom:10px"><h2>งานที่มอบหมาย</h2><a class="link small" href="#/tasks">ดูทั้งหมด</a></div>
+        <div class="small muted" style="margin:-4px 0 8px">รอดำเนินการ ${open} · ยืนยันแล้ว ${list.length - open}</div>
+        ${list.slice(0, 6).map(t => row(t, `ถึง${H(toText(t))} · ${t.status === 'done' ? 'ยืนยันโดย ' + H(t.doneByName || '') + ' ' + H(when(t.doneAt)) : 'มอบหมาย ' + H(when(t.at))}`)).join('') || '<div class="muted small">ยังไม่มีงานที่มอบหมาย</div>'}</section>`;
+    }
+    const list = tasks().filter(t => mine(t, me) && (t.status !== 'done' || (t.doneAt || '').slice(0, 10) === today))
+      .sort((a, b) => (a.status === 'done') - (b.status === 'done') || (a.due || '9').localeCompare(b.due || '9'));
+    return `<section class="card pad"><div class="between" style="margin-bottom:10px"><h2>งานที่ได้รับมอบหมายวันนี้</h2><a class="link small" href="#/tasks">ดูทั้งหมด</a></div>
+      ${list.map(t => row(t, (t.due ? 'กำหนด ' + U.fmtD(t.due, { year: false }) + ' · ' : '') + 'จาก ' + H(t.byName || ''))).join('') || '<div class="muted small">ไม่มีงานที่ได้รับมอบหมาย 🎉</div>'}</section>`;
+  };
+  // one assignment in full
+  function taskView(t) {
+    const me = App.me(), canDo = t.status !== 'done' && mine(t, me), q = t.quoteId && Store.quote(t.quoteId);
+    const kv = (k, v) => v ? `<div class="tk-kv"><span class="muted">${k}</span><span>${v}</span></div>` : '';
+    App.modal(`<div class="between" style="align-items:flex-start;gap:10px"><h2 style="margin:0">${H(t.title)}</h2>${badge(t)}</div>
+      ${t.priority === 'high' ? '<div style="margin-top:6px"><span class="badge st-tentative">ด่วน</span></div>' : ''}
+      ${t.detail ? `<p style="white-space:pre-line;margin:12px 0 4px">${H(t.detail)}</p>` : '<p class="muted small" style="margin:12px 0 4px">ไม่มีรายละเอียดเพิ่มเติม</p>'}
+      <div class="tk-kvs">
+        ${kv('มอบหมายให้', H(toText(t)))}
+        ${t.to.type === 'dept' && (t.to.emps || []).length ? kv('พนักงาน', H(t.to.emps.map(empName).filter(Boolean).join(', '))) : ''}
+        ${kv('มอบหมายโดย', H(t.byName || '—'))}
+        ${kv('มอบหมายเมื่อ', H(when(t.at)))}
+        ${kv('กำหนดเสร็จ', t.due ? H(U.fmtD(t.due)) : '—')}
+        ${q ? kv('ใบเสนอราคา', `<a href="#/quote/${encodeURIComponent(q.id)}" data-act="closeModal">${H(q.id)} · ${H(q.client)}</a>`) : ''}
+        ${t.status === 'done' ? kv('ยืนยันโดย', H(t.doneByName || '—')) + kv('ยืนยันเมื่อ', H(when(t.doneAt))) + (t.doneNote ? kv('หมายเหตุ', '“' + H(t.doneNote) + '”') : '') : ''}
+      </div>
+      <div class="acts"><a class="btn ghost" href="#/tasks" data-act="closeModal">ไปหน้างานทั้งหมด</a>${canDo ? `<button class="btn teal" data-act="tkDone" data-id="${H(t.id)}">ยืนยันงานนี้</button>` : '<button class="btn dark" data-act="closeModal">ปิด</button>'}</div>`);
+  }
+
   /* ---------------- the page ---------------- */
   App.V.tasks = {
     title: 'Assignment & Approve',
@@ -188,6 +227,7 @@
       const t = tasks().find(x => x.id === el.dataset.id); if (!t || !isAdmin()) return;
       App.confirm('ลบงาน “' + t.title + '”?', () => { Store.db.tasks = tasks().filter(x => x !== t); Store.save(); App.render(); App.toast('ลบแล้ว'); }, 'ลบงาน');
     },
+    tkView(el) { const t = tasks().find(x => x.id === el.dataset.id), me = App.me(); if (t && (isAdmin() || mine(t, me))) taskView(t); },
     tkDone(el) {
       const t = tasks().find(x => x.id === el.dataset.id), me = App.me(); if (!t || !mine(t, me)) return;
       App.modal(`<h2>ยืนยันงานนี้?</h2><p class="muted" style="margin-top:-8px">${H(t.title)}</p>

@@ -794,3 +794,12 @@ main.bleed{padding:0;max-width:none}
 .chip.role-add{min-width:36px;justify-content:center;font-weight:700;border-style:dashed}
 .chip.role-edit{border-style:dashed}
 .role-list{display:grid;gap:6px;max-height:55vh;overflow:auto}
+
+/* home: assignments card */
+.hm-task{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;border:0;border-top:1px solid var(--line);background:none;cursor:pointer;color:inherit;font:inherit}
+.hm-task:first-of-type{border-top:0}
+.hm-task b{display:block;font-weight:600;font-size:13.5px}
+.hm-task .small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hm-task:hover b{color:var(--red)}
+.tk-kvs{margin-top:12px;border-top:1px solid var(--line)}
+.tk-kv{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
