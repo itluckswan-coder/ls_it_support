@@ -33,6 +33,12 @@
 
     /* ---------- session ---------- */
     me() { const id = App.state.uid; return id ? Store.db.users.find(u => u.id === id) : null; },
+    // sections hidden for the signed-in user's role (settings.roles.views[roleId]); admins see everything
+    navHidden() {
+      const me = App.me(); if (!me || me.role === 'admin' || !App.roleOf) return [];
+      const v = ((Store.db.settings && Store.db.settings.roles) || {}).views || {}, l = v[App.roleOf(me).id];
+      return Array.isArray(l) ? l.filter(x => x !== 'home') : [];
+    },
     can(p) { const m = App.me(); return !!(m && m.perms && m.perms[p]); },
     firstName(u) { return (u && u.name || '').split(' ')[0]; },
     restoreSession() {
@@ -88,6 +94,9 @@
       if (route === 'setup' && !(cloud && g.API.setup)) { location.replace(App.state.uid ? '#/home' : '#/login'); return; }
       if (!App.state.uid && route !== 'login' && route !== 'setup') { location.replace('#/login'); return; }
       if (App.state.uid && route === 'login') { location.replace('#/home'); return; }
+      // a section the user's role can't see goes back to the home page
+      const sec = (App.V[route] || App.V.home).nav || route;
+      if (App.state.uid && sec !== 'home' && App.navHidden().includes(sec)) { location.replace('#/home'); return; }
       App.state.route = route; App.state.params = params;
       const view = App.V[route] || App.V.home;
       const root = document.getElementById('app');
@@ -113,7 +122,8 @@
     // menu entries this user may see (Dashboard is for admins only)
     navItems() {
       const me = App.me();
-      return NAV.filter(n => (n[0] !== 'users' || App.can('users') || App.can('view_beo')) && (n[0] !== 'dash' || (me && me.role === 'admin')));
+      const hidden = App.navHidden();
+      return NAV.filter(n => (n[0] !== 'users' || App.can('users') || App.can('view_beo')) && (n[0] !== 'dash' || (me && me.role === 'admin')) && !hidden.includes(n[0]));
     },
     /* ---------- shell ---------- */
     shell(active, body, view) {

@@ -1136,6 +1136,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     st.names = st.names || {}; st.custom = st.custom || [];
     fn(st); s.roles = st; Store.save();
   }
+  const hiddenOf = r => { const v = (((Store.db.settings || {}).roles || {}).views || {})[r ? r.id : ''] || []; return Array.isArray(v) ? v : []; };
   function roleForm(r) {
     const isNew = !r, base = r ? r.base : 'sales', perms = r ? r.perms : D.ROLE_PERMS.sales;
     App.modal(`<h2>${isNew ? 'เพิ่มบทบาทใหม่' : 'แก้ไขบทบาท'}</h2>
@@ -1143,7 +1144,10 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       ${!r || r.custom ? `<div class="field"><label class="f" for="rlBase">ระดับสิทธิ์ของระบบ</label><select class="input" id="rlBase">${D.ROLES.map(x => `<option value="${x.id}" ${x.id === base ? 'selected' : ''}>เทียบเท่า ${H(App.roles().find(y => y.id === x.id).name)}</option>`).join('')}</select>
         <div class="xs muted" style="margin-top:4px">ใช้กำหนดสิ่งที่ระบบอนุญาตตามตำแหน่ง เช่น การอนุมัติ การลบข้อมูล</div></div>
       <div class="small muted" style="margin:12px 0 4px">สิทธิ์เริ่มต้นของบทบาทนี้</div>
-      ${D.PERMS.map(p => `<label class="perm" style="cursor:pointer"><span>${H(p.name)}</span><input type="checkbox" class="rl-perm" value="${p.id}" ${perms.includes(p.id) ? 'checked' : ''}></label>`).join('')}` : '<div class="xs muted">บทบาทหลักของระบบ เปลี่ยนได้เฉพาะชื่อ</div>'}
+      ${D.PERMS.map(p => `<label class="perm" style="cursor:pointer"><span>${H(p.name)}</span><input type="checkbox" class="rl-perm" value="${p.id}" ${perms.includes(p.id) ? 'checked' : ''}></label>`).join('')}` : '<div class="xs muted">บทบาทหลักของระบบ เปลี่ยนชื่อและหมวดหมู่ที่มองเห็นได้</div>'}
+      <div class="small muted" style="margin:14px 0 4px">หมวดหมู่ที่มองเห็น</div>
+      <div id="rlViewsBox">${App.NAV.map(([id, label]) => `<label class="perm" style="cursor:pointer"><span>${H(label)}${id === 'home' ? ' <span class="xs muted">(เห็นเสมอ)</span>' : id === 'dash' ? ' <span class="xs muted">(เฉพาะผู้ดูแลระบบ)</span>' : ''}</span><input type="checkbox" class="rl-view" value="${id}" ${id === 'home' ? 'checked disabled' : hiddenOf(r).includes(id) ? '' : 'checked'}></label>`).join('')}</div>
+      <div class="xs muted" id="rlViewsAdmin" style="margin-top:4px">${base === 'admin' && (!r || r.custom || r.id === 'admin') ? 'บทบาทระดับผู้ดูแลระบบเห็นทุกหมวดหมู่เสมอ' : 'หมวดหมู่ที่ไม่ได้ติ๊กจะไม่แสดงในเมนูของบทบาทนี้ และเปิดผ่านลิงก์ไม่ได้'}</div>
       <div class="small red" id="rlErr" style="min-height:20px;margin-top:6px" role="alert"></div>
       <div class="acts">${r && r.custom ? '<button class="btn ghost red" id="rlDel" style="margin-right:auto">ลบบทบาท</button>' : ''}<button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="rlOk">${isNew ? 'เพิ่มบทบาท' : 'บันทึก'}</button></div>`, bg => {
       const err = bg.querySelector('#rlErr');
@@ -1152,10 +1156,15 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         if (!name) { err.textContent = 'กรุณากรอกชื่อบทบาท'; return; }
         if (App.roles().some(x => x.name === name && (!r || x.id !== r.id))) { err.textContent = 'มีบทบาทชื่อนี้อยู่แล้ว'; return; }
         const baseSel = bg.querySelector('#rlBase'), ps = [...bg.querySelectorAll('.rl-perm:checked')].map(x => x.value);
+        const hide = [...bg.querySelectorAll('.rl-view:not(:checked)')].map(x => x.value).filter(x => x !== 'home');
+        let newId = '';
         saveRoles(st => {
-          if (isNew) st.custom.push({ id: 'r_' + Math.random().toString(36).slice(2, 10), name, base: baseSel.value, perms: ps });
+          st.views = st.views || {};
+          if (isNew) { newId = 'r_' + Math.random().toString(36).slice(2, 10); st.custom.push({ id: newId, name, base: baseSel.value, perms: ps }); }
           else if (r.custom) Object.assign(st.custom.find(x => x.id === r.id) || {}, { name, base: baseSel.value, perms: ps });
           else st.names[r.id] = name;
+          const key = isNew ? newId : r.id;
+          if (hide.length) st.views[key] = hide; else delete st.views[key];
         });
         // people on an edited added role follow its new level
         if (r && r.custom) Store.db.users.filter(u => u.roleId === r.id).forEach(u => { u.role = baseSel.value; });
@@ -1166,7 +1175,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       if (del) del.onclick = () => {
         const n = Store.db.users.filter(u => u.roleId === r.id).length;
         if (n) { err.textContent = `มีผู้ใช้ ${n} คนอยู่ในบทบาทนี้ — เปลี่ยนบทบาทของผู้ใช้ก่อนจึงจะลบได้`; return; }
-        App.confirm('ลบบทบาท ' + r.name + '?', () => { saveRoles(st => { st.custom = st.custom.filter(x => x.id !== r.id); }); if (UU().role === r.id) UU().role = 'all'; App.render(); App.toast('ลบบทบาทแล้ว'); }, 'ลบ');
+        App.confirm('ลบบทบาท ' + r.name + '?', () => { saveRoles(st => { st.custom = st.custom.filter(x => x.id !== r.id); if (st.views) delete st.views[r.id]; }); if (UU().role === r.id) UU().role = 'all'; App.render(); App.toast('ลบบทบาทแล้ว'); }, 'ลบ');
       };
     });
   }
