@@ -380,7 +380,7 @@
      CALENDAR (1k)
      ===================================================================== */
   const ST_COLOR = {
-    draft: ['#EDECE6', '#4A524F', '#9a9a92'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#F8E1E1', '#8E1F25', '#A8262D'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
+    draft: ['#E4E2DA', '#3D4542', '#8A8A82'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#F8E1E1', '#8E1F25', '#A8262D'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
   };
   App.V.cal = {
     title: 'ปฏิทิน',
@@ -389,7 +389,8 @@
       const ui = App.state.ui.cal || (App.state.ui.cal = { ym: t.slice(0, 7), view: 'month', area: 'all', sel: t });
       const [y, m] = ui.ym.split('-').map(Number);
       const first = new Date(y, m - 1, 1), startD = U.addDays(U.iso(first), -first.getDay());
-      const qs = Store.db.quotes.filter(q => q.status !== 'cancelled' && (ui.area === 'all' || q.room === ui.area || q.items.some(i => i.ref === ui.area)));
+      // every quote with a date shows, drafts included; a missing end date counts as a one-day event
+      const qs = Store.db.quotes.filter(q => q.status !== 'cancelled' && q.start && (ui.area === 'all' || q.room === ui.area || (q.items || []).some(i => i.ref === ui.area))).map(q => q.end && q.end >= q.start ? q : Object.assign({}, q, { end: q.start }));
       const inMonth = qs.filter(q => q.start.slice(0, 7) === ui.ym || q.end.slice(0, 7) === ui.ym);
       const stat = s => { const l = inMonth.filter(q => q.status === s); return [l.length, l.reduce((a, q) => a + App.calc(q).net, 0)]; };
       const evOn = d => qs.filter(q => d >= q.start && d <= q.end);
@@ -414,7 +415,7 @@
       return `<div class="split left side260">
   <aside>
     <h1 style="margin-bottom:16px">ปฏิทินการจอง</h1>
-    ${['draft', 'sent', 'tentative', 'confirmed'].map(s => { const [n, v] = stat(s); return `<div class="stat-row"><span class="sq" style="border-color:${ST_COLOR[s][2]};background:${ST_COLOR[s][0]}"></span><span style="flex:1">${D.STATUS[s]}</span><b style="font:600 18px var(--fh);width:36px;text-align:center">${n}</b><span class="xs muted" style="width:44px;text-align:right">${U.short(v)}</span></div>`; }).join('')}
+    ${['draft', 'tentative', 'confirmed'].map(s => { const [n, v] = stat(s); return `<div class="stat-row"><span class="sq" style="border-color:${ST_COLOR[s][2]};background:${ST_COLOR[s][0]}"></span><span style="flex:1">${D.STATUS[s]}</span><b style="font:600 18px var(--fh);width:36px;text-align:center">${n}</b><span class="xs muted" style="width:44px;text-align:right">${U.short(v)}</span></div>`; }).join('')}
     <div class="small muted" style="margin:18px 0 8px">พื้นที่</div>
     <div class="row wrap" style="gap:6px">${areas.map(([k, l]) => `<button class="chip ${ui.area === k ? 'on' : ''}" data-act="calArea" data-v="${k}">${H(l)}</button>`).join('')}</div>
     ${selEv.length ? `<div class="card pad" style="margin-top:14px"><b>${U.fmtD(ui.sel, { dow: true })}</b>${selEv.map(q => `<a class="row" style="padding:8px 0;color:inherit;border-top:1px solid var(--line);margin-top:8px" href="#/quote/${encodeURIComponent(q.id)}"><i class="dot" style="background:${(ST_COLOR[q.status] || ST_COLOR.draft)[2]}"></i><span class="small" style="flex:1">${H(q.client)} · ${H(q.title)}</span></a>`).join('')}</div>` : ''}
