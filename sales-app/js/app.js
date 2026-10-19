@@ -487,7 +487,9 @@
   </aside>
 </div>`;
     },
-    salesHome(me) { return !!me && ['admin', 'manager', 'sales'].includes(me.role); },
+    // the quote side of the home page: only the built-in admin, sales manager and sales roles —
+    // roles added on top of those levels (e.g. an F&B staff role on the sales level) get the short home page
+    salesHome(me) { return !!me && ['admin', 'manager', 'sales'].includes(me.role) && !(App.roleOf && App.roleOf(me).custom); },
     followUps() {
       const out = [], today = U.today(), me = App.me();
       for (const b of Store.db.beos) {
