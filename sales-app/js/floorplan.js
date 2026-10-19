@@ -320,7 +320,7 @@
     <section class="card pad"><h3>ขนาดห้อง${H(roomName(id).replace(/^ห้อง/, ''))} (ม.)</h3>
       <div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${d.W}" data-change="fsW" aria-label="กว้าง (เมตร)"><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${d.H}" data-change="fsH" aria-label="ลึก (เมตร)"></div>
       <div class="xs muted" style="margin-top:6px">พื้นที่ ${(d.W * d.H).toFixed(1)} ตร.ม.${(D.MEETING_ROOMS.find(r => r.id === id) || {}).area ? ' · ข้อมูลห้อง ' + D.MEETING_ROOMS.find(r => r.id === id).area + ' ตร.ม.' : ''}</div></section>
-    <section class="card pad"><h3>เพิ่มของที่ห้ามย้าย</h3><div class="xs muted" style="margin-bottom:8px">เช่น เวทีถาวร เสา ประตู จอ — จะแสดงเป็นเส้นประในทุกผังของห้องนี้ และย้ายในผังงานไม่ได้</div>
+    <section class="card pad"><div class="fp-h"><h3>เพิ่มของที่ห้ามย้าย</h3><button class="fp-plus" data-act="fpItemNew" aria-label="เพิ่มของที่ห้ามย้ายชิ้นใหม่" title="เพิ่มของที่ห้ามย้ายชิ้นใหม่ กำหนดชื่อ ขนาด และสีเอง">+</button></div><div class="xs muted" style="margin-bottom:8px">เช่น เวทีถาวร เสา ประตู จอ — จะแสดงเป็นเส้นประในทุกผังของห้องนี้ และย้ายในผังงานไม่ได้</div>
       <div class="fp-grid">${['stage', 'screen', 'door', 'pillar', 'block', 'sound', 'buffet', 'carpet', 'podium', 'reg'].map(t => `<button class="btn ghost sm" data-act="fpAdd" data-v="${t}">+ ${NAMES[t]}</button>`).join('')}${libButtons()}</div></section>
     <section class="card pad" id="fpSel">${selPanel(d)}</section>
   </aside>
@@ -532,14 +532,14 @@
     fpTplDel(el) { const t = libTpl().find(x => x.id === el.dataset.id); if (t) App.confirm('ลบเทมเพลต “' + t.name + '”?', () => { setFloor(f => { f.templates = (f.templates || []).filter(x => x.id !== t.id); }); App.render(); }, 'ลบ'); },
     fpItemNew() {
       const sw = ['#e4e2da', '#c9d6e8', '#d6e8d0', '#f1e2b8', '#f0c9c0', '#e6d5ef', '#cfe8e5'];
-      App.modal(`<h2>เพิ่มสิ่งของใหม่</h2>
+      App.modal(`<h2>${setupMode() ? 'เพิ่มของที่ห้ามย้ายชิ้นใหม่' : 'เพิ่มสิ่งของใหม่'}</h2>
         <div class="field"><label class="f" for="ciName">ชื่อ</label><input class="input" id="ciName" placeholder="เช่น โต๊ะค็อกเทล, ซุ้มดอกไม้, จอ LED"></div>
         <div class="grid g2" style="margin-top:14px"><div><label class="f" for="ciShape">รูปทรง</label><select class="input" id="ciShape"><option value="rect">สี่เหลี่ยม</option><option value="round">วงกลม / วงรี</option></select></div>
           <div><label class="f">สี</label><div class="row wrap" style="gap:6px;margin-top:6px" id="ciColors">${sw.map((c, i) => `<button type="button" class="fp-sw ${i ? '' : 'on'}" data-c="${c}" style="background:${c}" aria-label="สี ${c}"></button>`).join('')}</div></div></div>
         <div class="grid g2" style="margin-top:14px"><div><label class="f" for="ciW">กว้าง (ม.)</label><input class="input" id="ciW" type="number" min="0.1" max="40" step="0.1" value="1.2"></div><div><label class="f" for="ciH">ลึก (ม.)</label><input class="input" id="ciH" type="number" min="0.1" max="40" step="0.1" value="0.8"></div></div>
         ${canLib() ? '<label class="row small" style="gap:8px;margin-top:14px;cursor:pointer"><input type="checkbox" id="ciKeep" checked> บันทึกไว้ในรายการ “เพิ่มของ” ให้ทุกคนใช้ครั้งหน้า</label>' : ''}
         <div class="small red" id="ciErr" style="min-height:20px;margin-top:6px" role="alert"></div>
-        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ciOk">เพิ่มลงผัง</button></div>`, bg => {
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ciOk">${setupMode() ? 'เพิ่มเป็นของที่ห้ามย้าย' : 'เพิ่มลงผัง'}</button></div>`, bg => {
         let color = sw[0];
         bg.querySelectorAll('.fp-sw').forEach(b => { b.onclick = () => { color = b.dataset.c; bg.querySelectorAll('.fp-sw').forEach(x => x.classList.toggle('on', x === b)); }; });
         bg.querySelector('#ciOk').onclick = () => {
