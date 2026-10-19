@@ -380,7 +380,7 @@
      CALENDAR (1k)
      ===================================================================== */
   const ST_COLOR = {
-    draft: ['#EDECE6', '#4A524F', '#9a9a92'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#F8E1E1', '#8E1F25', '#A8262D'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
+    draft: ['#E4E2DA', '#3D4542', '#8A8A82'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#F8E1E1', '#8E1F25', '#A8262D'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
   };
   App.V.cal = {
     title: 'ปฏิทิน',
@@ -389,7 +389,8 @@
       const ui = App.state.ui.cal || (App.state.ui.cal = { ym: t.slice(0, 7), view: 'month', area: 'all', sel: t });
       const [y, m] = ui.ym.split('-').map(Number);
       const first = new Date(y, m - 1, 1), startD = U.addDays(U.iso(first), -first.getDay());
-      const qs = Store.db.quotes.filter(q => q.status !== 'cancelled' && (ui.area === 'all' || q.room === ui.area || q.items.some(i => i.ref === ui.area)));
+      // drafts, tentative and confirmed quotes with a date show (sent and cancelled ones don't); a missing end date counts as a one-day event
+      const qs = Store.db.quotes.filter(q => q.status !== 'cancelled' && q.status !== 'sent' && q.start && (ui.area === 'all' || q.room === ui.area || (q.items || []).some(i => i.ref === ui.area))).map(q => q.end && q.end >= q.start ? q : Object.assign({}, q, { end: q.start }));
       const inMonth = qs.filter(q => q.start.slice(0, 7) === ui.ym || q.end.slice(0, 7) === ui.ym);
       const stat = s => { const l = inMonth.filter(q => q.status === s); return [l.length, l.reduce((a, q) => a + App.calc(q).net, 0)]; };
       const evOn = d => qs.filter(q => d >= q.start && d <= q.end);
@@ -408,13 +409,13 @@
         const ws = U.addDays(ui.sel, -U.d(ui.sel).getDay());
         main = `<div style="padding:8px 0">${[0, 1, 2, 3, 4, 5, 6].map(i => { const d = U.addDays(ws, i), ev = evOn(d); return `<div class="row" style="padding:12px 20px;border-bottom:1px solid var(--line);align-items:flex-start;${d === ui.sel ? 'background:var(--red-tint)' : ''}"><div style="width:90px;flex:none"><b>${U.DS[i]} ${U.d(d).getDate()}</b><div class="xs muted">${U.MS[U.d(d).getMonth()]}</div></div><div style="flex:1;display:grid;gap:6px">${ev.map(q => `<button class="pick" data-act="openQuote" data-id="${H(q.id)}" style="padding:8px 12px"><span><b style="font-weight:500">${H(q.client)}</b> · ${H(q.title)}<br><span class="small muted">${H(((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || '')} · ${q.pax} ท่าน</span></span>${App.statusBadge(q.status)}</button>`).join('') || '<span class="small muted">—</span>'}</div></div>`; }).join('')}</div>`;
       } else {
-        main = `<div class="grid g4" style="padding:16px;align-items:start">${['draft', 'sent', 'tentative', 'confirmed'].map(s => { const l = qs.filter(q => q.status === s && q.end >= t).sort((a, b) => a.start.localeCompare(b.start)); return `<div><div class="between" style="margin-bottom:10px"><b>${D.STATUS[s]}</b><span class="small muted">${l.length} · ${U.short(l.reduce((a, q) => a + App.calc(q).net, 0))}</span></div>${l.map(q => `<button class="pick" style="display:block;border-left:4px solid ${ST_COLOR[s][2]}" data-act="openQuote" data-id="${H(q.id)}"><b style="font-weight:500">${H(q.client)}</b><div class="small muted">${H(q.title)} · ${U.fmtRange(q.start, q.end, { year: false })}</div><div class="small b num">฿${U.n(Math.round(App.calc(q).net))}</div></button>`).join('') || '<div class="small muted">—</div>'}</div>`; }).join('')}</div>`;
+        main = `<div class="grid g3" style="padding:16px;align-items:start">${['draft', 'tentative', 'confirmed'].map(s => { const l = qs.filter(q => q.status === s && q.end >= t).sort((a, b) => a.start.localeCompare(b.start)); return `<div><div class="between" style="margin-bottom:10px"><b>${D.STATUS[s]}</b><span class="small muted">${l.length} · ${U.short(l.reduce((a, q) => a + App.calc(q).net, 0))}</span></div>${l.map(q => `<button class="pick" style="display:block;border-left:4px solid ${ST_COLOR[s][2]}" data-act="openQuote" data-id="${H(q.id)}"><b style="font-weight:500">${H(q.client)}</b><div class="small muted">${H(q.title)} · ${U.fmtRange(q.start, q.end, { year: false })}</div><div class="small b num">฿${U.n(Math.round(App.calc(q).net))}</div></button>`).join('') || '<div class="small muted">—</div>'}</div>`; }).join('')}</div>`;
       }
       const selEv = evOn(ui.sel);
       return `<div class="split left side260">
   <aside>
     <h1 style="margin-bottom:16px">ปฏิทินการจอง</h1>
-    ${['draft', 'sent', 'tentative', 'confirmed'].map(s => { const [n, v] = stat(s); return `<div class="stat-row"><span class="sq" style="border-color:${ST_COLOR[s][2]};background:${ST_COLOR[s][0]}"></span><span style="flex:1">${D.STATUS[s]}</span><b style="font:600 18px var(--fh);width:36px;text-align:center">${n}</b><span class="xs muted" style="width:44px;text-align:right">${U.short(v)}</span></div>`; }).join('')}
+    ${['draft', 'tentative', 'confirmed'].map(s => { const [n, v] = stat(s); return `<div class="stat-row"><span class="sq" style="border-color:${ST_COLOR[s][2]};background:${ST_COLOR[s][0]}"></span><span style="flex:1">${D.STATUS[s]}</span><b style="font:600 18px var(--fh);width:36px;text-align:center">${n}</b><span class="xs muted" style="width:44px;text-align:right">${U.short(v)}</span></div>`; }).join('')}
     <div class="small muted" style="margin:18px 0 8px">พื้นที่</div>
     <div class="row wrap" style="gap:6px">${areas.map(([k, l]) => `<button class="chip ${ui.area === k ? 'on' : ''}" data-act="calArea" data-v="${k}">${H(l)}</button>`).join('')}</div>
     ${selEv.length ? `<div class="card pad" style="margin-top:14px"><b>${U.fmtD(ui.sel, { dow: true })}</b>${selEv.map(q => `<a class="row" style="padding:8px 0;color:inherit;border-top:1px solid var(--line);margin-top:8px" href="#/quote/${encodeURIComponent(q.id)}"><i class="dot" style="background:${(ST_COLOR[q.status] || ST_COLOR.draft)[2]}"></i><span class="small" style="flex:1">${H(q.client)} · ${H(q.title)}</span></a>`).join('')}</div>` : ''}
