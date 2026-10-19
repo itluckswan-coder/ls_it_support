@@ -45,7 +45,7 @@
     catalog: db.catalog && Array.isArray(db.catalog.food) ? [['food', { list: db.catalog.food }]] : [],
     task: (db.tasks || []).map(t => [t.id, t])
   });
-  const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {} });
+  const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, roleId: u.roleId || '', dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {} });
 
   const API = {
     online: false, setup: false, token: null, serverTime: null, offline: false,

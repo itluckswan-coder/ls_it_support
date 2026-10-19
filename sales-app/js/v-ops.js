@@ -869,6 +869,21 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
      USERS (1m)
      ===================================================================== */
   const ROLE_CLS = { sales: 'r-sales', manager: 'r-manager', admin: 'r-admin', head: 'r-head', acc: 'r-acc' };
+  /* roles: the five built-in ones (their names can be changed) plus roles added here. An added role sits on one of
+     the built-in levels (`base`), which is what the server checks; it brings its own name and default permissions.
+     Stored in settings.roles = { names: { builtInId: name }, custom: [{ id, name, base, perms: [permId] }] } */
+  const permIds = D.PERMS.map(p => p.id);
+  App.roles = () => {
+    const st = (Store.db.settings && Store.db.settings.roles) || {}, names = st.names || {};
+    return D.ROLES.map(r => ({ id: r.id, name: String(names[r.id] || r.name), base: r.id, perms: D.ROLE_PERMS[r.id], custom: false }))
+      .concat((st.custom || []).filter(c => c && /^r_[a-z0-9]{4,20}$/.test(c.id) && D.ROLE_PERMS[c.base]).map(c => ({ id: c.id, name: String(c.name || 'บทบาทใหม่'), base: c.base, perms: (c.perms || []).filter(p => permIds.includes(p)), custom: true })));
+  };
+  const roleKey = u => (u.roleId && App.roles().some(r => r.custom && r.id === u.roleId && r.base === u.role)) ? u.roleId : u.role;
+  App.roleOf = u => { const k = roleKey(u); return App.roles().find(r => r.id === k) || { id: u.role, name: u.role, base: u.role, perms: [] }; };
+  App.roleName = u => (u ? App.roleOf(u).name : '');
+  const permsOf = r => Object.fromEntries(D.PERMS.map(p => [p.id, r.base === 'admin' || r.perms.includes(p.id)]));
+  // pick a role for a user record: the level the server checks + which named role it is
+  const setRole = (u, r) => { u.role = r.base; if (r.custom) u.roleId = r.id; else delete u.roleId; };
   const ST = { active: ['ใช้งานอยู่', 'st-confirmed'], invited: ['รอ', 'st-sent'], disabled: ['ปิดใช้', 'st-draft'] };
   const depts = ['ฝ่ายขายและการตลาด', 'ผู้บริหาร', 'ครัว / F&B', 'จัดเลี้ยง', 'ช่าง / AV', 'ส่วนหน้า', 'แม่บ้าน', 'บัญชี'];
   const fmtLast = iso => {
@@ -883,27 +898,27 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     render() {
       const db = Store.db, canEdit = App.can('users');
       const ui = App.state.ui.users || (App.state.ui.users = { q: '', role: 'all', page: 1, sel: App.state.uid, draft: null });
-      const list = db.users.filter(u => (ui.role === 'all' || u.role === ui.role) && (!ui.q || (u.name + ' ' + u.email).toLowerCase().includes(ui.q.toLowerCase())));
+      const list = db.users.filter(u => (ui.role === 'all' || roleKey(u) === ui.role) && (!ui.q || (u.name + ' ' + u.email).toLowerCase().includes(ui.q.toLowerCase())));
       const per = 7, pages = Math.max(1, Math.ceil(list.length / per)); ui.page = Math.min(ui.page, pages);
       const rows = list.slice((ui.page - 1) * per, ui.page * per);
       const u = db.users.find(x => x.id === ui.sel) || db.users[0];
       if (!ui.draft || ui.draft.id !== u.id) ui.draft = JSON.parse(JSON.stringify(u));
       const dr = ui.draft;
-      const cnt = r => db.users.filter(x => r === 'all' || x.role === r).length;
+      const cnt = r => db.users.filter(x => r === 'all' || roleKey(x) === r).length, roles = App.roles(), isAdmin = App.me().role === 'admin';
       return `
 <div class="page-hd"><div><h1>ผู้ใช้งาน</h1><div class="small muted">${db.users.length} คน · ใช้งานอยู่ ${db.users.filter(x => x.status === 'active').length} · รอ ${db.users.filter(x => x.status === 'invited').length} · ปิดใช้ ${db.users.filter(x => x.status === 'disabled').length}</div></div>
   ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="usCsv">นำเข้าจากไฟล์ CSV</button><button class="btn red" data-act="usInvite">+ เพิ่มผู้ใช้งาน</button></div>' : ''}</div>
 <div class="row wrap" style="margin-bottom:16px">
   <input class="input" style="max-width:260px;border-radius:999px" placeholder="ค้นหาชื่อ อีเมล…" value="${H(ui.q)}" data-change="usQ" aria-label="ค้นหาผู้ใช้">
   <button class="chip ${ui.role === 'all' ? 'on' : ''}" data-act="usRole" data-v="all">ทั้งหมด <span class="n">${cnt('all')}</span></button>
-  ${D.ROLES.map(r => `<button class="chip ${ui.role === r.id ? 'on' : ''}" data-act="usRole" data-v="${r.id}">${r.name} <span class="n">${cnt(r.id)}</span></button>`).join('')}
+  ${roles.map(r => `<button class="chip ${ui.role === r.id ? 'on' : ''}" data-act="usRole" data-v="${H(r.id)}">${H(r.name)} <span class="n">${cnt(r.id)}</span></button>`).join('')}
 </div>
 <div class="split wide-side">
   <section class="card" style="overflow:hidden">
     <table class="tbl resp"><thead><tr><th>ผู้ใช้</th><th>บทบาท</th><th>แผนก</th><th>เข้าใช้ล่าสุด</th><th class="r">สถานะ</th></tr></thead><tbody>
     ${rows.map(x => `<tr class="click" data-act="usSel" data-v="${x.id}" style="${x.id === u.id ? 'background:var(--red-tint);box-shadow:inset 3px 0 var(--red)' : ''};${x.status === 'disabled' ? 'opacity:.55' : ''}">
       <td><div class="row"><span class="avatar sm" style="background:${x.role === 'admin' ? 'var(--ink)' : x.role === 'head' ? 'var(--yellow-soft)' : x.role === 'acc' ? 'var(--navy-soft)' : x.role === 'manager' ? 'var(--red-soft)' : 'var(--teal-soft)'};color:${x.role === 'admin' ? 'var(--yellow)' : 'var(--ink)'}">${H(U.initials(x.name))}</span><div style="min-width:0"><div class="row" style="gap:6px;flex-wrap:nowrap"><span style="font-weight:500">${H(x.name)}</span>${canEdit ? `<button class="icon-btn us-edit" data-act="usEdit" data-v="${x.id}" title="แก้ไขข้อมูลผู้ใช้" aria-label="แก้ไขข้อมูล ${H(x.name)}">${PENCIL}</button>` : ''}</div><div class="sub" style="overflow:hidden;text-overflow:ellipsis">${H(x.email)}</div></div></div></td>
-      <td class="hide-m"><span class="role-badge ${ROLE_CLS[x.role]}">${H(D.ROLES.find(r => r.id === x.role).name)}</span></td><td class="hide-m">${H(x.dept)}</td><td class="hide-m small">${fmtLast(x.lastLogin)}</td>
+      <td class="hide-m"><span class="role-badge ${ROLE_CLS[x.role]}">${H(App.roleName(x))}</span></td><td class="hide-m">${H(x.dept)}</td><td class="hide-m small">${fmtLast(x.lastLogin)}</td>
       <td class="r"><span class="badge ${ST[x.status][1]}">${ST[x.status][0]}</span></td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">ไม่พบผู้ใช้</div></td></tr>'}
     </tbody></table>
     <div class="between" style="padding:14px 22px;border-top:1px solid var(--line)"><span class="small muted">แสดง ${list.length ? (ui.page - 1) * per + 1 : 0}–${Math.min(ui.page * per, list.length)} จาก ${list.length} คน</span>
@@ -912,7 +927,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   <aside class="card pad sticky" id="usPanel">
     <div class="row" style="align-items:flex-start;gap:14px"><span class="avatar lg">${H(U.initials(u.name))}</span><div style="flex:1;min-width:0"><h2 style="font-size:20px">${H(u.name)}</h2><div class="small muted" style="word-break:break-all">${H(u.email)}${u.phone ? ' · ' + H(u.phone) : ''}</div></div><span class="badge ${ST[u.status][1]}">${ST[u.status][0]}</span></div>
     <div class="small muted" style="margin:18px 0 8px">บทบาท</div>
-    <div class="row wrap" style="gap:6px">${D.ROLES.map(r => `<button class="chip ${dr.role === r.id ? 'on' : ''}" data-act="usDraftRole" data-v="${r.id}" ${canEdit ? '' : 'disabled'}>${r.name}</button>`).join('')}</div>
+    <div class="row wrap" style="gap:6px">${roles.filter(r => r.base !== 'admin' || isAdmin || dr.role === 'admin').map(r => `<button class="chip ${roleKey(dr) === r.id ? 'on' : ''}" data-act="usDraftRole" data-v="${H(r.id)}" ${canEdit ? '' : 'disabled'}>${H(r.name)}</button>`).join('')}
+      ${isAdmin ? '<button class="chip role-add" data-act="roleAdd" title="เพิ่มบทบาทใหม่" aria-label="เพิ่มบทบาทใหม่">＋</button><button class="chip role-edit" data-act="roleEdit" title="แก้ไขชื่อบทบาท">✎ แก้ไขบทบาท</button>' : ''}</div>
     <div class="small muted" style="margin:16px 0 8px">แผนก</div>
     <select class="input" data-change="usDept" ${canEdit ? '' : 'disabled'}>${depts.concat(depts.includes(dr.dept) ? [] : [dr.dept]).map(d => `<option ${d === dr.dept ? 'selected' : ''}>${H(d)}</option>`).join('')}</select>
     <div class="small muted" style="margin:16px 0 4px">สิทธิ์การใช้งาน</div>
@@ -934,12 +950,12 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     usRole(el) { UU().role = el.dataset.v; UU().page = 1; App.render(); },
     usPage(el) { UU().page = Number(el.dataset.v); App.render(); },
     usSel(el) { UU().sel = el.dataset.v; UU().draft = null; App.render(); if (window.innerWidth <= 1100) document.getElementById('usPanel')?.scrollIntoView({ behavior: 'smooth' }); },
-    usDraftRole(el) { const d = UU().draft; d.role = el.dataset.v; d.perms = Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[d.role].includes(p.id)])); App.render(); },
+    usDraftRole(el) { const d = UU().draft, r = App.roles().find(x => x.id === el.dataset.v); if (!r) return; setRole(d, r); d.perms = permsOf(r); App.render(); },
     us2fa() { const d = UU().draft; d.twoFA = !d.twoFA; App.render(); },
     usSave() {
       const d = UU().draft, u = Store.db.users.find(x => x.id === d.id);
       if (u.id === App.state.uid && !d.perms.users) { App.toast('ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้'); return; }
-      Object.assign(u, { role: d.role, dept: d.dept, perms: d.perms, twoFA: d.twoFA }); Store.save(); UU().draft = null; App.render(); App.toast('บันทึกแล้ว');
+      Object.assign(u, { role: d.role, dept: d.dept, perms: d.perms, twoFA: d.twoFA }); if (d.roleId) u.roleId = d.roleId; else delete u.roleId; Store.save(); UU().draft = null; App.render(); App.toast('บันทึกแล้ว');
     },
     usToggle() {
       const u = Store.db.users.find(x => x.id === UU().sel);
@@ -952,7 +968,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       if (u.role === 'admin' && me.role !== 'admin') { App.toast('เฉพาะผู้ดูแลระบบที่แก้ไขข้อมูลของผู้ดูแลระบบได้'); return; }
       UU().sel = u.id; UU().draft = null; App.render();
       const self = u.id === me.id, d = JSON.parse(JSON.stringify(u));
-      const roles = D.ROLES.filter(r => r.id !== 'admin' || me.role === 'admin' || u.role === 'admin');
+      const roles = App.roles().filter(r => r.base !== 'admin' || me.role === 'admin' || u.role === 'admin'), cur = roleKey(u);
       App.modal(`<h2>แก้ไขข้อมูลผู้ใช้งาน</h2><p class="muted" style="margin-top:-8px">${H(u.name)} · รหัส ${H(u.id)}</p>
         <div class="field"><label class="f" for="ueName">ชื่อ-นามสกุล</label><input class="input" id="ueName" name="name" value="${H(u.name)}"></div>
         <div class="grid g2" style="margin-top:14px">
@@ -960,7 +976,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
           <div><label class="f" for="uePhone">เบอร์โทร</label><input class="input" id="uePhone" type="tel" name="phone" value="${H(u.phone || '')}"></div>
         </div>
         <div class="grid g2" style="margin-top:14px">
-          <div><label class="f" for="ueRole">บทบาท</label><select class="input" id="ueRole" name="role">${roles.map(r => `<option value="${r.id}" ${r.id === u.role ? 'selected' : ''}>${r.name}</option>`).join('')}</select></div>
+          <div><label class="f" for="ueRole">บทบาท</label><select class="input" id="ueRole" name="role">${roles.map(r => `<option value="${H(r.id)}" ${r.id === cur ? 'selected' : ''}>${H(r.name)}</option>`).join('')}</select></div>
           <div><label class="f" for="ueDept">แผนก</label><input class="input" id="ueDept" name="dept" value="${H(u.dept || '')}" list="ueDepts"><datalist id="ueDepts">${depts.map(x => `<option value="${H(x)}">`).join('')}</datalist></div>
         </div>
         <div class="grid g2" style="margin-top:14px">
@@ -981,9 +997,10 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
           if (!/.+@.+\..+/.test(f.email)) { err.textContent = 'อีเมลไม่ถูกต้อง'; return; }
           if (Store.db.users.some(x => x.id !== u.id && x.email.toLowerCase() === f.email.toLowerCase())) { err.textContent = 'อีเมลนี้มีผู้ใช้อยู่แล้ว'; return; }
           // a new role brings that role's default permissions; same role keeps the current ones
-          const perms = f.role === u.role ? d.perms : Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[f.role].includes(p.id)]));
+          const r = roles.find(x => x.id === f.role) || App.roleOf(u);
+          const perms = r.id === cur ? d.perms : permsOf(r);
           if (self && !perms.users) { err.textContent = 'ไม่สามารถเปลี่ยนบทบาทของตัวเองเป็นบทบาทที่ไม่มีสิทธิ์จัดการผู้ใช้ได้'; return; }
-          const next = Object.assign({}, u, { name: f.name, email: f.email, phone: (f.phone || '').trim(), role: f.role, dept: f.dept || u.dept, status: self ? u.status : f.status, perms, twoFA: d.twoFA });
+          const next = Object.assign({}, u, { name: f.name, email: f.email, phone: (f.phone || '').trim(), dept: f.dept || u.dept, status: self ? u.status : f.status, perms, twoFA: d.twoFA }); setRole(next, r);
           btn.disabled = true;
           try {
             if (g.API && g.API.online) {
@@ -1046,7 +1063,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         <div class="field"><label class="f">ชื่อ-นามสกุล</label><input class="input" name="name"></div>
         <div class="field"><label class="f">อีเมล</label><input class="input" type="email" name="email" placeholder="name@luckswangroup.com" autocomplete="off"></div>
         <div class="field"><label class="f">เบอร์โทร</label><input class="input" type="tel" name="phone"></div>
-        <div class="grid g2" style="margin-top:14px"><div><label class="f">บทบาท</label><select class="input" name="role">${D.ROLES.map(r => `<option value="${r.id}">${r.name}</option>`).join('')}</select></div><div><label class="f">แผนก</label><input class="input" name="dept" value="ฝ่ายขายและการตลาด"></div></div>
+        <div class="grid g2" style="margin-top:14px"><div><label class="f">บทบาท</label><select class="input" name="role">${App.roles().filter(r => r.base !== 'admin' || App.me().role === 'admin').map(r => `<option value="${H(r.id)}">${H(r.name)}</option>`).join('')}</select></div><div><label class="f">แผนก</label><input class="input" name="dept" value="ฝ่ายขายและการตลาด"></div></div>
         <div class="grid g2" style="margin-top:14px">
           <div><label class="f" for="nuPw">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label><div class="pw-wrap"><input class="input" id="nuPw" name="pw" type="password" autocomplete="new-password"><button type="button" id="nuShow">แสดง</button></div></div>
           <div><label class="f" for="nuPw2">ยืนยันรหัสผ่าน</label><input class="input" id="nuPw2" name="pw2" type="password" autocomplete="new-password"></div>
@@ -1096,7 +1113,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
               const [name, email, role, dp, phone] = r.map(x => (x || '').trim());
               if (!email || !/@/.test(email) || /email|อีเมล/i.test(email)) { skip++; continue; }
               if (Store.db.users.some(u => u.email.toLowerCase() === email.toLowerCase())) { skip++; continue; }
-              const rid = D.ROLES.find(x => x.id === role || x.name === role) || D.ROLES[0];
+              const rid = App.roles().find(x => x.id === role || x.name === role) || App.roles()[0];
               addUser({ name: name || email, email, role: rid.id, dept: dp || 'ฝ่ายขายและการตลาด', phone }); n++;
             }
             Store.save(); bg.querySelector('#csvMsg').textContent = `นำเข้า ${n} คน · ข้าม ${skip} แถว`; App.render();
@@ -1108,9 +1125,62 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   });
   function makeUser(f) {
     const ids = Store.db.users.map(u => parseInt(u.id.slice(1), 10) || 0);
-    return { id: 'u' + (Math.max(0, ...ids) + 1), name: f.name, email: f.email, role: f.role, dept: f.dept, status: 'invited', phone: f.phone || '', lastLogin: null,
-      perms: Object.fromEntries(D.PERMS.map(p => [p.id, D.ROLE_PERMS[f.role].includes(p.id)])), twoFA: false, pw: null };
+    const r = App.roles().find(x => x.id === f.role) || App.roles()[0];
+    const u = { id: 'u' + (Math.max(0, ...ids) + 1), name: f.name, email: f.email, dept: f.dept, status: 'invited', phone: f.phone || '', lastLogin: null,
+      perms: permsOf(r), twoFA: false, pw: null };
+    setRole(u, r); return u;
   }
+  /* ---------- adding and renaming roles (admin) ---------- */
+  function saveRoles(fn) {
+    const s = Store.db.settings || (Store.db.settings = {}), st = JSON.parse(JSON.stringify(s.roles || {}));
+    st.names = st.names || {}; st.custom = st.custom || [];
+    fn(st); s.roles = st; Store.save();
+  }
+  function roleForm(r) {
+    const isNew = !r, base = r ? r.base : 'sales', perms = r ? r.perms : D.ROLE_PERMS.sales;
+    App.modal(`<h2>${isNew ? 'เพิ่มบทบาทใหม่' : 'แก้ไขบทบาท'}</h2>
+      <div class="field"><label class="f" for="rlName">ชื่อบทบาท</label><input class="input" id="rlName" maxlength="40" value="${H(r ? r.name : '')}" placeholder="เช่น พนักงานต้อนรับ"></div>
+      ${!r || r.custom ? `<div class="field"><label class="f" for="rlBase">ระดับสิทธิ์ของระบบ</label><select class="input" id="rlBase">${D.ROLES.map(x => `<option value="${x.id}" ${x.id === base ? 'selected' : ''}>เทียบเท่า ${H(App.roles().find(y => y.id === x.id).name)}</option>`).join('')}</select>
+        <div class="xs muted" style="margin-top:4px">ใช้กำหนดสิ่งที่ระบบอนุญาตตามตำแหน่ง เช่น การอนุมัติ การลบข้อมูล</div></div>
+      <div class="small muted" style="margin:12px 0 4px">สิทธิ์เริ่มต้นของบทบาทนี้</div>
+      ${D.PERMS.map(p => `<label class="perm" style="cursor:pointer"><span>${H(p.name)}</span><input type="checkbox" class="rl-perm" value="${p.id}" ${perms.includes(p.id) ? 'checked' : ''}></label>`).join('')}` : '<div class="xs muted">บทบาทหลักของระบบ เปลี่ยนได้เฉพาะชื่อ</div>'}
+      <div class="small red" id="rlErr" style="min-height:20px;margin-top:6px" role="alert"></div>
+      <div class="acts">${r && r.custom ? '<button class="btn ghost red" id="rlDel" style="margin-right:auto">ลบบทบาท</button>' : ''}<button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="rlOk">${isNew ? 'เพิ่มบทบาท' : 'บันทึก'}</button></div>`, bg => {
+      const err = bg.querySelector('#rlErr');
+      bg.querySelector('#rlOk').onclick = () => {
+        const name = bg.querySelector('#rlName').value.trim();
+        if (!name) { err.textContent = 'กรุณากรอกชื่อบทบาท'; return; }
+        if (App.roles().some(x => x.name === name && (!r || x.id !== r.id))) { err.textContent = 'มีบทบาทชื่อนี้อยู่แล้ว'; return; }
+        const baseSel = bg.querySelector('#rlBase'), ps = [...bg.querySelectorAll('.rl-perm:checked')].map(x => x.value);
+        saveRoles(st => {
+          if (isNew) st.custom.push({ id: 'r_' + Math.random().toString(36).slice(2, 10), name, base: baseSel.value, perms: ps });
+          else if (r.custom) Object.assign(st.custom.find(x => x.id === r.id) || {}, { name, base: baseSel.value, perms: ps });
+          else st.names[r.id] = name;
+        });
+        // people on an edited added role follow its new level
+        if (r && r.custom) Store.db.users.filter(u => u.roleId === r.id).forEach(u => { u.role = baseSel.value; });
+        if (r && r.custom) Store.save();
+        App.closeModal(); UU().draft = null; App.render(); App.toast(isNew ? 'เพิ่มบทบาท ' + name + ' แล้ว' : 'บันทึกบทบาทแล้ว');
+      };
+      const del = bg.querySelector('#rlDel');
+      if (del) del.onclick = () => {
+        const n = Store.db.users.filter(u => u.roleId === r.id).length;
+        if (n) { err.textContent = `มีผู้ใช้ ${n} คนอยู่ในบทบาทนี้ — เปลี่ยนบทบาทของผู้ใช้ก่อนจึงจะลบได้`; return; }
+        App.confirm('ลบบทบาท ' + r.name + '?', () => { saveRoles(st => { st.custom = st.custom.filter(x => x.id !== r.id); }); if (UU().role === r.id) UU().role = 'all'; App.render(); App.toast('ลบบทบาทแล้ว'); }, 'ลบ');
+      };
+    });
+  }
+  Object.assign(App.ACT, {
+    roleAdd() { if (App.me().role !== 'admin') return; roleForm(null); },
+    roleEdit() {
+      if (App.me().role !== 'admin') return;
+      const roles = App.roles();
+      App.modal(`<h2>แก้ไขบทบาท</h2><p class="muted" style="margin-top:-8px">เลือกบทบาทที่ต้องการแก้ไขชื่อ</p>
+        <div class="role-list">${roles.map(r => `<button class="pick" data-act="roleOpen" data-v="${H(r.id)}"><span><b style="font-weight:500">${H(r.name)}</b><br><span class="xs muted">${r.custom ? 'บทบาทที่เพิ่ม · เทียบเท่า ' + H(roles.find(x => x.id === r.base).name) : 'บทบาทหลักของระบบ'} · ${Store.db.users.filter(u => roleKey(u) === r.id).length} คน</span></span><span class="muted">✎</span></button>`).join('')}</div>
+        <div class="acts"><button class="btn ghost" data-act="roleAdd">＋ เพิ่มบทบาทใหม่</button><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
+    },
+    roleOpen(el) { const r = App.roles().find(x => x.id === el.dataset.v); if (r) roleForm(r); }
+  });
   function addUser(f) { const u = makeUser(f); Store.db.users.push(u); return u; }
   Object.assign(App.CHG, {
     usQ(el) { UU().q = el.value; UU().page = 1; App.render(); },
