@@ -179,6 +179,8 @@ async function applyRules(env, user, kind, id, data, prev) {
   }
   if (kind === 'employees' || kind === 'settings') {
     if (!can(user, 'edit_prices') && !can(user, 'staff')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้');
+    // role names and added roles (settings.roles) are the admin's to change
+    if (kind === 'settings' && user.role !== 'admin') { if (prev && prev.roles) data.roles = prev.roles; else delete data.roles; }
   }
   return data;
 }
@@ -265,7 +267,7 @@ async function putUser(req, env, user, id) {
   const dupe = await env.DB.prepare('SELECT id FROM users WHERE email = ? AND id != ?').bind(data.email, id).first();
   if (dupe) fail(409, 'อีเมลนี้มีผู้ใช้อยู่แล้ว');
   if (id === user.id && !(data.perms && data.perms.users) && user.role !== 'admin') fail(400, 'ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้');
-  const clean = { name: String(data.name || '').slice(0, 100), role: data.role, dept: String(data.dept || '').slice(0, 100), phone: String(data.phone || '').slice(0, 40),
+  const clean = { name: String(data.name || '').slice(0, 100), role: data.role, roleId: /^r_[a-z0-9]{4,20}$/.test(String(data.roleId || '')) ? data.roleId : '', dept: String(data.dept || '').slice(0, 100), phone: String(data.phone || '').slice(0, 40),
     status: ['active', 'invited', 'disabled'].includes(data.status) ? data.status : 'invited', twoFA: !!data.twoFA,
     perms: Object.fromEntries(ALL_PERMS.map(p => [p, !!(data.perms && data.perms[p])])), lastLogin: row ? JSON.parse(row.data).lastLogin || null : null, lastDevice: row ? JSON.parse(row.data).lastDevice || '' : '' };
   if (row) {

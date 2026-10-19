@@ -260,7 +260,7 @@
       const old = document.querySelector('.pop'); if (old) { old.remove(); return; }
       const me = App.me(), cloud = g.API && g.API.online;
       const p = document.createElement('div'); p.className = 'pop';
-      p.innerHTML = `<div class="hd"><b>${H(me.name)}</b><div class="small muted">${H(me.email)}</div><div class="small muted">${H((D.ROLES.find(r => r.id === me.role) || {}).name || '')}</div>
+      p.innerHTML = `<div class="hd"><b>${H(me.name)}</b><div class="small muted">${H(me.email)}</div><div class="small muted">${H(App.roleName(me))}</div>
         <div class="xs" style="margin-top:6px;color:${cloud ? (g.API.offline ? 'var(--red)' : 'var(--teal-d)') : 'var(--muted)'}">${cloud ? (g.API.offline ? '● ออฟไลน์ — รอส่งข้อมูล' : '● เชื่อมต่อฐานข้อมูลกลางแล้ว') : '● ข้อมูลเก็บในเครื่องนี้'}</div></div>
         <button data-act="changePw">เปลี่ยนรหัสผ่าน</button>
         ${App.deferredInstall ? '<button data-act="install">ติดตั้งแอปบนเครื่องนี้</button>' : ''}
