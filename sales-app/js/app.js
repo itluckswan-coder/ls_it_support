@@ -446,6 +446,15 @@
       const pct = Math.round(closed / target * 100);
       const pkgFrom = Math.min(...D.FOOD.filter(f => f.cat === 'package').map(f => f.price));
       const fu = App.V.home.followUps();
+      const fuCard = `<section class="card pad">
+      <h2 style="margin-bottom:14px">ต้องติดตามวันนี้</h2>
+      ${fu.length ? fu.slice(0, 5).map(f => `<div class="fu"><i class="dot" style="background:${f.color}"></i><div style="flex:1"><b style="font-weight:600;font-size:13.5px">${H(f.title)}</b><div class="small muted">${H(f.sub)}</div></div>${f.action}</div>`).join('') : '<div class="muted small">ไม่มีงานค้าง 🎉</div>'}
+    </section>`;
+      // the full sales home is for admins, sales managers and sales staff (and roles added on those levels);
+      // everyone else gets just their follow-ups
+      if (!App.V.home.salesHome(me)) return `
+<div class="page-hd"><div><div class="eyebrow">${U.DL[now.getDay()]} ${U.fmtD(today)}</div><h1>${greet} คุณ${H(App.firstName(me))}</h1></div></div>
+<div style="max-width:720px">${fuCard}</div>`;
       return `
 <div class="page-hd"><div><div class="eyebrow">${U.DL[now.getDay()]} ${U.fmtD(today)}</div><h1>${greet} คุณ${H(App.firstName(me))}</h1></div>
   <a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
@@ -473,13 +482,11 @@
       <div style="margin:12px 0 14px"><span style="font:700 30px var(--fh)">฿${U.short(closed)}</span> <span class="muted">/ ${U.short(target)}</span></div>
       <div class="bar"><i style="width:${U.clamp(pct, 0, 100)}%"></i></div>
     </section>
-    <section class="card pad">
-      <h2 style="margin-bottom:14px">ต้องติดตามวันนี้</h2>
-      ${fu.length ? fu.slice(0, 5).map(f => `<div class="fu"><i class="dot" style="background:${f.color}"></i><div style="flex:1"><b style="font-weight:600;font-size:13.5px">${H(f.title)}</b><div class="small muted">${H(f.sub)}</div></div>${f.action}</div>`).join('') : '<div class="muted small">ไม่มีงานค้าง 🎉</div>'}
-    </section>
+    ${fuCard}
   </aside>
 </div>`;
     },
+    salesHome(me) { return !!me && ['admin', 'manager', 'sales'].includes(me.role); },
     followUps() {
       const out = [], today = U.today(), me = App.me();
       for (const b of Store.db.beos) {
@@ -489,7 +496,7 @@
         if (st === 'rejected' && b.approval.requestedBy === App.state.uid)
           out.push({ p: 0, color: 'var(--red)', title: `ใบฟังก์ชัน ${b.id} ถูกตีกลับ`, sub: b.approval.comment || '', action: lnk + 'แก้ไข</a>' });
       }
-      for (const q of Store.db.quotes) {
+      for (const q of App.V.home.salesHome(me) ? Store.db.quotes : []) {
         const open = `<a class="link" href="#/quote/${encodeURIComponent(q.id)}">`;
         if (q.status === 'sent' && q.views > 0)
           out.push({ p: 1, color: 'var(--red)', title: `${q.client} เปิดอ่านใบเสนอ ${q.views} ครั้ง`, sub: 'ยังไม่ตอบ' + (q.holdUntil ? ' · ห้องกันไว้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''), action: q.phone ? `<a class="link" href="${App.tel(q.phone)}">โทร</a>` : open + 'เปิด</a>' });
