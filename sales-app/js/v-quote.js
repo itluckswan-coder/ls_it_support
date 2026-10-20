@@ -420,7 +420,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     } else if (sec === 'food') {
       list = D.FOOD.map(f => ({ k: 'food:' + f.id, name: f.name, sub: (D.FOOD_CATS.find(c => c.id === f.cat) || {}).name + ' · ' + f.unit, price: f.price }));
     } else if (sec === 'room') {
-      list = D.ROOM_TYPES.map(t => ({ k: 'room:' + t.id, name: t.name, sub: t.beds, price: t.group }));
+      list = D.ROOM_TYPES.map(t => ({ k: 'room:' + t.id, name: t.full, sub: t.zone + ' · ' + t.beds + ' · รวมอาหารเช้า', price: D.roomPrice(t, q.start, true) }));
     } else {
       list = D.SERVICES.map(s => ({ k: 'svc:' + s.id, name: s.name, sub: s.desc, price: s.price }));
     }
@@ -438,7 +438,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
           const f = D.FOOD.find(x => x.id === id);
           const times = f.cat === 'coffee' ? days * 2 : f.cat === 'lunch' ? days : f.cat === 'package' || f.cat === 'wedding' ? null : 1;
           it = D.foodItem(id, /โต๊ะ/.test(f.unit) ? Math.ceil(q.pax / 10) : /งาน/.test(f.unit) ? 1 : q.pax, times);
-        } else { const t = D.ROOM_TYPES.find(x => x.id === id); it = D.roomItem(t.name + ' รวมอาหารเช้า', Math.ceil(q.pax / 2), nights, t.group, 'เช็กอิน ' + U.fmtD(q.start, { year: false }), id); }
+        } else { const t = D.ROOM_TYPES.find(x => x.id === id), lines = App.roomLines(t, Math.ceil(q.pax / t.pax), q.start, nights, true, 'เช็กอิน ' + U.fmtD(q.start, { year: false })); it = lines[0]; q.items.push(...lines.slice(1)); }
         q.items.push(it); App.closeModal(); App.touch(q); App.render(); App.toast('เพิ่ม ' + it.name);
       });
       bg.querySelector('#custom').onclick = () => {
@@ -495,10 +495,10 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     const nights = s.nights;
     for (const t of D.ROOM_TYPES) {
       const c = s.rooms[t.id] || 0;
-      if (c > 0) items.push(D.roomItem(t.name + ' รวมอาหารเช้า', c, nights, t.group, 'เช็กอิน ' + U.fmtD(q.start, { year: false }) + ' · ' + nights + ' คืน', t.id));
+      if (c > 0) items.push(...App.roomLines(t, c, q.start, nights, true, 'เช็กอิน ' + U.fmtD(q.start, { year: false }) + ' · ' + nights + ' คืน'));
     }
     const tot = Object.values(s.rooms).reduce((a, b) => a + b, 0);
-    if (tot >= 20) items.push(D.roomItem('ห้องเจ้าหน้าที่ (ฟรีสำหรับผู้จัด)', Math.floor(tot / 20), nights, (D.ROOM_TYPES.find(t => (s.rooms[t.id] || 0) > 0) || D.ROOM_TYPES[0]).group, 'ทุก 20 ห้อง ฟรี 1 ห้อง', 'comp', { free: true }));
+    if (tot >= 20) items.push(D.roomItem('ห้องเจ้าหน้าที่ (ฟรีสำหรับผู้จัด)', Math.floor(tot / 20), nights, D.roomPrice(D.ROOM_TYPES.find(t => (s.rooms[t.id] || 0) > 0) || D.ROOM_TYPES[0], q.start, true), 'ทุก 20 ห้อง ฟรี 1 ห้อง', 'comp', { free: true }));
     q.items = items;
   }
 
@@ -559,11 +559,11 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       }
       if (w.step === 4) {
         const tot = Object.values(w.sel.rooms).reduce((a, b) => a + b, 0);
-        body = `<h1>ห้องพัก</h1><div class="muted" style="margin:4px 0 16px">ราคากรุ๊ป · เช็กอิน ${U.fmtD(q.start)}</div>
+        body = `<h1>ห้องพัก</h1><div class="muted" style="margin:4px 0 16px">ราคารวมอาหารเช้า ช่วง ${H(D.seasonOf(q.start).name)} · เช็กอิน ${U.fmtD(q.start)}</div>
           <div class="slot"><span style="flex:1"><b>จำนวนคืน</b></span><span class="stepper"><button class="minus" data-act="wizNights" data-v="-1">−</button><input value="${w.sel.nights}" readonly aria-label="จำนวนคืน"><button class="plus" data-act="wizNights" data-v="1">+</button></span></div>
           ${D.ROOM_TYPES.map(t => {
             const c = w.sel.rooms[t.id] || 0;
-            return `<div class="slot ${c ? 'hl' : ''}"><div style="flex:1"><b>${H(t.name)}</b><div class="small muted">${H(t.beds)}</div></div><b class="num">${U.n(t.group)} ฿</b>
+            return `<div class="slot ${c ? 'hl' : ''}"><div style="flex:1"><b>${H(t.full)}</b><div class="small muted">${H(t.zone)} · ${H(t.beds)}</div></div><b class="num">${U.n(D.roomPrice(t, q.start, true))} ฿</b>
               <span class="stepper"><button class="minus" data-act="wizRoom" data-k="${t.id}" data-v="-1">−</button><input value="${c}" data-change="wizRoomSet" data-k="${t.id}" inputmode="numeric" aria-label="จำนวนห้อง"><button class="plus" data-act="wizRoom" data-k="${t.id}" data-v="1">+</button></span></div>`;
           }).join('')}
           <div class="small muted" style="margin-top:12px">รวม ${tot} ห้อง · รองรับ ${tot * 2} ท่าน${tot >= 20 ? ' · ฟรีห้องผู้จัด ' + Math.floor(tot / 20) + ' ห้อง' : ''}</div>`;

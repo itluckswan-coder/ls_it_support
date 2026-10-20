@@ -30,14 +30,65 @@
       amen: ['ไฟประดับ', 'เวทีกลางแจ้ง', 'เครื่องเสียงพื้นฐาน'] }
   ];
 
-  const ROOM_TYPES = [
-    { id: 'gdx', name: 'Grand Deluxe', zone: 'โซน Resort · มีระเบียง', size: 42, beds: 'เตียงแฝด 25 / เตียงใหญ่ 5', rack: 2200, group: 1290, total: 30, img: 'img/room-grand-deluxe.jpg' },
-    { id: 'sup', name: 'Superior', zone: 'โซน Resident', size: 52, beds: 'เตียงแฝด 20 ห้อง', rack: 1800, group: 1290, total: 20, img: 'img/room-superior.jpg' },
-    { id: 'dlx', name: 'Deluxe', zone: 'โซน Resident', size: 52, beds: 'แฝด 19 / ใหญ่ 9 / 3 เตียง 6', rack: 2000, group: 1390, total: 34, img: 'img/room-deluxe.jpg' },
-    { id: 'jrs', name: 'Junior Suite', zone: 'โซน Resort · มีระเบียง', size: 52, beds: 'เตียงใหญ่ + ห้องนั่งเล่น', rack: 3500, group: 2490, total: 6, img: 'img/room-junior-suite.jpg' },
-    { id: 'gch', name: 'Grand Chiang', zone: 'โซน Resident', size: 52, beds: 'เตียงควีน 2 เตียง', rack: 2800, group: 1890, total: 4, img: '' },
-    { id: 'gpl', name: 'Grand Pool', zone: 'Pool access', size: 52, beds: 'เตียงควีน 2 เตียง', rack: 3200, group: 2290, total: 6, img: '' }
+  /* ---------- rooms: types from the hotel rate card, priced by season ----------
+   * Every room type (a room family + bed) has a count and a full (rack) price; each season has a "with breakfast"
+   * (ABF) and a "room only" price for 2 guests (Triple: 3). Prices are before service charge and VAT.
+   * Admins change counts, prices and season dates on the room-rates page (settings.roomRates). */
+  const ROOM_DEF = [
+    // id, family, bed, zone, rooms, rack, pax, [season1 ABF, RO], [season2 ABF, RO], img
+    ['sup', 'Superior ชั้น 3', 'Twin', 'Resident', 20, 1240, 2, [800, 550], [850, 600], 'img/room-superior.jpg'],
+    ['dlx', 'Deluxe ชั้น 1-2', 'Twin', 'Resident', 19, 1340, 2, [850, 600], [900, 650], 'img/room-deluxe.jpg'],
+    ['dlx_db', 'Deluxe ชั้น 1-2', 'Double', 'Resident', 9, 1440, 2, [900, 650], [950, 700], 'img/room-deluxe.jpg'],
+    ['dlx_tr', 'Deluxe ชั้น 1-2', 'Triple (3 ท่าน)', 'Resident', 6, 1600, 3, [1150, 950], [1250, 1050], 'img/room-deluxe.jpg'],
+    ['gpl', 'Grand Pool', 'Twin (queen)', 'Resident', 4, 1350, 2, [1100, 750], [1150, 800], ''],
+    ['gch', 'Grand Chiang', 'Twin (queen)', 'Resident', 4, 1350, 2, [1100, 750], [1150, 800], ''],
+    ['gdx', 'Grand Deluxe ชั้น 2-3', 'Twin', 'Resort', 16, 1600, 2, [1050, 850], [1200, 900], 'img/room-grand-deluxe.jpg'],
+    ['gdx_db', 'Grand Deluxe ชั้น 2-3', 'Double', 'Resort', 4, 1650, 2, [1150, 900], [1250, 950], 'img/room-grand-deluxe.jpg'],
+    ['gdw', 'Grand Deluxe (Wheel Chair Access) ชั้น 1', 'Twin', 'Resort', 8, 1700, 2, [1200, 950], [1300, 1000], 'img/room-grand-deluxe.jpg'],
+    ['gdw_db', 'Grand Deluxe (Wheel Chair Access) ชั้น 1', 'Double', 'Resort', 2, 1750, 2, [1250, 1050], [1350, 1050], 'img/room-grand-deluxe.jpg'],
+    ['jrs', 'Junior Suite', 'Double', 'Resort', 5, 2150, 2, [1500, 1250], [1650, 1300], 'img/room-junior-suite.jpg'],
+    ['hms', 'Honeymoon Suite', 'Double', 'Resort', 1, 2150, 2, [1600, 1400], [1700, 1450], '']
   ];
+  // seasons repeat every year; from/to are month-day, a season may wrap past the new year
+  const SEASONS_DEFAULT = [{ id: 's1', name: '1 มี.ค. – 31 ก.ค.', from: '03-01', to: '07-31' }, { id: 's2', name: '1 ส.ค. – 28 ก.พ.', from: '08-01', to: '02-29' }];
+  const ROOM_RATES_DEFAULT = {
+    seasons: SEASONS_DEFAULT,
+    types: Object.fromEntries(ROOM_DEF.map(r => [r[0], { total: r[4], rack: r[5], rates: { s1: r[7], s2: r[8] } }]))
+  };
+  const ROOM_TYPES = []; // filled by applyRoomRates (pages hold a reference)
+  let SEASONS = SEASONS_DEFAULT;
+  const md = s => /^\d{2}-\d{2}$/.test(s || '') ? s : null;
+  function applyRoomRates(rr) {
+    rr = rr && typeof rr === 'object' ? rr : {};
+    const ss = (Array.isArray(rr.seasons) && rr.seasons.length ? rr.seasons : SEASONS_DEFAULT).filter(x => x && md(x.from) && md(x.to)).slice(0, 6);
+    SEASONS = ss.length ? ss.map(x => ({ id: String(x.id), name: String(x.name || (x.from + ' – ' + x.to)).slice(0, 40), from: x.from, to: x.to })) : SEASONS_DEFAULT;
+    const types = rr.types || {};
+    ROOM_TYPES.length = 0;
+    for (const [id, fam, bed, zone, total, rack, pax, s1, s2, img] of ROOM_DEF) {
+      const o = types[id] || {}, num = (v, d) => (Number(v) >= 0 && v !== '' && v != null ? Number(v) : d);
+      const rates = {};
+      for (const se of SEASONS) { const def = se.id === 's2' ? s2 : s1, r = (o.rates || {})[se.id] || def; rates[se.id] = [num(r[0], def[0]), num(r[1], def[1])]; }
+      ROOM_TYPES.push({ id, fam, bed, name: fam.replace(/ ชั้น .*$/, '') + ' · ' + bed, full: fam + ' · ' + bed, zone: 'Zone : ' + zone, zoneId: zone, total: Math.round(num(o.total, total)), rack: num(o.rack, rack), pax, img, rates,
+        beds: bed + ' · ' + pax + ' ท่าน/ห้อง', size: '', get group() { return roomPrice(this, U.today(), true); } });
+    }
+  }
+  // which season a date falls in (by month-day, repeating every year)
+  function seasonOf(date) {
+    const m = String(date || U.today()).slice(5, 10);
+    const hit = SEASONS.find(se => se.from <= se.to ? m >= se.from && m <= se.to : m >= se.from || m <= se.to);
+    return hit || SEASONS[0];
+  }
+  const roomPrice = (t, date, abf) => { const r = t.rates[seasonOf(date).id] || Object.values(t.rates)[0] || [0, 0]; return abf ? r[0] : r[1]; };
+  // a stay split by season: [{ season, from, nights, price }], so a stay across the change of season is priced per night
+  function roomStay(t, ci, nights, abf) {
+    const out = [];
+    for (let k = 0; k < nights; k++) {
+      const d = U.addDays(ci, k), se = seasonOf(d), last = out[out.length - 1];
+      if (last && last.season.id === se.id) last.nights++; else out.push({ season: se, from: d, nights: 1, price: roomPrice(t, d, abf) });
+    }
+    return out;
+  }
+  applyRoomRates(null);
 
   const FOOD_CATS = [
     { id: 'all', name: 'ทั้งหมด' },
@@ -418,7 +469,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },
@@ -443,7 +494,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, FOOD_CATS, FOOD, SERVICES, DEPTS, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;

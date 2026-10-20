@@ -141,7 +141,7 @@
       else if (d.kind === 'staff') db.staff[d.id] = data;
       else if (d.kind === 'task') replace(db.tasks || (db.tasks = []));
       else if (d.kind === 'employees') db.employees = data.list || [];
-      else if (d.kind === 'settings') db.settings = Object.assign({}, Store.seedData().settings, data);
+      else if (d.kind === 'settings') { db.settings = Object.assign({}, Store.seedData().settings, data); g.DATA.applyRoomRates(db.settings.roomRates); }
       else if (d.kind === 'catalog' && d.id === 'food') { db.catalog = { food: data.list || [] }; g.DATA.applyCatalog(db.catalog.food); }
       this.ver[key] = d.version;
       this.snap[key] = JSON.stringify(d.kind === 'employees' ? { list: db.employees } : d.kind === 'settings' ? db.settings : d.kind === 'catalog' ? { list: db.catalog.food } : data);
