@@ -91,16 +91,29 @@
     lineTotal(it) { return (Number(it.price) || 0) * (Number(it.q1) || 0) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1); },
     calc(q, settings) {
       const S = settings || { service: 0.10, vat: 0.07 };
+      const D = g.DATA, items = q.items || [];
+      /* meeting-room rules: a meeting room's rent is paid down by the lunch and coffee-break spend of the same quote
+         (rent − food; free once the food reaches the rent, the room still listed). Kinnaree's LED screen is 3,000
+         when the rest of the quote is 50,000 or more (before service and VAT), otherwise 5,000. */
+      const isRoom = it => it.sec === 'meet' && D && D.MEETING_ROOMS.some(r => r.id === it.ref);
+      const isMeeting = it => isRoom(it) && !['banquet', 'cocktail'].includes(it.layout);
+      const isMeal = it => it.sec === 'food' && D && ['lunch', 'coffee'].includes((D.FOOD.find(f => f.id === it.ref) || {}).cat);
+      const isLed = it => it.ref === 'svc:ledk';
+      const roomFee = items.filter(isMeeting).reduce((a, it) => a + U.lineTotal(it), 0);
+      const meals = items.filter(isMeal).reduce((a, it) => a + U.lineTotal(it), 0);
+      const credit = roomFee ? Math.min(roomFee, meals) : 0;
+      const rest = items.filter(it => !isLed(it)).reduce((a, it) => a + U.lineTotal(it), 0) - credit;
+      for (const it of items) if (isLed(it)) it.price = rest >= 50000 ? 3000 : 5000;
       const by = { meet: 0, food: 0, room: 0, other: 0 };
-      for (const it of q.items || []) by[it.sec] = (by[it.sec] || 0) + U.lineTotal(it);
-      const sub = by.meet + by.food + by.room + by.other;
+      for (const it of items) by[it.sec] = (by[it.sec] || 0) + U.lineTotal(it);
+      const gross = by.meet + by.food + by.room + by.other, sub = gross - credit;
       const pct = q.discount && q.discount.type === 'amt' ? (sub ? q.discount.value / sub : 0) : ((q.discount && q.discount.value) || 0) / 100;
       const disc = q.discount && q.discount.type === 'amt' ? Math.min(sub, Number(q.discount.value) || 0) : Math.round(sub * pct * 100) / 100;
       const after = sub - disc;
       const svc = Math.round(after * S.service * 100) / 100;
       const vat = Math.round((after + svc) * S.vat * 100) / 100;
       const net = Math.round((after + svc + vat) * 100) / 100;
-      return { by, sub, disc, pct: pct * 100, svc, vat, net, perPax: q.pax ? net / q.pax : 0 };
+      return { by, gross, credit, roomFee, roomFree: !!roomFee && credit >= roomFee, sub, disc, pct: pct * 100, svc, vat, net, perPax: q.pax ? net / q.pax : 0 };
     },
     debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
     download(name, text, type = 'application/json') {

@@ -206,7 +206,7 @@
         <div><div class="row" style="align-items:baseline;flex-wrap:wrap"><h3 style="font-size:19px">${H(room.name)}</h3><span class="small muted">${room.area} ตร.ม. · ${H(room.desc)}</span></div>
           <div class="small muted" style="margin:8px 0 10px">${D.LAYOUTS.filter(l => l.id !== ui.layout && room.cap[l.id][1]).slice(0, 3).map(l => l.name + ' ' + room.cap[l.id][0] + '–' + room.cap[l.id][1]).join(' · ')}</div>${avail(room)}</div>
         <div class="cap"><span class="xs muted">${D.LAYOUTS.find(l => l.id === ui.layout).name}</span><b class="${fc === 'red' ? 'red' : ''}">${mx ? mn + '–' + mx : '—'}</b><span class="small ${fc === 'red' ? 'red' : 'muted'}">${fl}</span></div>
-        <div class="pr" style="text-align:right"><b style="font:600 22px var(--fh)">${U.n(ui.half ? room.half : room.full)} ฿</b><div class="xs muted">เต็มวัน · ครึ่งวัน ${U.n(room.half)}</div></div>
+        <div class="pr" style="text-align:right"><b style="font:600 22px var(--fh)">${U.n(ui.half ? room.half : room.full)} ฿</b><div class="xs muted">${ui.half ? 'ครึ่งวัน · เต็มวัน ' + U.n(room.full) : 'เต็มวัน 08:00–17:00'}</div>${room.minBanquet ? `<div class="xs muted">งานเลี้ยงการันตี ${room.minBanquet} ท่านขึ้นไป</div>` : ''}</div>
       </article>`;
     }).join('')}
   </div>
@@ -217,6 +217,8 @@
       <h2 style="font-size:22px;margin:4px 0">${H(r.name)} · ${D.LAYOUTS.find(l => l.id === ui.layout).name}</h2>
       <div class="small muted">${r.area} ตร.ม. · รองรับ ${r.cap[ui.layout][0]}–${r.cap[ui.layout][1]} ท่าน · ผังตัวอย่าง ${pax} ที่</div>
       <div class="seat">${seatChart(ui.layout, Math.min(pax, 400))}</div>
+      ${['banquet', 'cocktail'].includes(ui.layout) && r.minBanquet && pax < r.minBanquet ? `<div class="note red" style="margin:10px 0">งานเลี้ยงที่${H(r.th || r.name)} ต้องการันตีผู้เข้าร่วม ${r.minBanquet} ท่านขึ้นไป (ตอนนี้ ${pax} ท่าน)</div>` : ''}
+      <div class="xs muted" style="margin:8px 0 12px">เต็มวัน 08:00–17:00 · พักกลางวัน 12:00–13:00 · งานประชุมที่ทานอาหารกลางวัน/เบรก นำค่าอาหารมาหักค่าห้องได้ (ค่าอาหารถึงราคาห้อง = ห้องฟรี) · ใช้ห้องเกินเวลา ${U.n(2000)} บาท/ชม.</div>
       <h3 style="font-size:14px;margin-bottom:10px">รวมในห้อง</h3>
       <div class="amen">${r.amen.map(a => `<span>${H(a)}</span>`).join('')}</div>
       <div class="card" style="padding:14px 16px;margin:16px 0;display:flex;align-items:center;gap:12px"><div style="flex:1"><b>AV Package</b><div class="small muted">โปรเจกเตอร์คู่ ไมค์ไร้สาย 4 · ช่าง</div></div>${App.sw('AV Package', ui.av, 'data-change="meetAv"')}</div>

@@ -13,17 +13,17 @@
   ];
 
   const MEETING_ROOMS = [
-    { id: 'kinnaree', name: 'Kinnaree', th: 'ห้องกินรี', area: 430, desc: 'โดมโค้ง ตกแต่งล้านนา', img: 'img/meet-kinnaree.jpg',
+    { id: 'kinnaree', minBanquet: 80, name: 'Kinnaree', th: 'ห้องกินรี', area: 430, desc: 'โดมโค้ง ตกแต่งล้านนา', img: 'img/meet-kinnaree.jpg',
       cap: { theatre: [200, 330], classroom: [150, 300], ushape: [60, 130], banquet: [150, 320], cocktail: [250, 450] }, full: 30000, half: 15000,
       amen: ['Wi-Fi 1 Gbps', 'จอ LED 6×3 ม.', 'ไมค์ 4 ตัว', 'เวที', 'น้ำดื่ม'] },
-    { id: 'thikhampon', name: 'Thikhampon', th: 'ห้องทิฆัมพร', area: 170, desc: 'อาคารล้านนาส่วนตัว · มีห้องน้ำในตัว', img: 'img/meet-thikhampon.jpg',
+    { id: 'thikhampon', minBanquet: 50, name: 'Thikhampon', th: 'ห้องทิฆัมพร', area: 170, desc: 'อาคารล้านนาส่วนตัว · มีห้องน้ำในตัว', img: 'img/meet-thikhampon.jpg',
       cap: { theatre: [100, 200], classroom: [50, 120], ushape: [30, 50], banquet: [50, 120], cocktail: [80, 150] }, full: 12000, half: 7000,
       amen: ['Wi-Fi 1 Gbps', 'จอ LED 4×2.5 ม.', 'ไมค์ 2 ตัว', 'น้ำดื่ม'] },
-    { id: 'ruenhong', name: 'Ruen Hong', th: 'เรือนหงส์', area: 140, desc: 'ห้องกระจก วิวสวน', img: 'img/meet-ruenhong.jpg',
+    { id: 'ruenhong', minBanquet: 50, name: 'Ruen Hong', th: 'เรือนหงส์', area: 140, desc: 'ห้องกระจก วิวสวน', img: 'img/meet-ruenhong.jpg',
       cap: { theatre: [50, 100], classroom: [30, 50], ushape: [30, 50], banquet: [50, 70], cocktail: [60, 100] }, full: 10000, half: 6000,
       amen: ['Wi-Fi', 'ทีวี 75"', 'ไมค์ 2 ตัว', 'น้ำดื่ม'] },
-    { id: 'prayamengrai', name: 'Praya Meng Rai', th: 'ห้องพญาเม็งราย', area: 70, desc: 'ห้องประชุมเล็กสีทอง', img: 'img/meet-prayamengrai.jpg',
-      cap: { theatre: [10, 20], classroom: [10, 15], ushape: [10, 15], banquet: [10, 20], cocktail: [15, 25] }, full: 5000, half: 2000,
+    { id: 'prayamengrai', minBanquet: 5, name: 'Praya Meng Rai', th: 'ห้องพญาเม็งราย', area: 70, desc: 'ห้องประชุมเล็กสีทอง', img: 'img/meet-prayamengrai.jpg',
+      cap: { theatre: [10, 20], classroom: [10, 15], ushape: [10, 15], banquet: [10, 20], cocktail: [15, 25] }, full: 3000, half: 2000,
       amen: ['Wi-Fi', 'ทีวี 65"', 'ไวท์บอร์ด', 'น้ำดื่ม'] },
     { id: 'pool', name: 'ลานสระว่ายน้ำ', th: 'ลานสระว่ายน้ำ', area: 600, desc: 'พื้นที่กลางแจ้ง · งานเลี้ยง/ขันโตก', img: '',
       cap: { theatre: [0, 0], classroom: [0, 0], ushape: [0, 0], banquet: [100, 300], cocktail: [150, 350] }, full: 15000, half: 8000,
@@ -153,6 +153,7 @@
   const SERVICES = [
     { id: 'av', name: 'AV Package', desc: 'โปรเจกเตอร์คู่ ไมค์ไร้สาย 4 ตัว พร้อมช่างเทคนิค', price: 8000, unit: 'วัน' },
     { id: 'led', name: 'จอ LED เพิ่ม', desc: 'จอ LED 3×2 ม. พร้อมติดตั้ง', price: 12000, unit: 'วัน' },
+    { id: 'ledk', name: 'จอ LED ห้องกินรี', desc: 'ใช้ได้ตลอดการใช้งานห้อง · ยอดรวม 50,000 บาทขึ้นไป 3,000 บาท / ต่ำกว่านั้น 5,000 บาท', price: 5000, unit: 'งาน' },
     { id: 'photo', name: 'ช่างภาพ', desc: 'ช่างภาพ 1 ท่าน 8 ชม.', price: 6500, unit: 'วัน' },
     { id: 'stage', name: 'ตกแต่งเวที/ป้าย', desc: 'ป้ายไวนิล + ดอกไม้หน้าเวที', price: 4500, unit: 'งาน' },
     { id: 'shuttle', name: 'รถรับส่ง', desc: 'รถตู้ VIP พร้อมคนขับ', price: 2500, unit: 'เที่ยว' }
@@ -224,7 +225,7 @@
   const meetItem = (roomId, days, layout, extra = {}) => {
     const r = MEETING_ROOMS.find(x => x.id === roomId);
     return Object.assign({ id: U.uid('i'), sec: 'meet', ref: roomId, name: r.name + ' — ' + (LAYOUTS.find(l => l.id === layout) || {}).name + (extra.pax ? ' ' + extra.pax + ' ท่าน' : ''),
-      desc: extra.desc || 'เต็มวัน 08:00–17:00', price: extra.half ? r.half : r.full, q1: days, u1: 'วัน', q2: null, u2: '', layout,
+      desc: extra.desc || 'เต็มวัน 08:00–17:00 · พักกลางวัน 12:00–13:00', price: extra.half ? r.half : r.full, q1: days, u1: 'วัน', q2: null, u2: '', layout,
       sched: extra.sched || [] }, extra.more || {});
   };
   const svcItem = (sid, days, sched) => {
