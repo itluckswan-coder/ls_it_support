@@ -272,10 +272,10 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
     App.modal(`<div class="between" style="align-items:flex-start;gap:10px"><div><h2 style="margin:0">${H(TYPES[l.type].name)}</h2><div class="small muted">${H(l.no)}</div></div>${badge(l)}</div>
       <div class="tk-kvs" style="margin-top:12px">
         ${kv('ผู้ขอ', `${H(who(l))}${l.nick ? ' (' + H(l.nick) + ')' : ''}`)}${kv('ตำแหน่ง/แผนก', H([l.position, l.dept].filter(Boolean).join(' · ') || '—'))}
-        ${kv('รายละเอียด', summary(l))}${l.type === 'scan' && l.sc.witness ? kv('พยาน', H(l.sc.witness + (l.sc.witnessPos ? ' · ' + l.sc.witnessPos : ''))) : ''}
+        ${(p => kv('รายละเอียด', H(p.what)) + (p.time && p.time !== '—' ? kv('เวลา', H(p.time)) : '') + kv('วันที่', H(p.date)))(parts(l))}${l.type === 'scan' && l.sc.witness ? kv('พยาน', H(l.sc.witness + (l.sc.witnessPos ? ' · ' + l.sc.witnessPos : ''))) : ''}
         ${l.reason ? kv(l.type === 'scan' ? 'หมายเหตุ' : 'เหตุผล', H(l.reason)) : ''}${kv('วันที่เขียน', H((l.at || '').slice(0, 16).replace('T', ' ')))}
       </div>
-      <div style="margin-top:12px">${STEPS.map(line).join('')}</div>
+      ${maySign(me) ? `<div style="margin-top:12px">${STEPS.map(line).join('')}</div>` : ''}
       <div class="xs muted" style="margin-top:6px">ลงนามและอนุมัติใบลาได้เฉพาะผู้ดูแลระบบ</div>
       <div class="acts" style="flex-wrap:wrap"><a class="btn ghost" href="#/leaveprint/${encodeURIComponent(l.id)}" data-act="closeModal">พิมพ์ฟอร์ม</a>${acts.join('')}<button class="btn ghost" data-act="closeModal">ปิด</button></div>`);
   }
