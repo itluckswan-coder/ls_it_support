@@ -1260,8 +1260,12 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
           const key = isNew ? newId : r.id;
           if (hide.length) st.views[key] = hide; else delete st.views[key];
         });
-        // people on an edited added role follow its new level
-        if (r && r.custom) Store.db.users.filter(u => u.roleId === r.id).forEach(u => { u.role = baseSel.value; });
+        // people on an edited added role follow its new level and get its permissions (ones the role no longer has are taken away;
+        // anything else given to one person by hand stays)
+        if (r && r.custom) Store.db.users.filter(u => u.roleId === r.id).forEach(u => {
+          u.role = baseSel.value; u.perms = Object.assign({}, u.perms);
+          for (const p of D.PERMS) { if (ps.includes(p.id)) u.perms[p.id] = true; else if ((r.perms || []).includes(p.id)) u.perms[p.id] = false; }
+        });
         if (r && r.custom) Store.save();
         App.closeModal(); UU().draft = null; App.render(); App.toast(isNew ? 'เพิ่มบทบาท ' + name + ' แล้ว' : 'บันทึกบทบาทแล้ว');
       };
