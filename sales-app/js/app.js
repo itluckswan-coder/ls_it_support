@@ -121,7 +121,21 @@
       App._pendingRender = false; App.render();
     },
 
+    // menu groups: one button that opens its sections (shown only when the user may see at least one of them)
+    NAV_GROUPS: [{ id: 'rooms', name: 'การจัดการห้อง', kids: ['meet', 'room'] }],
+    // the menu as rendered: plain entries, with each group in place of its first visible section
+    navTree() {
+      const out = [], done = new Set();
+      for (const n of App.navItems()) {
+        const grp = App.NAV_GROUPS.find(gr => gr.kids.includes(n[0]));
+        if (!grp) { out.push(n); continue; }
+        if (done.has(grp.id)) continue; done.add(grp.id);
+        out.push({ grp, items: App.navItems().filter(x => grp.kids.includes(x[0])) });
+      }
+      return out;
+    },
     // menu entries this user may see (Dashboard is for admins only)
+    closeNavPop() { document.querySelectorAll('.nav-pop').forEach(x => x.remove()); document.querySelectorAll('[data-act=navGrp]').forEach(b => b.setAttribute('aria-expanded', 'false')); },
     navItems() {
       const me = App.me();
       const hidden = App.navHidden();
@@ -130,13 +144,14 @@
     /* ---------- shell ---------- */
     shell(active, body, view) {
       const me = App.me();
-      const nav = App.navItems();
       const tabs = [['home', 'หน้าหลัก', '#/home', ICON.home], ['quote', 'ใบเสนอ', '#/quotes', ICON.doc], ['cal', 'ปฏิทิน', '#/cal', ICON.cal], ['beo', 'ใบฟังก์ชัน', '#/beo', ICON.sheet]];
       return `
 <header class="topbar">
   <button class="menu-btn" data-act="drawer" aria-label="เมนู">${ICON.menu}</button>
   <a class="brand" href="#/home"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort"><span class="sep"></span><span class="t">ลักษวรรณ รีสอร์ต<small>ฝ่ายขาย</small></span></a>
-  <nav class="nav">${nav.map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}">${n[1]}</a>`).join('')}</nav>
+  <nav class="nav">${App.navTree().map(n => n.grp
+    ? `<button type="button" class="nav-grp ${n.items.some(x => x[0] === active) ? 'on' : ''}" data-act="navGrp" data-g="${n.grp.id}" aria-haspopup="true" aria-expanded="false">${n.grp.name} <span class="caret" aria-hidden="true">▾</span></button>`
+    : `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}">${n[1]}</a>`).join('')}</nav>
   <div class="tb-right">
     ${App.bellButton ? App.bellButton() : ''}
     <button class="search-btn" data-act="toggleSearch" aria-label="ค้นหา">${ICON.search}</button>
@@ -291,8 +306,25 @@
       const active = App.state.route === 'quote' || App.state.route === 'quotes' || App.state.route === 'new' || App.state.route === 'doc' ? 'quote' : (App.V[App.state.route] || {}).nav || App.state.route;
       const bg = document.createElement('div'); bg.className = 'drawer-bg'; bg.dataset.act = 'closeDrawer';
       const d = document.createElement('nav'); d.className = 'drawer';
-      d.innerHTML = `<div style="padding:4px 10px 16px"><img src="img/logo-wide-sm.png" alt="" style="width:120px"></div>` + App.navItems().map(n => `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}" data-act="closeDrawer">${n[1]}</a>`).join('');
+      d.innerHTML = `<div style="padding:4px 10px 16px"><img src="img/logo-wide-sm.png" alt="" style="width:120px"></div>` + App.navTree().map(n => {
+        const link = (x, sub) => `<a href="${x[2]}" class="${x[0] === active ? 'on' : ''}${sub ? ' sub' : ''}" data-act="closeDrawer">${x[1]}</a>`;
+        if (!n.grp) return link(n);
+        const open = n.items.some(x => x[0] === active);
+        return `<button type="button" class="drawer-grp ${open ? 'open' : ''}" data-act="drawerGrp" aria-expanded="${open}">${n.grp.name} <span class="caret" aria-hidden="true">▾</span></button><div class="drawer-kids" ${open ? '' : 'hidden'}>${n.items.map(x => link(x, true)).join('')}</div>`;
+      }).join('');
       document.body.append(bg, d);
+    },
+    drawerGrp(el) { const k = el.nextElementSibling, open = k.hidden; k.hidden = !open; el.classList.toggle('open', open); el.setAttribute('aria-expanded', open); },
+    // a menu group's sections drop down under its button (fixed, so the scrolling menu bar does not clip them)
+    navGrp(el) {
+      const old = document.querySelector('.nav-pop'), same = old && old.dataset.g === el.dataset.g;
+      App.closeNavPop(); if (same) return;
+      const n = App.navTree().find(x => x.grp && x.grp.id === el.dataset.g); if (!n) return;
+      const active = (App.V[App.state.route] || {}).nav || App.state.route, r = el.getBoundingClientRect();
+      const pop = document.createElement('div'); pop.className = 'nav-pop'; pop.dataset.g = n.grp.id; pop.setAttribute('role', 'menu');
+      pop.style.top = (r.bottom + 6) + 'px'; pop.style.left = Math.max(8, Math.min(r.left, innerWidth - 228)) + 'px';
+      pop.innerHTML = n.items.map(x => `<a role="menuitem" href="${x[2]}" class="${x[0] === active ? 'on' : ''}">${x[1]}</a>`).join('');
+      document.body.appendChild(pop); el.setAttribute('aria-expanded', 'true');
     },
     closeDrawer() { document.querySelectorAll('.drawer,.drawer-bg').forEach(x => x.remove()); },
     toggleSearch() { const s = document.getElementById('searchBox'); s.classList.toggle('open'); if (s.classList.contains('open')) s.querySelector('input').focus(); },
@@ -562,7 +594,9 @@
         catch (e) { if (e.network && Store.db.users.length) App.state.uid = localStorage.getItem('lsSales.cloudUid'); else g.API.clearToken(); }
       }
     } else { Store.load(); App.restoreSession(); }
-    window.addEventListener('hashchange', App.render);
+    window.addEventListener('hashchange', () => { App.closeNavPop(); App.render(); });
+    document.addEventListener('click', e => { if (document.querySelector('.nav-pop') && !e.target.closest('.nav-pop,[data-act=navGrp]')) App.closeNavPop(); }, true);
+    window.addEventListener('resize', () => App.closeNavPop());
     window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); App.deferredInstall = e; });
     if (!location.hash) location.replace(App.state.uid ? '#/home' : '#/login');
     App.render();
