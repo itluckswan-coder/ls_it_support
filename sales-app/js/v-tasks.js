@@ -29,6 +29,9 @@
       if (admin && t.status === 'done') out.push({ at: t.doneAt, title: (t.doneByName || 'ผู้รับงาน') + ' ยืนยันงานแล้ว', sub: t.title, href: '#/tasks', tone: 'teal' });
     }
     if (admin) for (const b of toApprove()) { const q = Store.quote(b.quoteId); out.push({ at: q.updatedAt || '', title: 'ใบฟังก์ชันรออนุมัติ', sub: b.id + ' · ' + q.client, href: '#/tasks/approve', tone: 'yellow' }); }
+    // leave requests (การแจ้งใบลา): waiting on this user's signature, and the requester hears the outcome
+    if (App.leaveWaiting) for (const l of App.leaveWaiting()) out.push({ at: l.at, title: 'ใบลารอลงนาม', sub: l.no + ' · ' + l.byName, href: '#/leave', tone: 'yellow' });
+    for (const l of Store.db.leaves || []) if (l.by === me.id && (l.status === 'approved' || l.status === 'rejected')) { const x = (l.sign || {}).gm || (l.sign || {}).head || {}; out.push({ at: x.at, title: l.status === 'approved' ? 'ใบลาได้รับอนุมัติ' : 'ใบลาไม่ได้รับอนุมัติ', sub: l.no + (x.byName ? ' · โดย ' + x.byName : ''), href: '#/leave', tone: l.status === 'approved' ? 'teal' : 'red' }); }
     // meeting rooms booked over another booking's times: the admin is asked; the seller hears back once approved
     for (const q of Store.db.quotes) {
       if (admin && q.overlapReq && !q.overlapOk && q.status !== 'cancelled') out.push({ at: q.overlapReq.at, title: 'ขออนุมัติจองห้องประชุมทับเวลา', sub: q.id + ' · ' + q.client + ' · โดย ' + q.overlapReq.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'yellow' });

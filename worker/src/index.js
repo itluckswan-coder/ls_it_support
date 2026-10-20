@@ -2,10 +2,10 @@
  * Serves /api/*; every other path is the static web app (../sales-app). */
 
 const RANK = { sales: 1, acc: 1, head: 2, manager: 3, admin: 4 };
-const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices'];
+const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices', 'leave_head', 'leave_gm', 'leave_hr'];
 const PBKDF2_ITER = 10000; // kept modest so login fits the Workers free-plan CPU budget
 const SESSION_DAYS = { remember: 30, normal: 1 };
-const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task'];
+const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task', 'leave'];
 const MAX_IMAGE_BYTES = 1500000;
 
 /* ---------------- helpers ---------------- */
@@ -94,7 +94,12 @@ async function saveUserRow(env, u, version) {
 }
 
 /* ---------------- state ---------------- */
-async function state(env, since) {
+/* leave requests (การแจ้งใบลา, HRSD08.1) are personal: the requester, the head of their department and the
+   approvers (ผู้จัดการทั่วไป / ฝ่ายบุคคล) see them; nobody else gets them from the server */
+const sameDept = (a, b) => !!a && !!b && String(a).trim() === String(b).trim();
+const leaveHead = (l, u) => u.role === 'admin' || ((u.role === 'head' || u.role === 'manager' || can(u, 'leave_head')) && sameDept(l.dept, u.dept) && l.by !== u.id);
+const leaveSeen = (l, u) => !!l && (l.by === u.id || can(u, 'leave_gm') || can(u, 'leave_hr') || leaveHead(l, u));
+async function state(env, since, user) {
   const docs = since
     ? (await env.DB.prepare('SELECT kind, id, data, version, deleted, updated_at FROM docs WHERE updated_at >= ?').bind(since).all()).results
     : (await env.DB.prepare('SELECT kind, id, data, version, deleted, updated_at FROM docs WHERE deleted = 0').all()).results;
@@ -106,7 +111,7 @@ async function state(env, since) {
   return {
     serverTime: now(),
     userIds,
-    docs: docs.map(d => ({ kind: d.kind, id: d.id, version: d.version, deleted: !!d.deleted, data: d.deleted ? null : JSON.parse(d.data) })),
+    docs: docs.filter(d => d.kind !== 'leave' || !user || d.deleted || leaveSeen(JSON.parse(d.data), user)).map(d => ({ kind: d.kind, id: d.id, version: d.version, deleted: !!d.deleted, data: d.deleted ? null : JSON.parse(d.data) })),
     users: users.map(r => Object.assign(publicUser(r), { _v: r.version }))
   };
 }
@@ -174,6 +179,29 @@ async function applyRules(env, user, kind, id, data, prev) {
     if (!data.to || !['user', 'dept'].includes(data.to.type)) fail(400, 'ระบุผู้รับมอบหมาย');
     if (JSON.stringify(data).length > 20000) fail(413, 'รายละเอียดงานยาวเกินไป');
   }
+  if (kind === 'leave') {
+    if (!prev) {
+      // a new request: always the caller's own, unsigned and waiting for the head of department
+      Object.assign(data, { by: user.id, byName: user.name, at: now(), status: 'pending', sign: {} });
+    } else {
+      if (!leaveSeen(prev, user)) fail(403, 'คุณไม่มีสิทธิ์แก้ไขใบลานี้');
+      const keep = ({ status, sign, ...rest }) => rest;
+      if (JSON.stringify(keep(prev)) !== JSON.stringify(keep(data))) fail(403, 'แก้ไขรายละเอียดใบลาที่ส่งแล้วไม่ได้');
+      const ps = prev.sign || {}, ns = data.sign || {}, steps = ['head', 'gm', 'dgm', 'hr'];
+      const added = steps.filter(k => JSON.stringify(ps[k] || null) !== JSON.stringify(ns[k] || null));
+      if (added.length > 1 || added.some(k => ps[k])) fail(409, 'ใบลานี้ถูกลงนามไปแล้ว — โหลดใหม่แล้วลองอีกครั้ง');
+      const k = added[0], ok = k && ns[k].ok !== false;
+      const allowed = !k ? (data.status === prev.status || (data.status === 'cancelled' && prev.by === user.id && ['pending', 'gm'].includes(prev.status)))
+        : k === 'head' ? prev.status === 'pending' && leaveHead(prev, user) && data.status === (ok ? 'gm' : 'rejected')
+        : k === 'gm' ? prev.status === 'gm' && can(user, 'leave_gm') && data.status === (ok ? 'approved' : 'rejected')
+        : k === 'dgm' ? ['approved', 'done'].includes(prev.status) && can(user, 'leave_gm') && ok && data.status === prev.status
+        : prev.status === 'approved' && can(user, 'leave_hr') && ok && data.status === 'done';
+      if (!allowed) fail(403, 'คุณลงนามหรือเปลี่ยนสถานะใบลานี้ไม่ได้');
+      if (k) Object.assign(ns[k], { by: user.id, byName: user.name, at: now(), note: String(ns[k].note || '').slice(0, 500) });
+    }
+    if (!['qt', 'change', 'scan'].includes(data.type)) fail(400, 'ประเภทใบลาไม่ถูกต้อง');
+    if (JSON.stringify(data).length > 20000) fail(413, 'ข้อมูลใบลายาวเกินไป');
+  }
   if (kind === 'catalog') {
     if (!can(user, 'edit_prices')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขเมนูและแพ็กเกจ');
     if (id !== 'food' || !Array.isArray(data.list)) fail(400, 'ข้อมูลเมนูไม่ถูกต้อง');
@@ -202,13 +230,13 @@ async function putDoc(req, env, user, kind, id) {
   const v = (row ? row.version : 0) + 1, at = now();
   await env.DB.prepare('INSERT INTO docs (kind, id, data, version, updated_at, updated_by, deleted) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data, version = excluded.version, updated_at = excluded.updated_at, updated_by = excluded.updated_by, deleted = 0')
     .bind(kind, id, JSON.stringify(out), v, at, user.id).run();
-  if (kind === 'beo' || kind === 'quote' || kind === 'task') await audit(env, user, kind, id, prev ? 'update' : 'create', kind === 'beo' ? out.approval && out.approval.state : kind === 'task' ? out.status : '');
+  if (kind === 'beo' || kind === 'quote' || kind === 'task' || kind === 'leave') await audit(env, user, kind, id, prev ? 'update' : 'create', kind === 'beo' ? out.approval && out.approval.state : kind === 'task' || kind === 'leave' ? out.status : '');
   return json({ doc: { kind, id, version: v, data: out } });
 }
 
 async function deleteDoc(env, user, kind, id) {
   if (user.role !== 'admin' && !(RANK[user.role] >= RANK.manager)) fail(403, 'เฉพาะผู้จัดการขึ้นไปที่ลบข้อมูลได้');
-  if (kind === 'task' && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบงานที่มอบหมายได้');
+  if ((kind === 'task' || kind === 'leave') && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบข้อมูลนี้ได้');
   await env.DB.prepare('UPDATE docs SET deleted = 1, version = version + 1, updated_at = ?, updated_by = ? WHERE kind = ? AND id = ?').bind(now(), user.id, kind, id).run();
   await audit(env, user, kind, id, 'delete');
   return json({ ok: true });
@@ -347,7 +375,7 @@ async function api(req, env, url) {
   if (path === '/api/state' && m === 'GET') {
     const since = url.searchParams.get('since');
     if (since && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(since)) fail(400, 'since ไม่ถูกต้อง');
-    return json(Object.assign(await state(env, since), { me: user.id }));
+    return json(Object.assign(await state(env, since, user), { me: user.id }));
   }
   let r;
   if ((r = /^\/api\/doc\/([a-z]+)\/(.+)$/.exec(path))) {

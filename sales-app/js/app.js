@@ -23,7 +23,7 @@
 
   const NAV = [
     ['home', 'หน้าหลัก', '#/home'], ['meet', 'ห้องประชุม', '#/meet'], ['room', 'ห้องพัก', '#/rooms'], ['food', 'จัดเลี้ยง', '#/food'], ['quote', 'ใบเสนอราคา', '#/quotes'],
-    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users'], ['tasks', 'Assignment & Approve', '#/tasks'], ['dash', 'Dashboard', '#/dash']
+    ['beo', 'ใบฟังก์ชัน', '#/beo'], ['cal', 'ปฏิทิน', '#/cal'], ['staff', 'พนักงาน', '#/staff'], ['users', 'ผู้ใช้งาน', '#/users'], ['leave', 'การแจ้งใบลา', '#/leave'], ['tasks', 'Assignment & Approve', '#/tasks'], ['dash', 'Dashboard', '#/dash']
   ];
 
   const App = {
