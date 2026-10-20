@@ -1,5 +1,5 @@
 /* Luck Swan Sales — offline cache */
-const CACHE = 'ls-sales-v68';
+const CACHE = 'ls-sales-v69';
 const ASSETS = [
   'css/app.css',
   'fonts.css',

@@ -192,14 +192,12 @@
     { id: 'staff', name: 'จัดรอบพนักงาน / อนุมัติต่อรอบ' },
     { id: 'users', name: 'จัดการผู้ใช้งาน' },
     { id: 'edit_prices', name: 'แก้ไขราคาและแพ็กเกจ', note: 'เฉพาะผู้ดูแลระบบ' },
-    { id: 'leave_head', name: 'ลงนามใบลาในแผนก (หัวหน้าแผนก)' },
-    { id: 'leave_gm', name: 'อนุมัติใบลา (ผู้จัดการทั่วไป / รองผู้จัดการทั่วไป)' },
-    { id: 'leave_hr', name: 'รับทราบใบลา และดูข้อมูลรายละเอียดใบลา (ฝ่ายทรัพยากรบุคคล)' }
+    { id: 'leave_hr', name: 'ดูข้อมูลรายละเอียดใบลา (ฝ่ายทรัพยากรบุคคล)', note: 'การอนุมัติใบลาเป็นของผู้ดูแลระบบเท่านั้น' }
   ];
   const ROLE_PERMS = {
     sales: ['create_quote', 'discount10', 'view_beo', 'customers'],
     manager: ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users'],
-    head: ['view_beo', 'staff', 'leave_head'],
+    head: ['view_beo', 'staff'],
     acc: ['view_beo', 'customers'],
     admin: PERMS.map(p => p.id)
   };

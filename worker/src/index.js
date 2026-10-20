@@ -2,7 +2,7 @@
  * Serves /api/*; every other path is the static web app (../sales-app). */
 
 const RANK = { sales: 1, acc: 1, head: 2, manager: 3, admin: 4 };
-const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices', 'leave_head', 'leave_gm', 'leave_hr'];
+const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices', 'leave_hr'];
 const PBKDF2_ITER = 10000; // kept modest so login fits the Workers free-plan CPU budget
 const SESSION_DAYS = { remember: 30, normal: 1 };
 const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task', 'leave'];
@@ -97,8 +97,10 @@ async function saveUserRow(env, u, version) {
 /* leave requests (การแจ้งใบลา, HRSD08.1) are personal: the requester, the head of their department and the
    approvers (ผู้จัดการทั่วไป / ฝ่ายบุคคล) see them; nobody else gets them from the server */
 const sameDept = (a, b) => !!a && !!b && String(a).trim() === String(b).trim();
-const leaveHead = (l, u) => u.role === 'admin' || ((u.role === 'head' || u.role === 'manager' || can(u, 'leave_head')) && sameDept(l.dept, u.dept) && l.by !== u.id);
-const leaveSeen = (l, u) => !!l && (l.by === u.id || can(u, 'leave_gm') || can(u, 'leave_hr') || leaveHead(l, u));
+const leaveHead = (l, u) => (u.role === 'head' || u.role === 'manager') && sameDept(l.dept, u.dept);
+const leaveSeen = (l, u) => !!l && (l.by === u.id || can(u, 'leave_hr') || leaveHead(l, u));
+// every signature and the approval on a leave request is the admin's
+const leaveSigner = u => u.role === 'admin';
 async function state(env, since, user) {
   const docs = since
     ? (await env.DB.prepare('SELECT kind, id, data, version, deleted, updated_at FROM docs WHERE updated_at >= ?').bind(since).all()).results
@@ -192,10 +194,11 @@ async function applyRules(env, user, kind, id, data, prev) {
       if (added.length > 1 || added.some(k => ps[k])) fail(409, 'ใบลานี้ถูกลงนามไปแล้ว — โหลดใหม่แล้วลองอีกครั้ง');
       const k = added[0], ok = k && ns[k].ok !== false;
       const allowed = !k ? (data.status === prev.status || (data.status === 'cancelled' && prev.by === user.id && ['pending', 'gm'].includes(prev.status)))
-        : k === 'head' ? prev.status === 'pending' && leaveHead(prev, user) && data.status === (ok ? 'gm' : 'rejected')
-        : k === 'gm' ? prev.status === 'gm' && can(user, 'leave_gm') && data.status === (ok ? 'approved' : 'rejected')
-        : k === 'dgm' ? ['approved', 'done'].includes(prev.status) && can(user, 'leave_gm') && ok && data.status === prev.status
-        : prev.status === 'approved' && can(user, 'leave_hr') && ok && data.status === 'done';
+        : !leaveSigner(user) ? false
+        : k === 'head' ? prev.status === 'pending' && data.status === (ok ? 'gm' : 'rejected')
+        : k === 'gm' ? prev.status === 'gm' && data.status === (ok ? 'approved' : 'rejected')
+        : k === 'dgm' ? ['approved', 'done'].includes(prev.status) && ok && data.status === prev.status
+        : prev.status === 'approved' && ok && data.status === 'done';
       if (!allowed) fail(403, 'คุณลงนามหรือเปลี่ยนสถานะใบลานี้ไม่ได้');
       if (k) Object.assign(ns[k], { by: user.id, byName: user.name, at: now(), note: String(ns[k].note || '').slice(0, 500) });
     }
