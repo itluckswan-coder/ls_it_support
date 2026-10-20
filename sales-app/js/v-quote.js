@@ -135,6 +135,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       ${canDelQ() ? `<button class="btn ghost red sm" style="width:100%;margin-top:12px" data-act="qDelete" data-id="${H(q.id)}">ลบใบเสนอราคา</button>` : ''}
       ${q.history && q.history.length ? `<div class="hr"></div><div class="small muted" style="margin-bottom:6px">ประวัติ</div>${q.history.slice(0, 5).map((h, i) => `<div class="row small" style="padding:4px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('')}` : ''}
     </section>
+    ${overlapCard(q)}
     ${App.otCard ? App.otCard(q) : ''}
   </aside>
 </div>`;
@@ -320,6 +321,9 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     },
     qStatus(el) {
       const q = cur(), v = el.dataset.v;
+      if ((v === 'tentative' || v === 'confirmed') && !App.overlapOk(q)) {
+        App.toast('ห้องประชุมทับเวลากับการจองอื่น — ต้องให้ผู้ดูแลระบบอนุมัติก่อน'); document.getElementById('qOverlap')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return;
+      }
       const run = () => {
         q.status = v;
         if (v === 'tentative' && !q.holdUntil) q.holdUntil = U.addDays(U.today(), 10);
@@ -873,4 +877,28 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       </article>`;
     }
   };
+  /* ---------- meeting rooms booked over each other ---------- */
+  function overlapCard(q) {
+    const list = App.meetConflicts(q); if (!list.length) return '';
+    const ok = App.overlapOk(q), admin = App.me().role === 'admin', rn = id => { const r = D.MEETING_ROOMS.find(x => x.id === id); return r ? r.th || r.name : id; };
+    return `<section class="card pad" id="qOverlap" style="border:1.5px solid ${ok ? 'var(--teal)' : 'var(--red)'}">
+      <h3 style="margin-bottom:8px">${ok ? '✓ อนุมัติให้จองทับเวลาแล้ว' : '⚠ ห้องประชุมทับเวลากับการจองอื่น'}</h3>
+      ${list.map(c => `<div class="small" style="padding:6px 0;border-top:1px solid var(--line)"><b>${H(rn(c.room))}</b> · ${U.fmtD(c.date, { year: false })}<br>ใบนี้ ${H(c.mine)} ทับกับ <a href="#/quote/${encodeURIComponent(c.other.id)}">${H(c.other.id)}</a> ${H(c.other.client)} ${H(c.theirs)} <span class="xs muted">(${H(D.STATUS[c.other.status])})</span></div>`).join('')}
+      ${ok ? `<div class="xs muted" style="margin-top:8px">โดย ${H(q.overlapOk.byName)} · ${H((q.overlapOk.at || '').slice(0, 16).replace('T', ' '))}</div>${admin ? '<button class="link red small" data-act="qOverlapUndo" style="margin-top:6px">ยกเลิกการอนุมัติ</button>' : ''}`
+        : admin ? `<button class="btn teal sm" style="width:100%;margin-top:10px" data-act="qOverlapOk">อนุมัติให้จองทับเวลา</button>`
+        : q.overlapReq ? `<div class="note" style="margin-top:10px">ส่งขออนุมัติแล้ว · รอผู้ดูแลระบบ (${H(q.overlapReq.byName)})</div>`
+        : `<div class="xs muted" style="margin-top:8px">จองชั่วคราว/ยืนยันได้เมื่อผู้ดูแลระบบอนุมัติ</div><button class="btn ghost sm" style="width:100%;margin-top:8px" data-act="qOverlapReq">ขออนุมัติจากผู้ดูแลระบบ</button>`}
+    </section>`;
+  }
+  Object.assign(App.ACT, {
+    qOverlapReq() { const q = cur(), me = App.me(); q.overlapReq = { by: me.id, byName: me.name, at: U.nowTH() }; App.touch(q, 'ขออนุมัติจองห้องประชุมทับเวลา'); App.render(); App.toast('ส่งขออนุมัติแล้ว'); },
+    qOverlapOk() {
+      const q = cur(), me = App.me(); if (me.role !== 'admin') return;
+      App.confirm('อนุมัติให้ ' + q.id + ' จองห้องประชุมทับเวลากับการจองอื่น?', () => {
+        q.overlapOk = { key: App.overlapKey(App.meetConflicts(q)), by: me.id, byName: me.name, at: U.nowTH() }; delete q.overlapReq;
+        App.touch(q, 'อนุมัติจองห้องประชุมทับเวลา'); App.render(); App.toast('อนุมัติแล้ว');
+      }, 'อนุมัติ');
+    },
+    qOverlapUndo() { const q = cur(); if (App.me().role !== 'admin') return; delete q.overlapOk; App.touch(q, 'ยกเลิกการอนุมัติจองทับเวลา'); App.render(); }
+  });
 })(window);

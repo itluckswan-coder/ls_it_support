@@ -185,9 +185,11 @@
       const r = D.MEETING_ROOMS.find(x => x.id === ui.sel);
       const fit = room => { const [mn, mx] = room.cap[ui.layout]; return !mx ? ['ไม่รองรับ', 'red'] : pax > mx ? ['ไม่พอ', 'red'] : pax < mn ? ['กว้างขวาง', 'teal'] : ['พอดี', 'teal']; };
       const avail = room => {
-        const b = days.map(d => [d, App.meetBooking(room.id, d, q && q.id)]).filter(x => x[1]);
-        if (!b.length) return `<span class="badge st-confirmed">ว่างทั้ง ${days.length} วัน</span>`;
-        return `<span class="badge st-tentative">${U.fmtD(b[0][0], { year: false })} มี${b[0][1].status === 'confirmed' ? 'การจองยืนยัน' : 'จองชั่วคราว'}</span>`;
+        const from = ui.half ? '13:00' : '08:00', to = '17:00', busy = [];
+        for (const o of Store.db.quotes) if ((!q || o.id !== q.id) && App.holding(o)) for (const s of App.meetSlots(o)) if (s.room === room.id && days.includes(s.date)) busy.push(Object.assign({ o }, s));
+        if (!busy.length) return `<span class="badge st-confirmed">ว่างทั้ง ${days.length} วัน</span>`;
+        const clash = busy.find(s => s.from < to && from < s.to), b = clash || busy[0];
+        return `<span class="badge ${clash ? 'st-tentative' : 'st-sent'}">${U.fmtD(b.date, { year: false })} มีงาน ${H(b.from)}–${H(b.to)}${clash ? ' · ทับเวลา' : ' · ไม่ทับเวลา'}</span>`;
       };
       const price = ui.half ? r.half : r.full, nd = days.length;
       const total = price * nd + (ui.av ? 8000 * nd : 0);
@@ -239,7 +241,6 @@
       const run = id => {
         const q = Store.quote(id); App.setCtx(id);
         const r = D.MEETING_ROOMS.find(x => x.id === ui.sel), days = U.daysOf(q.start, q.end);
-        const busy = days.map(d => App.meetBooking(r.id, d, q.id)).find(Boolean);
         const apply = () => {
           const old = q.items.find(i => i.sec === 'meet' && D.MEETING_ROOMS.some(m => m.id === i.ref));
           const sched = days.map((d, i) => ({ day: i + 1, start: ui.half ? '13:00' : '08:30', end: '17:00', place: r.name }));
@@ -250,11 +251,13 @@
           if (ui.av && av) av.q1 = days.length;
           if (!ui.av && av) q.items = q.items.filter(i => i !== av);
           q.room = r.id;
-          if (ui.holdDays) { q.holdUntil = U.addDays(U.today(), ui.holdDays); if (q.status === 'draft' || q.status === 'sent') q.status = 'tentative'; }
-          App.touch(q, `เลือกห้อง ${r.name}${ui.holdDays ? ' + จองชั่วคราวถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''}`);
+          let held = false;
+          if (ui.holdDays && (q.status === 'draft' || q.status === 'sent')) { if (App.overlapOk(q)) { q.holdUntil = U.addDays(U.today(), ui.holdDays); q.status = 'tentative'; held = true; } else App.toast('ห้องทับเวลากับการจองอื่น — ยังไม่จองชั่วคราว ต้องให้ผู้ดูแลระบบอนุมัติในหน้าใบเสนอราคา'); }
+          else if (ui.holdDays) { q.holdUntil = U.addDays(U.today(), ui.holdDays); held = true; }
+          App.touch(q, `เลือกห้อง ${r.name}${held ? ' + จองชั่วคราวถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''}`);
           App.render(); App.toast('อัปเดต ' + q.id + ' แล้ว');
         };
-        if (busy) App.confirm(`${r.name} มีการจองของ ${busy.client} ในช่วงนี้ ต้องการเพิ่มต่อหรือไม่?`, apply, 'เพิ่มต่อ'); else apply();
+        apply();
       };
       const q = App.ctxQuote(); if (!q) App.pickQuoteModal('เพิ่มในใบเสนอราคาใด?', run); else run(q.id);
     }
