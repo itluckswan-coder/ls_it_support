@@ -87,7 +87,13 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
   const dayOf = l => l.type === 'qt' ? l.qt.date : l.type === 'change' ? (l.ch.mode === 'day' ? l.ch.toDate : l.ch.date) : l.sc.date;
   const ok = l => l.status === 'approved' || l.status === 'done';
   const signer = (l, k) => { const x = (l.sign || {})[k]; return x ? x.byName + (x.ok === false ? ' (ไม่อนุมัติ)' : '') + ' ' + U.fmtD(x.at.slice(0, 10), { year: false }) : ''; };
-  const detailText = l => summary(l).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  // the request split into what, at what time and on which day(s), as plain text
+  const parts = l => {
+    if (l.type === 'qt') return { what: (l.qt.mode === 'do' ? 'ทำ QT ' : 'ลา QT ') + l.qt.hours + ' ชม.', time: l.qt.from + '–' + l.qt.to + ' น.', date: dTH(l.qt.date) };
+    if (l.type === 'change') return l.ch.mode === 'day' ? { what: 'เปลี่ยนวันหยุด', time: '—', date: dTH(l.ch.fromDate) + ' → ' + dTH(l.ch.toDate) }
+      : { what: 'เปลี่ยนเวลาทำงาน', time: l.ch.fromTime + ' → ' + l.ch.toTime + ' น.', date: dTH(l.ch.date) };
+    return { what: CAUSES[l.sc.cause] || '', time: 'เข้า ' + (l.sc.inTime || '—') + ' · ออก ' + (l.sc.outTime || '—'), date: dTH(l.sc.date) };
+  };
   function infoRows(all) {
     const f = App.state.ui.leaveInfo || (App.state.ui.leaveInfo = { type: 'all', status: 'all', month: U.today().slice(0, 7), dept: 'all', q: '' });
     const q = f.q.trim().toLowerCase();
@@ -134,13 +140,13 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
 </section>
 <section class="card" style="overflow:hidden">
   <div style="padding:14px 18px 4px"><h3>รายละเอียดใบแจ้ง</h3><div class="xs muted">${rows.length} ใบ · กดที่แถวเพื่อดูใบและลงนาม</div></div>
-  <div style="overflow-x:auto"><table class="tbl" style="font-size:13px;min-width:1100px"><thead><tr><th>เลขที่</th><th>วันที่มีผล</th><th>ชื่อ-สกุล</th><th>ตำแหน่ง / แผนก</th><th>ประเภท</th><th>รายละเอียด</th><th>เหตุผล / พยาน</th><th>ลงนาม</th><th>สถานะ</th></tr></thead><tbody>
+  <div style="overflow-x:auto"><table class="tbl" style="font-size:13px;min-width:1100px"><thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ตำแหน่ง / แผนก</th><th>ประเภท</th><th>รายละเอียด</th><th>เวลา</th><th>วันที่</th><th>เหตุผล / พยาน</th><th>ลงนาม</th><th>สถานะ</th></tr></thead><tbody>
   ${rows.map(l => `<tr data-act="lvOpen" data-id="${H(l.id)}" style="cursor:pointer">
-    <td style="white-space:nowrap">${H(l.no)}<div class="sub">เขียน ${U.fmtD((l.at || '').slice(0, 10), { year: false })}</div></td><td style="white-space:nowrap">${dTH(dayOf(l))}</td>
+    <td style="white-space:nowrap">${H(l.no)}<div class="sub">เขียน ${U.fmtD((l.at || '').slice(0, 10), { year: false })}</div></td>
     <td>${H(who(l))}${l.nick ? `<div class="sub">${H(l.nick)}</div>` : ''}</td><td>${H(l.position || '—')}<div class="sub">${H(l.dept || '')}${l.branch ? ' · ' + H(l.branch) : ''}</div></td>
-    <td style="white-space:nowrap">${H(TYPES[l.type].name)}</td><td>${summary(l)}</td>
+    <td style="white-space:nowrap">${H(TYPES[l.type].name)}</td>${(p => `<td>${H(p.what)}</td><td style="white-space:nowrap">${H(p.time)}</td><td style="white-space:nowrap">${H(p.date)}</td>`)(parts(l))}
     <td>${H(l.reason || '')}${l.type === 'scan' && l.sc.witness ? `<div class="sub">พยาน ${H(l.sc.witness)}${l.sc.witnessPos ? ' · ' + H(l.sc.witnessPos) : ''}</div>` : ''}</td>
-    <td class="xs">${STEPS.map(([k, t]) => signer(l, k) ? `<div><span class="muted">${t}:</span> ${H(signer(l, k))}</div>` : '').join('') || '<span class="muted">—</span>'}</td><td>${badge(l)}</td></tr>`).join('') || '<tr><td colspan="9"><div class="empty">ไม่มีใบแจ้งตามตัวกรอง</div></td></tr>'}
+    <td class="xs">${STEPS.map(([k, t]) => signer(l, k) ? `<div><span class="muted">${t}:</span> ${H(signer(l, k))}</div>` : '').join('') || '<span class="muted">—</span>'}</td><td>${badge(l)}</td></tr>`).join('') || '<tr><td colspan="10"><div class="empty">ไม่มีใบแจ้งตามตัวกรอง</div></td></tr>'}
   </tbody></table></div>
 </section>`;
   }
@@ -148,11 +154,11 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
   App.ACT.lvExport = () => {
     const me = App.me(); if (!mayHr(me)) return;
     const { f, rows } = infoRows(leaves().filter(l => visible(l, me)));
-    const out = [['เลขที่', 'วันที่เขียน', 'วันที่มีผล', 'ชื่อ-สกุล', 'ชื่อเล่น', 'ตำแหน่ง', 'แผนก', 'สาขา', 'ประเภท', 'รายละเอียด', 'ชั่วโมง QT', 'เหตุผล', 'พยาน', 'หัวหน้าแผนก', 'ผู้จัดการทั่วไป', 'รองผู้จัดการทั่วไป', 'ฝ่ายบุคคล', 'สถานะ']]
-      .concat(rows.map(l => [l.no, (l.at || '').slice(0, 10), dayOf(l) || '', who(l), l.nick || '', l.position || '', l.dept || '', l.branch || '', TYPES[l.type].name, detailText(l),
+    const out = [['เลขที่', 'วันที่เขียน', 'ชื่อ-สกุล', 'ชื่อเล่น', 'ตำแหน่ง', 'แผนก', 'สาขา', 'ประเภท', 'รายละเอียด', 'เวลา', 'วันที่', 'ชั่วโมง QT', 'เหตุผล', 'พยาน', 'หัวหน้าแผนก', 'ผู้จัดการทั่วไป', 'รองผู้จัดการทั่วไป', 'ฝ่ายบุคคล', 'สถานะ']]
+      .concat(rows.map(l => [l.no, (l.at || '').slice(0, 10), who(l), l.nick || '', l.position || '', l.dept || '', l.branch || '', TYPES[l.type].name, ...(p => [p.what, p.time, p.date])(parts(l)),
         l.type === 'qt' ? (l.qt.mode === 'use' ? -1 : 1) * (Number(l.qt.hours) || 0) : '', l.reason || '', l.type === 'scan' ? [l.sc.witness, l.sc.witnessPos].filter(Boolean).join(' · ') : '',
         signer(l, 'head'), signer(l, 'gm'), signer(l, 'dgm'), signer(l, 'hr'), (STATUS[l.status] || STATUS.pending)[0]]));
-    const blob = g.Sheet.writeXlsx(out, { sheetName: 'ใบแจ้ง', widths: [20, 12, 12, 24, 10, 18, 18, 16, 16, 44, 10, 30, 22, 22, 22, 22, 22, 18] });
+    const blob = g.Sheet.writeXlsx(out, { sheetName: 'ใบแจ้ง', widths: [20, 12, 24, 10, 18, 18, 16, 16, 24, 20, 26, 10, 30, 22, 22, 22, 22, 22, 18] });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ข้อมูลใบลา-' + (f.month || 'ทั้งหมด') + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   };
 
