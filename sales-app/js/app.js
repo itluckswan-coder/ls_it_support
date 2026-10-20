@@ -607,7 +607,10 @@
       navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
       navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
         reg.update();
+        // a page left open all day still picks up a new version: check on return, on focus and every few minutes
         document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update(); });
+        window.addEventListener('focus', () => reg.update());
+        setInterval(() => { if (document.visibilityState === 'visible') reg.update(); }, 5 * 60e3);
       }).catch(() => { /* offline support unavailable */ });
     }
   }
