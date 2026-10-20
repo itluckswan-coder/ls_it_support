@@ -192,7 +192,7 @@
         if (q.id === excludeId || !App.holding(q)) continue;
         for (const it of q.items) {
           if (it.sec !== 'room' || it.free) continue;
-          const nights = Number(it.q2) || 1, ci = q.start, co = U.addDays(ci, nights);
+          const nights = Number(it.q2) || 1, ci = it.ci || q.start, co = U.addDays(ci, nights);
           if (!(date >= ci && date < co)) continue;
           if (it.block && it.block[typeId]) n += it.block[typeId];
           else if (it.ref === typeId) n += Number(it.q1) || 0;

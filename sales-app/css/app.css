@@ -803,3 +803,11 @@ main.bleed{padding:0;max-width:none}
 .hm-task:hover b{color:var(--red)}
 .tk-kvs{margin-top:12px;border-top:1px solid var(--line)}
 .tk-kv{display:grid;grid-template-columns:120px 1fr;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
+
+/* rooms by zone + room rates */
+.rm-zone{font:600 15px var(--fh);margin:4px 0 10px;color:var(--ink2)}
+.rr-season{gap:8px;align-items:center;margin-bottom:8px}
+.rr-tbl th,.rr-tbl td{white-space:nowrap;vertical-align:middle}
+.rr-tbl .rr-s{border-left:2px solid var(--line)}
+.rr-tbl tr.rr-z td{background:var(--bg);font-weight:600;font-size:13px}
+.rr-tbl .input.sm,.rr-season .input.sm{height:34px;padding:0 8px;font-size:13px}

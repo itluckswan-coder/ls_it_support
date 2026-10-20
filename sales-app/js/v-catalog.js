@@ -266,17 +266,25 @@
      GROUP ROOMS (1h)
      ===================================================================== */
   function roomState(q) {
-    const st = { counts: {}, ci: q ? q.start : U.today(), nights: q ? Math.max(1, U.daysOf(q.start, q.end).length - 1) : 1, late: false };
+    const st = { counts: {}, ci: q ? q.start : U.today(), nights: q ? Math.max(1, U.daysOf(q.start, q.end).length - 1) : 1, late: false, abf: true };
     if (q) {
-      for (const it of q.items.filter(i => i.sec === 'room' && !i.free)) {
-        if (it.block) for (const [k, v] of Object.entries(it.block)) st.counts[k] = (st.counts[k] || 0) + v;
-        else if (D.ROOM_TYPES.some(t => t.id === it.ref)) st.counts[it.ref] = (st.counts[it.ref] || 0) + Number(it.q1);
-        if (it.q2) st.nights = Number(it.q2);
+      const rooms = q.items.filter(i => i.sec === 'room' && !i.free && i.ref !== 'late');
+      // a stay across a change of season is several lines of one room type: count the rooms once, add up the nights
+      const span = {};
+      for (const it of rooms) {
+        if (it.block) { for (const [k, v] of Object.entries(it.block)) st.counts[k] = (st.counts[k] || 0) + v; }
+        else if (D.ROOM_TYPES.some(t => t.id === it.ref)) st.counts[it.ref] = Math.max(st.counts[it.ref] || 0, Number(it.q1) || 0);
+        const ci = it.ci || q.start, n = Number(it.q2) || 1, k = it.ref || 'block';
+        const sp = span[k] || (span[k] = { a: ci, b: U.addDays(ci, n) });
+        if (ci < sp.a) sp.a = ci; if (U.addDays(ci, n) > sp.b) sp.b = U.addDays(ci, n);
       }
+      const sp = Object.values(span)[0]; if (sp) { st.ci = sp.a; st.nights = Math.max(1, U.diffDays(sp.a, sp.b)); }
       st.late = q.items.some(i => i.ref === 'late');
+      st.abf = !rooms.some(i => /Room only/i.test(i.name));
     }
     return st;
   }
+  const stayTotal = (t, ui) => D.roomStay(t, ui.ci, ui.nights, ui.abf).reduce((a, x) => a + x.nights * x.price, 0);
   App.V.rooms = {
     nav: 'room', title: 'ห้องพัก',
     render() {
@@ -285,29 +293,35 @@
       if (!ui || ui.q !== (q && q.id)) ui = App.state.ui.rooms = Object.assign(roomState(q), { q: q && q.id });
       const co = U.addDays(ui.ci, ui.nights);
       const sel = D.ROOM_TYPES.filter(t => ui.counts[t.id] > 0);
-      const tot = sel.reduce((a, t) => a + ui.counts[t.id], 0);
-      const amount = sel.reduce((a, t) => a + ui.counts[t.id] * t.group * ui.nights, 0);
+      const tot = sel.reduce((a, t) => a + ui.counts[t.id], 0), guests = sel.reduce((a, t) => a + ui.counts[t.id] * t.pax, 0);
+      const amount = sel.reduce((a, t) => a + ui.counts[t.id] * stayTotal(t, ui), 0);
       const free = Math.floor(tot / 20);
       const cutoff = U.addDays(ui.ci, -14);
-      return `
-<div class="page-hd"><div><h1>ห้องพักสำหรับกลุ่ม</h1><div class="small muted">ราคากรุ๊ป (10 ห้องขึ้นไป) · ราคาสุทธิก่อน Service และ VAT</div><div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
-  <div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div></div>
-<div class="split">
-  <div class="rcards">${D.ROOM_TYPES.map(t => {
-    const c = ui.counts[t.id] || 0;
-    return `<article class="card rcard ${c ? 'on' : ''}">
-      <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(t.name)}</span>`}</div>
-      <div class="bd"><div class="between"><h3 style="font-size:19px">${H(t.name)}</h3></div>
-        <div class="small muted" style="margin:6px 0 12px">${t.size} ตร.ม. · ${H(t.beds)} · อาหารเช้าห้องราชพฤกษ์ 2 ท่าน</div>
-        <div class="between"><div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(t.group)} ฿</span><span class="small muted"> / คืน</span></div>
-        <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.name)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม">+</button></span></div>
+      const segs = D.roomStay(D.ROOM_TYPES[0], ui.ci, ui.nights, true), season = D.seasonOf(ui.ci);
+      const card = t => {
+        const c = ui.counts[t.id] || 0, pr = D.roomPrice(t, ui.ci, ui.abf), left = t.total;
+        return `<article class="card rcard ${c ? 'on' : ''}">
+      <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(t.fam)}</span>`}</div>
+      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(t.fam)}</h3><span class="badge">${H(t.bed)}</span></div>
+        <div class="small muted" style="margin:6px 0 12px">มี ${left} ห้อง · ราคาสำหรับ ${t.pax} ท่าน · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
+        <div class="between"><div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(pr)} ฿</span><span class="small muted"> / คืน</span></div>
+        <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.full)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม">+</button></span></div>
+        ${c > left ? `<div class="xs red" style="margin-top:6px">เกินจำนวนห้องที่มี (${left})</div>` : ''}
       </div></article>`;
-  }).join('')}</div>
+      };
+      const zones = ['Resident', 'Resort'];
+      return `
+<div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคาก่อน Service และ VAT · ช่วงราคา ${H(season.name)}${segs.length > 1 ? ' และ ' + segs.slice(1).map(x => H(x.season.name)).join(', ') + ' (คิดแยกตามคืน)' : ''}</div><div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
+  <div class="row wrap" style="gap:10px">${App.can('edit_prices') ? '<a class="btn ghost sm" href="#/roomrates">ตั้งราคาห้องพัก</a>' : ''}
+  <div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div></div></div>
+<div class="seg white" style="margin-bottom:14px" role="group" aria-label="อาหารเช้า"><button class="${ui.abf ? 'on' : ''}" data-act="rmAbf" data-v="1">With ABF · รวมอาหารเช้า</button><button class="${ui.abf ? '' : 'on'}" data-act="rmAbf" data-v="0">Room only · ไม่รวมอาหารเช้า</button></div>
+<div class="split">
+  <div>${zones.map(z => `<h2 class="rm-zone">Zone : ${z}</h2><div class="rcards" style="margin-bottom:18px">${D.ROOM_TYPES.filter(t => t.zoneId === z).map(card).join('')}</div>`).join('')}</div>
   <aside class="card pad sticky">
     <h2 style="margin-bottom:12px">Room block</h2>
-    ${sel.length ? sel.map(t => `<div class="sum-row"><span>${H(t.name)} ${ui.counts[t.id]}</span><span class="num">${U.n(ui.counts[t.id] * t.group * ui.nights)}</span></div>`).join('') : '<div class="small muted">ยังไม่ได้เลือกห้อง</div>'}
+    ${sel.length ? sel.map(t => `<div class="sum-row"><span>${H(t.name)} × ${ui.counts[t.id]}</span><span class="num">${U.n(ui.counts[t.id] * stayTotal(t, ui))}</span></div>`).join('') : '<div class="small muted">ยังไม่ได้เลือกห้อง</div>'}
     <div class="sum-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><b>รวม ${tot} ห้อง × ${ui.nights} คืน</b><b class="num">${U.n(amount)}</b></div>
-    <div class="small muted">รองรับ ${tot * 2} ท่าน (พักห้องละ 2)${q ? ' · ผู้เข้าร่วม ' + q.pax + ' ท่าน' : ''}</div>
+    <div class="small muted">รองรับ ${guests} ท่าน · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}${q ? ' · ผู้เข้าร่วม ' + q.pax + ' ท่าน' : ''}</div>
     <div class="hr"></div>
     <div class="between"><div><div>ห้องฟรีสำหรับผู้จัด</div><div class="small muted">ทุก 20 ห้อง ฟรี 1 ห้อง</div></div><span class="badge" style="background:var(--yellow)">+${free} ห้อง</span></div>
     <div class="between" style="margin-top:14px"><span>Late check-out 14:00</span>${App.sw('Late check-out', ui.late, 'data-change="rmLate"')}</div>
@@ -317,8 +331,13 @@
 </div>`;
     }
   };
+  // quote lines for a room type: one line per season the stay touches
+  App.roomLines = (t, count, ci, nights, abf, desc) => D.roomStay(t, ci, nights, abf).map((x, k, all) =>
+    D.roomItem(t.full + (abf ? ' รวมอาหารเช้า' : ' Room only (ไม่รวมอาหารเช้า)'), count, x.nights, x.price,
+      (desc || '') + (all.length > 1 ? (desc ? ' · ' : '') + 'คืนที่ ' + (k ? all.slice(0, k).reduce((a, y) => a + y.nights, 0) + 1 : 1) + '–' + all.slice(0, k + 1).reduce((a, y) => a + y.nights, 0) + ' ราคาช่วง ' + x.season.name : ''), t.id, { ci: x.from }));
   Object.assign(App.ACT, {
     rmStep(el) { const ui = App.state.ui.rooms, k = el.dataset.k; ui.counts[k] = U.clamp((ui.counts[k] || 0) + Number(el.dataset.v), 0, 999); App.render(); },
+    rmAbf(el) { App.state.ui.rooms.abf = el.dataset.v === '1'; App.render(); },
     rmApply() {
       const ui = App.state.ui.rooms;
       const run = id => {
@@ -326,14 +345,73 @@
         q.items = q.items.filter(i => i.sec !== 'room' && i.ref !== 'late');
         const sel = D.ROOM_TYPES.filter(t => ui.counts[t.id] > 0), tot = sel.reduce((a, t) => a + ui.counts[t.id], 0);
         const desc = `เช็กอิน ${U.fmtD(ui.ci, { year: false })} 14:00 → เช็กเอาต์ ${U.fmtD(U.addDays(ui.ci, ui.nights), { year: false })} ${ui.late ? '14:00' : '12:00'}`;
-        for (const t of sel) q.items.push(D.roomItem(t.name + ' รวมอาหารเช้า', ui.counts[t.id], ui.nights, t.group, desc, t.id));
-        if (tot >= 20) q.items.push(D.roomItem('ห้องเจ้าหน้าที่ พักห้องละ 2 ท่าน รวมอาหารเช้า', Math.floor(tot / 20), ui.nights, sel[0].group, 'ห้องฟรีสำหรับผู้จัด ทุก 20 ห้อง ฟรี 1 ห้อง', 'comp', { free: true }));
+        for (const t of sel) q.items.push(...App.roomLines(t, ui.counts[t.id], ui.ci, ui.nights, ui.abf, desc));
+        if (tot >= 20) q.items.push(D.roomItem('ห้องเจ้าหน้าที่ พักห้องละ 2 ท่าน' + (ui.abf ? ' รวมอาหารเช้า' : ''), Math.floor(tot / 20), ui.nights, D.roomPrice(sel[0], ui.ci, ui.abf), 'ห้องฟรีสำหรับผู้จัด ทุก 20 ห้อง ฟรี 1 ห้อง', 'comp', { free: true }));
         if (ui.late) q.items.push({ id: U.uid('i'), sec: 'room', ref: 'late', name: 'Late check-out 14:00', desc: 'สำหรับ room block', price: 0, q1: tot, u1: 'ห้อง', q2: null, u2: '', sched: [], free: true });
         if (ui.ci !== q.start) App.toast('หมายเหตุ: วันเช็กอินต่างจากวันงาน');
         App.touch(q, `อัปเดตห้องพัก ${tot} ห้อง × ${ui.nights} คืน`); App.state.ui.rooms = null;
         App.go('#/quote/' + encodeURIComponent(q.id));
       };
       const q = App.ctxQuote(); if (!q) App.pickQuoteModal('อัปเดตใบเสนอราคาใด?', run); else run(q.id);
+    }
+  });
+  /* ---------- room rates (admins / edit_prices): counts, rack and season prices, season dates ---------- */
+  const rrDraft = () => {
+    const ui = App.state.ui;
+    if (!ui.rr) {
+      ui.rr = { seasons: D.seasons().map(x => Object.assign({}, x)), types: {} };
+      for (const t of D.ROOM_TYPES) ui.rr.types[t.id] = { total: t.total, rack: t.rack, rates: JSON.parse(JSON.stringify(t.rates)) };
+      ui.rrDirty = false;
+    }
+    return ui.rr;
+  };
+  const MON = U.MS;
+  const mdPick = (si, k, v) => { const [m, d] = v.split('-').map(Number); return `<span class="row" style="gap:4px;flex-wrap:nowrap"><select class="input sm" data-change="rrSeason" data-s="${si}" data-k="${k}d" aria-label="วัน">${Array.from({ length: 31 }, (_, i) => `<option ${i + 1 === d ? 'selected' : ''}>${i + 1}</option>`).join('')}</select><select class="input sm" data-change="rrSeason" data-s="${si}" data-k="${k}m" aria-label="เดือน">${MON.map((x, i) => `<option value="${i + 1}" ${i + 1 === m ? 'selected' : ''}>${x}</option>`).join('')}</select></span>`; };
+  App.V.roomrates = {
+    nav: 'room', title: 'ตั้งราคาห้องพัก',
+    render() {
+      if (!App.can('edit_prices')) return '<div class="empty">เฉพาะผู้มีสิทธิ์แก้ไขราคาและแพ็กเกจ — <a href="#/rooms">กลับ</a></div>';
+      const d = rrDraft(), ui = App.state.ui, ss = d.seasons;
+      const num = (id, path, v, w = 86) => `<input class="input sm num" style="width:${w}px;text-align:right" inputmode="numeric" value="${v}" data-change="rrNum" data-t="${id}" data-p="${path}">`;
+      const row = t => { const x = d.types[t.id]; return `<tr><td><b style="font-weight:500">${H(t.fam)}</b></td><td>${H(t.bed)}</td><td>${num(t.id, 'total', x.total, 64)}</td><td>${num(t.id, 'rack', x.rack)}</td>
+        ${ss.map(se => { const r = x.rates[se.id] || [0, 0]; return `<td class="rr-s">${num(t.id, se.id + '.0', r[0])}</td><td>${num(t.id, se.id + '.1', r[1])}</td>`; }).join('')}</tr>`; };
+      return `<div class="page-hd"><div><div class="small"><a class="link" href="#/rooms">← ห้องพัก</a></div><h1>ตั้งราคาห้องพัก</h1>
+        <div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคาก่อน Service และ VAT · ใช้กับทุกการจอง · ช่วงราคาวนซ้ำทุกปี</div></div>
+        <div class="row wrap"><button class="btn ghost" data-act="rrReset">คืนค่าตามตารางราคา</button><button class="btn red" data-act="rrSave" ${ui.rrDirty ? '' : 'disabled'}>บันทึกราคา</button></div></div>
+      <section class="card pad" style="margin-bottom:16px"><h3 style="margin-bottom:10px">ช่วงราคา</h3>
+        ${ss.map((se, i) => `<div class="row wrap rr-season"><input class="input sm" style="max-width:200px" value="${H(se.name)}" data-change="rrSeason" data-s="${i}" data-k="name" aria-label="ชื่อช่วงราคา"><span class="small muted">ตั้งแต่</span>${mdPick(i, 'from', se.from)}<span class="small muted">ถึง</span>${mdPick(i, 'to', se.to)}</div>`).join('')}
+        <div class="xs muted" style="margin-top:6px">ช่วงที่ข้ามปีได้ เช่น 1 ส.ค. – 28/29 ก.พ. · เข้าพักข้ามช่วงราคา ระบบคิดราคาแยกตามคืน</div></section>
+      <section class="card" style="overflow:auto"><table class="tbl rr-tbl"><thead>
+        <tr><th rowspan="2">ประเภทห้อง</th><th rowspan="2">เตียง</th><th rowspan="2">จำนวน (ห้อง)</th><th rowspan="2">ราคาเต็ม</th>${ss.map(se => `<th colspan="2" class="rr-s c">${H(se.name)}</th>`).join('')}</tr>
+        <tr>${ss.map(() => '<th class="rr-s r">With ABF</th><th class="r">Room only</th>').join('')}</tr></thead><tbody>
+        ${['Resident', 'Resort'].map(z => `<tr class="rr-z"><td colspan="${4 + ss.length * 2}">Zone : ${z}</td></tr>` + D.ROOM_TYPES.filter(t => t.zoneId === z).map(row).join('')).join('')}
+      </tbody></table></section>`;
+    }
+  };
+  Object.assign(App.ACT, {
+    rrSave() {
+      const d = rrDraft(), st = Store.db.settings || (Store.db.settings = {});
+      st.roomRates = JSON.parse(JSON.stringify(d)); D.applyRoomRates(st.roomRates); Store.save();
+      App.state.ui.rr = null; App.state.ui.rooms = null; App.render(); App.toast('บันทึกราคาห้องพักแล้ว');
+    },
+    rrReset() {
+      App.confirm('คืนค่าราคา จำนวนห้อง และช่วงราคาตามตารางราคาเดิม?', () => {
+        const def = D.ROOM_RATES_DEFAULT; App.state.ui.rr = JSON.parse(JSON.stringify(def)); App.state.ui.rrDirty = true; App.render();
+      }, 'คืนค่า');
+    }
+  });
+  Object.assign(App.CHG, {
+    rrNum(el) {
+      const d = rrDraft(), x = d.types[el.dataset.t], v = Math.max(0, Math.round(Number(String(el.value).replace(/[, ]/g, '')) || 0));
+      const [a, b] = el.dataset.p.split('.');
+      if (b == null) x[a] = v; else { x.rates[a] = x.rates[a] || [0, 0]; x.rates[a][Number(b)] = v; }
+      App.state.ui.rrDirty = true; App.render();
+    },
+    rrSeason(el) {
+      const se = rrDraft().seasons[Number(el.dataset.s)], k = el.dataset.k, pad = n => String(n).padStart(2, '0');
+      if (k === 'name') se.name = el.value.trim().slice(0, 40) || se.name;
+      else { const f = k.slice(0, -1), [m, dd] = se[f].split('-'); se[f] = k.endsWith('m') ? pad(el.value) + '-' + dd : m + '-' + pad(el.value); }
+      App.state.ui.rrDirty = true; App.render();
     }
   });
   Object.assign(App.CHG, {
