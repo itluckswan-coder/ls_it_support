@@ -380,8 +380,12 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       <div class="field"><label class="f">เงื่อนไขมัดจำ</label><input class="input" name="deposit" value="${H(q.deposit || '')}"></div>
       <div class="field"><label class="f">บันทึกติดตาม (แสดงในหน้าแรก)</label><input class="input" name="followUp" value="${H(q.followUp || '')}"></div>
       <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">บันทึก</button></div>`, bg => {
+      const st = bg.querySelector('[name=start]'), en = bg.querySelector('[name=end]');
+      let len = q.end >= q.start ? U.diffDays(q.start, q.end) : 0;
+      st.onchange = () => { if (st.value) en.value = U.addDays(st.value, len); };
+      en.onchange = () => { if (en.value && st.value && en.value >= st.value) len = U.diffDays(st.value, en.value); };
       bg.querySelector('#ok').onclick = () => {
-        const f = App.formData(bg);
+        const f = App.formData(bg), oldDays = U.daysOf(q.start, q.end).length;
         if (!f.start) { App.toast('กรุณาระบุวันงาน'); return; }
         if (!f.end || f.end < f.start) f.end = f.start;
         const oldPax = q.pax;
@@ -389,6 +393,15 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
           start: f.start, end: f.end, taxId: f.taxId, validUntil: f.validUntil, holdUntil: f.holdUntil, address: f.address, deposit: f.deposit, followUp: f.followUp });
         const days = U.daysOf(q.start, q.end).length;
         q.items.forEach(it => { it.sched = (it.sched || []).filter(s => s.day <= days); });
+        // a new number of days: lines counted per day (rooms/services in days, meals and breaks per day) follow it
+        let moved = 0;
+        if (days !== oldDays) for (const it of q.items) {
+          if (it.sec === 'meet' && /วัน/.test(it.u1 || '') && Number(it.q1) === oldDays) { it.q1 = days; moved++; }
+          else if (it.sec === 'food' && it.q2 != null && it.q2 !== '') {
+            if (Number(it.q2) === oldDays * 2 && oldDays > 0) { it.q2 = days * 2; moved++; } else if (Number(it.q2) === oldDays) { it.q2 = days; moved++; }
+          }
+        }
+        if (moved) setTimeout(() => App.toast(`ปรับจำนวนวัน/มื้อของ ${moved} รายการเป็น ${days} วันตามวันงานใหม่`), 50);
         App.closeModal();
         const np = parseInt(f.pax, 10) || q.pax;
         if (np !== oldPax) setPax(q, np); else { App.touch(q, 'แก้ไขข้อมูลลูกค้า'); App.render(); }
@@ -468,7 +481,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     const start = U.addDays(U.today(), 30);
     const w = {
       step: 1,
-      q: { id: '', title: '', client: '', clientFull: '', contact: '', phone: '', email: '', cc: [], start, end: U.addDays(start, 1), pax: 50, status: 'draft',
+      q: { id: '', title: '', client: '', clientFull: '', contact: '', phone: '', email: '', cc: [], start, end: start, pax: 50, status: 'draft',
         discount: { type: 'pct', value: 0 }, validUntil: U.addDays(U.today(), 14), holdUntil: '', deposit: '30% ภายใน 7 วันหลังยืนยัน', items: [], history: [], views: 0, dietary: [] },
       sel: { room: '', layout: 'classroom', half: false, av: true, slots: {}, rooms: {}, nights: 1 },
       changed: null
@@ -527,7 +540,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
             <div><label class="f">โทรศัพท์</label><input class="input" type="tel" data-change="wizF" data-f="phone" value="${H(q.phone)}"></div>
             <div><label class="f">อีเมล</label><input class="input" type="email" data-change="wizF" data-f="email" value="${H(q.email)}"></div>
             <div><label class="f">วันเริ่มงาน</label><input class="input" type="date" data-change="wizF" data-f="start" value="${H(q.start)}"></div>
-            <div><label class="f">วันสิ้นสุด</label><input class="input" type="date" data-change="wizF" data-f="end" value="${H(q.end)}"></div>
+            <div><label class="f">วันสิ้นสุด</label><input class="input" type="date" data-change="wizF" data-f="end" value="${H(q.end)}"><div class="xs ${U.daysOf(q.start, q.end).length > 7 ? 'red' : 'muted'}" style="margin-top:4px">รวม ${U.daysOf(q.start, q.end).length} วัน (${U.fmtRange(q.start, q.end)})</div></div>
             <div><label class="f">จำนวนผู้เข้าร่วม</label><input class="input" inputmode="numeric" data-change="wizF" data-f="pax" value="${H(q.pax)}"></div>
           </div></div>`;
       if (w.step === 2) {
@@ -647,9 +660,10 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   });
   Object.assign(App.CHG, {
     wizF(el) {
-      const q = W().q, f = el.dataset.f;
+      const q = W().q, f = el.dataset.f, len = q.start && q.end && q.end >= q.start ? U.diffDays(q.start, q.end) : 0;
       q[f] = f === 'pax' ? Math.max(1, parseInt(el.value, 10) || 1) : el.value;
-      if (f === 'start' && (!q.end || q.end < q.start)) q.end = q.start;
+      // moving the start date keeps the event's length (the default dates are a month ahead — moving only the start used to stretch the event)
+      if (f === 'start' && q.start) q.end = U.addDays(q.start, len);
       if (f === 'end' && q.end < q.start) q.end = q.start;
       App.render();
     },
