@@ -811,3 +811,11 @@ main.bleed{padding:0;max-width:none}
 .rr-tbl .rr-s{border-left:2px solid var(--line)}
 .rr-tbl tr.rr-z td{background:var(--bg);font-weight:600;font-size:13px}
 .rr-tbl .input.sm,.rr-season .input.sm{height:34px;padding:0 8px;font-size:13px}
+.rm-tree{position:relative;margin-left:8px;padding-left:16px;border-left:2px solid var(--line)}
+.rm-br{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px dashed var(--line)}
+.rm-br:first-child{border-top:0}
+.rm-br::before{content:'';position:absolute;left:-16px;top:50%;width:12px;border-top:2px solid var(--line)}
+.rm-br.on::before{border-color:var(--yellow)}
+.rm-br.on .rm-br-l>b{color:var(--red)}
+.rm-br .pr{font-size:20px}
+.rm-br-l{min-width:0}
