@@ -312,13 +312,21 @@
         <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.full)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม">+</button></span></div>
         ${c > t.total ? `<div class="xs red" style="margin-top:6px">เกินจำนวนห้องที่มี (${t.total})</div>` : ''}`;
       };
+      // bed types stay folded behind a button until it is pressed (or one of them is already picked)
+      const branches = (fam, list) => {
+        const open = (ui.open || {})[fam] || list.some(x => ui.counts[x.id] > 0), from = Math.min(...list.map(x => D.roomPrice(x, ui.ci, ui.abf)));
+        const picked = list.filter(x => ui.counts[x.id] > 0).map(x => x.bed + ' ' + ui.counts[x.id]).join(' · ');
+        return `<button class="rm-fold ${open ? 'open' : ''}" data-act="rmFold" data-v="${H(fam)}" aria-expanded="${open}"><span><b>เลือกแบบเตียง</b> <span class="xs muted">${list.map(x => H(x.bed)).join(' / ')}</span>${picked ? `<span class="xs red" style="display:block">เลือกแล้ว: ${H(picked)}</span>` : ''}</span>
+          <span class="rm-fold-r">${open ? '' : `<span class="xs muted">เริ่ม</span> <b class="num">${U.n(from)} ฿</b>`}<i class="rm-chev">▾</i></span></button>
+          ${open ? `<div class="rm-tree">${list.map(branch).join('')}</div>` : ''}`;
+      };
       const card = fam => {
         const list = D.ROOM_TYPES.filter(t => t.fam === fam), t = list[0], on = list.some(x => ui.counts[x.id] > 0);
         return `<article class="card rcard ${on ? 'on' : ''}">
       <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(fam)}</span>`}</div>
       <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(fam)}</h3>${list.length > 1 ? '' : `<span class="badge">${H(t.bed)}</span>`}</div>
         <div class="small muted" style="margin:4px 0 6px">${list.length > 1 ? list.length + ' แบบเตียง · ' + list.reduce((a, x) => a + x.total, 0) + ' ห้อง' : 'มี ' + t.total + ' ห้อง · ราคาสำหรับ ' + t.pax + ' ท่าน'} · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
-        ${list.length > 1 ? `<div class="rm-tree">${list.map(branch).join('')}</div>` : single(t)}
+        ${list.length > 1 ? branches(fam, list) : single(t)}
       </div></article>`;
       };
       const fams = z => [...new Set(D.ROOM_TYPES.filter(t => t.zoneId === z).map(t => t.fam))];
@@ -350,6 +358,13 @@
       (desc || '') + (all.length > 1 ? (desc ? ' · ' : '') + 'คืนที่ ' + (k ? all.slice(0, k).reduce((a, y) => a + y.nights, 0) + 1 : 1) + '–' + all.slice(0, k + 1).reduce((a, y) => a + y.nights, 0) + ' ราคาช่วง ' + x.season.name : ''), t.id, { ci: x.from }));
   Object.assign(App.ACT, {
     rmStep(el) { const ui = App.state.ui.rooms, k = el.dataset.k; ui.counts[k] = U.clamp((ui.counts[k] || 0) + Number(el.dataset.v), 0, 999); App.render(); },
+    rmFold(el) {
+      const ui = App.state.ui.rooms, fam = el.dataset.v, list = D.ROOM_TYPES.filter(t => t.fam === fam);
+      ui.open = ui.open || {};
+      const isOpen = ui.open[fam] || list.some(x => ui.counts[x.id] > 0);
+      if (isOpen && list.some(x => ui.counts[x.id] > 0)) { App.toast('ตั้งจำนวนห้องเป็น 0 ก่อนจึงจะพับได้'); return; }
+      ui.open[fam] = !isOpen; App.render();
+    },
     rmAbf(el) { App.state.ui.rooms.abf = el.dataset.v === '1'; App.render(); },
     rmApply() {
       const ui = App.state.ui.rooms;

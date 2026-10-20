@@ -819,3 +819,9 @@ main.bleed{padding:0;max-width:none}
 .rm-br.on .rm-br-l>b{color:var(--red)}
 .rm-br .pr{font-size:20px}
 .rm-br-l{min-width:0}
+.rm-fold{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;margin:8px 0 6px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--bg);cursor:pointer;text-align:left;color:inherit;font:inherit}
+.rm-fold:hover{border-color:var(--ink2)}
+.rm-fold.open{background:#fff;border-color:var(--yellow)}
+.rm-fold-r{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.rm-chev{font-style:normal;transition:transform .15s}
+.rm-fold.open .rm-chev{transform:rotate(180deg)}
