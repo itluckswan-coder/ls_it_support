@@ -191,12 +191,15 @@
     { id: 'customers', name: 'จัดการข้อมูลลูกค้า' },
     { id: 'staff', name: 'จัดรอบพนักงาน / อนุมัติต่อรอบ' },
     { id: 'users', name: 'จัดการผู้ใช้งาน' },
-    { id: 'edit_prices', name: 'แก้ไขราคาและแพ็กเกจ', note: 'เฉพาะผู้ดูแลระบบ' }
+    { id: 'edit_prices', name: 'แก้ไขราคาและแพ็กเกจ', note: 'เฉพาะผู้ดูแลระบบ' },
+    { id: 'leave_head', name: 'ลงนามใบลาในแผนก (หัวหน้าแผนก)' },
+    { id: 'leave_gm', name: 'อนุมัติใบลา (ผู้จัดการทั่วไป / รองผู้จัดการทั่วไป)' },
+    { id: 'leave_hr', name: 'รับทราบใบลา (ฝ่ายบุคคล)' }
   ];
   const ROLE_PERMS = {
     sales: ['create_quote', 'discount10', 'view_beo', 'customers'],
     manager: ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users'],
-    head: ['view_beo', 'staff'],
+    head: ['view_beo', 'staff', 'leave_head'],
     acc: ['view_beo', 'customers'],
     admin: PERMS.map(p => p.id)
   };
@@ -480,7 +483,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },

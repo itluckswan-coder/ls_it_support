@@ -43,7 +43,8 @@
     employees: [['all', { list: db.employees || [] }]],
     settings: [['main', db.settings || {}]],
     catalog: db.catalog && Array.isArray(db.catalog.food) ? [['food', { list: db.catalog.food }]] : [],
-    task: (db.tasks || []).map(t => [t.id, t])
+    task: (db.tasks || []).map(t => [t.id, t]),
+    leave: (db.leaves || []).map(l => [l.id, l])
   });
   const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, roleId: u.roleId || '', dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {} });
 
@@ -111,7 +112,7 @@
     async loadState() {
       const j = await this.req('GET', 'state');
       const seed = Store.seedData();
-      const db = { v: 1, settings: seed.settings, users: [], quotes: [], beos: [], employees: [], staff: {}, tasks: [], seq: {} };
+      const db = { v: 1, settings: seed.settings, users: [], quotes: [], beos: [], employees: [], staff: {}, tasks: [], leaves: [], seq: {} };
       this.ver = {}; this.snap = {}; this.userSnap = {};
       Store.db = db;
       g.DATA.applyCatalog(null); // built-in menu unless the shared database has an edited one
@@ -132,6 +133,7 @@
         if (d.kind === 'beo') db.beos = db.beos.filter(x => x.id !== d.id);
         if (d.kind === 'staff') delete db.staff[d.id];
         if (d.kind === 'task') db.tasks = (db.tasks || []).filter(x => x.id !== d.id);
+        if (d.kind === 'leave') db.leaves = (db.leaves || []).filter(x => x.id !== d.id);
         delete this.ver[key]; delete this.snap[key]; return;
       }
       const data = d.data;
@@ -140,6 +142,7 @@
       else if (d.kind === 'beo') { replace(db.beos); this.beoPrev[d.id] = JSON.stringify(data); }
       else if (d.kind === 'staff') db.staff[d.id] = data;
       else if (d.kind === 'task') replace(db.tasks || (db.tasks = []));
+      else if (d.kind === 'leave') replace(db.leaves || (db.leaves = []));
       else if (d.kind === 'employees') db.employees = data.list || [];
       else if (d.kind === 'settings') { db.settings = Object.assign({}, Store.seedData().settings, data); g.DATA.applyRoomRates(db.settings.roomRates); }
       else if (d.kind === 'catalog' && d.id === 'food') { db.catalog = { food: data.list || [] }; g.DATA.applyCatalog(db.catalog.food); }
