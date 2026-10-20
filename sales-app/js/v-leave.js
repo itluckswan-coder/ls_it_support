@@ -51,7 +51,8 @@
       const me = App.me(), ui = App.state.ui.leave || (App.state.ui.leave = { tab: 'mine' });
       const all = leaves().filter(l => visible(l, me)).sort((a, b) => ((b.at || '') + b.no).localeCompare((a.at || '') + a.no));
       const wait = all.filter(l => waitingOn(l, me)), approver = all.some(l => l.by !== me.id) || mayGm(me) || mayHr(me) || me.role === 'head';
-      const tabs = [['mine', 'ใบของฉัน', all.filter(l => l.by === me.id).length]].concat(approver ? [['wait', 'รอฉันลงนาม', wait.length], ['all', 'ทั้งหมด', all.length]] : []);
+      const tabs = [['mine', 'ใบของฉัน', all.filter(l => l.by === me.id).length]].concat(approver ? [['wait', 'รอฉันลงนาม', wait.length], ['all', 'ทั้งหมด', all.length]] : [])
+        .concat(mayHr(me) ? [['info', 'ข้อมูลรายละเอียด', 0]] : []);
       if (!tabs.some(t => t[0] === ui.tab)) ui.tab = 'mine';
       const list = ui.tab === 'mine' ? all.filter(l => l.by === me.id) : ui.tab === 'wait' ? wait : all;
       return `
@@ -61,16 +62,90 @@
     <div class="between"><b style="font-size:17px">${t.name}</b><span class="btn red sm" aria-hidden="true">+ แจ้ง</span></div><div class="small muted" style="margin-top:6px">${t.sub}</div></button>`).join('')}
 </div>
 <div class="seg white" style="margin-bottom:14px" role="tablist">${tabs.map(t => `<button role="tab" class="${ui.tab === t[0] ? 'on' : ''}" data-act="lvTab" data-v="${t[0]}">${t[1]}${t[2] ? ` <span class="n">${t[2]}</span>` : ''}</button>`).join('')}</div>
-<section class="card" style="overflow:hidden">
+${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden">
   <table class="tbl resp"><thead><tr><th>เลขที่ / ประเภท</th><th>ผู้ขอ</th><th>รายละเอียด</th><th>สถานะ</th></tr></thead><tbody>
   ${list.map(l => `<tr class="clickable" data-act="lvOpen" data-id="${H(l.id)}" style="cursor:pointer">
     <td><div style="font-weight:500">${H(TYPES[l.type].name)}</div><div class="sub">${H(l.no)} · ${U.fmtD((l.at || '').slice(0, 10), { year: false })}</div></td>
     <td class="hide-m">${H(who(l))}<div class="sub">${H(l.position || '')}${l.dept ? ' · ' + H(l.dept) : ''}</div></td>
     <td class="hide-m small">${summary(l)}</td><td>${badge(l)}</td></tr>`).join('') || `<tr><td colspan="4"><div class="empty">${ui.tab === 'wait' ? 'ไม่มีใบที่รอคุณลงนาม' : 'ยังไม่มีใบแจ้ง — เลือกประเภทด้านบนเพื่อแจ้ง'}</div></td></tr>`}
   </tbody></table>
-</section>
+</section>`}
 <div class="note" style="margin-top:14px">หมายเหตุ: อนุญาตให้ทำหรือใช้ QT จะต้องทำหรือใช้ 2 ชั่วโมงขึ้นไป · ไม่อนุญาตให้ทำหรือใช้ QT ก่อนเวลาเข้างาน จะถือว่าเปลี่ยนเวลาทำงาน · การเปลี่ยนวันหยุด/เวลาทำงาน ตรวจสอบจากตารางเวรที่มีการประกาศทุกครั้ง</div>`;
     }
+  };
+
+  /* ---------------- ข้อมูลรายละเอียด: every request in detail, for HR (ฝ่ายทรัพยากรบุคคล) and admins ---------------- */
+  // the day a request takes effect (QT day, the new day off / day of the new hours, the day of the missed scan)
+  const dayOf = l => l.type === 'qt' ? l.qt.date : l.type === 'change' ? (l.ch.mode === 'day' ? l.ch.toDate : l.ch.date) : l.sc.date;
+  const ok = l => l.status === 'approved' || l.status === 'done';
+  const signer = (l, k) => { const x = (l.sign || {})[k]; return x ? x.byName + (x.ok === false ? ' (ไม่อนุมัติ)' : '') + ' ' + U.fmtD(x.at.slice(0, 10), { year: false }) : ''; };
+  const detailText = l => summary(l).replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  function infoRows(all) {
+    const f = App.state.ui.leaveInfo || (App.state.ui.leaveInfo = { type: 'all', status: 'all', month: U.today().slice(0, 7), dept: 'all', q: '' });
+    const q = f.q.trim().toLowerCase();
+    return { f, rows: all.filter(l => (f.type === 'all' || l.type === f.type) && (f.status === 'all' || (f.status === 'ok' ? ok(l) : f.status === 'wait' ? ['pending', 'gm'].includes(l.status) : l.status === f.status))
+      && (!f.month || (dayOf(l) || '').startsWith(f.month)) && (f.dept === 'all' || (l.dept || '') === f.dept)
+      && (!q || [who(l), l.nick, l.position, l.dept, l.no].join(' ').toLowerCase().includes(q))).sort((a, b) => (dayOf(b) || '').localeCompare(dayOf(a) || '') || b.no.localeCompare(a.no)) };
+  }
+  function info(all) {
+    const { f, rows } = infoRows(all);
+    const months = [...new Set(all.map(l => (dayOf(l) || '').slice(0, 7)).filter(Boolean).concat(U.today().slice(0, 7)))].sort().reverse();
+    const depts = [...new Set(all.map(l => l.dept).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'th'));
+    const qtH = m => rows.filter(l => l.type === 'qt' && l.qt.mode === m && ok(l)).reduce((a, l) => a + (Number(l.qt.hours) || 0), 0);
+    const sel = (k, opts) => `<select class="input" style="width:auto;min-width:0" data-change="lvInfo" data-k="${k}">${opts.map(([v, t]) => `<option value="${H(v)}" ${f[k] === v ? 'selected' : ''}>${H(t)}</option>`).join('')}</select>`;
+    const kpi = (t, v, sub) => `<div class="card kpi"><div class="small muted">${t}</div><div class="v">${v}</div><div class="small muted">${sub}</div></div>`;
+    // per person: QT made and used, changes of day off and missed scans (approved requests only)
+    const people = {};
+    for (const l of rows) {
+      const k = who(l) + '|' + (l.dept || ''), p = people[k] || (people[k] = { name: who(l), nick: l.nick, dept: l.dept, pos: l.position, doH: 0, useH: 0, change: 0, scan: 0, wait: 0 });
+      if (!ok(l)) { if (['pending', 'gm'].includes(l.status)) p.wait++; continue; }
+      if (l.type === 'qt') p[l.qt.mode === 'do' ? 'doH' : 'useH'] += Number(l.qt.hours) || 0; else p[l.type]++;
+    }
+    const plist = Object.values(people).sort((a, b) => a.name.localeCompare(b.name, 'th'));
+    return `
+<div class="row wrap" style="margin-bottom:14px;gap:8px">
+  <input class="input" style="max-width:240px;border-radius:999px" placeholder="ค้นหาชื่อ ชื่อเล่น แผนก เลขที่…" value="${H(f.q)}" data-change="lvInfo" data-k="q" aria-label="ค้นหา">
+  ${sel('month', [['', 'ทุกเดือน']].concat(months.map(m => [m, U.ML[+m.slice(5) - 1] + ' ' + (+m.slice(0, 4) + 543)])))}
+  ${sel('type', [['all', 'ทุกประเภท']].concat(Object.entries(TYPES).map(([k, t]) => [k, t.name])))}
+  ${sel('status', [['all', 'ทุกสถานะ'], ['wait', 'รออนุมัติ'], ['ok', 'อนุมัติแล้ว'], ['done', 'ฝ่ายบุคคลรับทราบแล้ว'], ['rejected', 'ไม่อนุมัติ'], ['cancelled', 'ยกเลิก']])}
+  ${sel('dept', [['all', 'ทุกแผนก']].concat(depts.map(d => [d, d])))}
+  <button class="btn ghost" data-act="lvExport" style="margin-left:auto">ส่งออก Excel</button>
+</div>
+<div class="grid g4" style="margin-bottom:16px">
+  ${kpi('ใบแจ้งทั้งหมด', rows.length + ' <small>ใบ</small>', `รออนุมัติ ${rows.filter(l => ['pending', 'gm'].includes(l.status)).length} · รอฝ่ายบุคคล ${rows.filter(l => l.status === 'approved').length}`)}
+  ${kpi('QT (อนุมัติแล้ว)', `${qtH('do')} / ${qtH('use')} <small>ชม.</small>`, 'ทำ QT / ลา QT')}
+  ${kpi('เปลี่ยนวันหยุด / เวลา', rows.filter(l => l.type === 'change').length + ' <small>ใบ</small>', `อนุมัติแล้ว ${rows.filter(l => l.type === 'change' && ok(l)).length}`)}
+  ${kpi('ลืมสแกนนิ้ว', rows.filter(l => l.type === 'scan').length + ' <small>ใบ</small>', `อนุมัติแล้ว ${rows.filter(l => l.type === 'scan' && ok(l)).length}`)}
+</div>
+<section class="card" style="overflow:hidden;margin-bottom:16px">
+  <div style="padding:14px 18px 4px"><h3>สรุปรายบุคคล</h3><div class="xs muted">นับเฉพาะใบที่อนุมัติแล้ว · คงเหลือ QT = ทำ QT − ลา QT</div></div>
+  <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>ชื่อ-สกุล</th><th>แผนก</th><th class="r">ทำ QT (ชม.)</th><th class="r">ลา QT (ชม.)</th><th class="r">คงเหลือ QT</th><th class="r">เปลี่ยนวันหยุด/เวลา</th><th class="r">ลืมสแกนนิ้ว</th><th class="r">รออนุมัติ</th></tr></thead><tbody>
+  ${plist.map(p => `<tr><td>${H(p.name)}${p.nick ? ` <span class="muted small">(${H(p.nick)})</span>` : ''}<div class="sub">${H(p.pos || '')}</div></td><td>${H(p.dept || '—')}</td><td class="r">${p.doH}</td><td class="r">${p.useH}</td>
+    <td class="r b ${p.doH - p.useH < 0 ? 'red' : ''}">${p.doH - p.useH}</td><td class="r">${p.change}</td><td class="r">${p.scan}</td><td class="r">${p.wait || ''}</td></tr>`).join('') || '<tr><td colspan="8"><div class="empty">ไม่มีข้อมูลตามตัวกรอง</div></td></tr>'}
+  </tbody></table></div>
+</section>
+<section class="card" style="overflow:hidden">
+  <div style="padding:14px 18px 4px"><h3>รายละเอียดใบแจ้ง</h3><div class="xs muted">${rows.length} ใบ · กดที่แถวเพื่อดูใบและลงนาม</div></div>
+  <div style="overflow-x:auto"><table class="tbl" style="font-size:13px;min-width:1100px"><thead><tr><th>เลขที่</th><th>วันที่มีผล</th><th>ชื่อ-สกุล</th><th>ตำแหน่ง / แผนก</th><th>ประเภท</th><th>รายละเอียด</th><th>เหตุผล / พยาน</th><th>ลงนาม</th><th>สถานะ</th></tr></thead><tbody>
+  ${rows.map(l => `<tr data-act="lvOpen" data-id="${H(l.id)}" style="cursor:pointer">
+    <td style="white-space:nowrap">${H(l.no)}<div class="sub">เขียน ${U.fmtD((l.at || '').slice(0, 10), { year: false })}</div></td><td style="white-space:nowrap">${dTH(dayOf(l))}</td>
+    <td>${H(who(l))}${l.nick ? `<div class="sub">${H(l.nick)}</div>` : ''}</td><td>${H(l.position || '—')}<div class="sub">${H(l.dept || '')}${l.branch ? ' · ' + H(l.branch) : ''}</div></td>
+    <td style="white-space:nowrap">${H(TYPES[l.type].name)}</td><td>${summary(l)}</td>
+    <td>${H(l.reason || '')}${l.type === 'scan' && l.sc.witness ? `<div class="sub">พยาน ${H(l.sc.witness)}${l.sc.witnessPos ? ' · ' + H(l.sc.witnessPos) : ''}</div>` : ''}</td>
+    <td class="xs">${STEPS.map(([k, t]) => signer(l, k) ? `<div><span class="muted">${t}:</span> ${H(signer(l, k))}</div>` : '').join('') || '<span class="muted">—</span>'}</td><td>${badge(l)}</td></tr>`).join('') || '<tr><td colspan="9"><div class="empty">ไม่มีใบแจ้งตามตัวกรอง</div></td></tr>'}
+  </tbody></table></div>
+</section>`;
+  }
+  App.CHG.lvInfo = el => { const f = App.state.ui.leaveInfo; f[el.dataset.k] = el.value; App.render(); };
+  App.ACT.lvExport = () => {
+    const me = App.me(); if (!mayHr(me)) return;
+    const { f, rows } = infoRows(leaves().filter(l => visible(l, me)));
+    const out = [['เลขที่', 'วันที่เขียน', 'วันที่มีผล', 'ชื่อ-สกุล', 'ชื่อเล่น', 'ตำแหน่ง', 'แผนก', 'สาขา', 'ประเภท', 'รายละเอียด', 'ชั่วโมง QT', 'เหตุผล', 'พยาน', 'หัวหน้าแผนก', 'ผู้จัดการทั่วไป', 'รองผู้จัดการทั่วไป', 'ฝ่ายบุคคล', 'สถานะ']]
+      .concat(rows.map(l => [l.no, (l.at || '').slice(0, 10), dayOf(l) || '', who(l), l.nick || '', l.position || '', l.dept || '', l.branch || '', TYPES[l.type].name, detailText(l),
+        l.type === 'qt' ? (l.qt.mode === 'use' ? -1 : 1) * (Number(l.qt.hours) || 0) : '', l.reason || '', l.type === 'scan' ? [l.sc.witness, l.sc.witnessPos].filter(Boolean).join(' · ') : '',
+        signer(l, 'head'), signer(l, 'gm'), signer(l, 'dgm'), signer(l, 'hr'), (STATUS[l.status] || STATUS.pending)[0]]));
+    const blob = g.Sheet.writeXlsx(out, { sheetName: 'ใบแจ้ง', widths: [20, 12, 12, 24, 10, 18, 18, 16, 16, 44, 10, 30, 22, 22, 22, 22, 22, 18] });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'ข้อมูลใบลา-' + (f.month || 'ทั้งหมด') + '.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   };
 
   /* ---------------- request form ---------------- */
