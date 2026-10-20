@@ -40,6 +40,19 @@ h3{font-size:16px}
 .nav a{padding:8px 12px;border-radius:999px;font-size:14px;font-weight:500;color:var(--ink2);white-space:nowrap}
 .nav a:hover{background:var(--bg)}
 .nav a.on{background:var(--ink);color:#fff}
+.nav .nav-grp{padding:8px 12px;border-radius:999px;font-size:14px;font-weight:500;color:var(--ink2);white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.nav .nav-grp:hover{background:var(--bg)}
+.nav .nav-grp.on{background:var(--ink);color:#fff}
+.nav .nav-grp .caret,.drawer-grp .caret{font-size:10px;transition:transform .15s}
+.nav .nav-grp[aria-expanded=true] .caret,.drawer-grp.open .caret{transform:rotate(180deg)}
+.nav-pop{position:fixed;z-index:70;min-width:200px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 32px rgba(23,33,31,.14);padding:6px;display:flex;flex-direction:column;gap:2px}
+.nav-pop a{padding:10px 14px;border-radius:10px;font-size:14px;font-weight:500;color:var(--ink2)}
+.nav-pop a:hover{background:var(--bg)}
+.nav-pop a.on{background:var(--ink);color:#fff}
+.drawer-grp{padding:12px 14px;border-radius:12px;font-weight:500;color:var(--ink2);text-align:left;display:flex;justify-content:space-between;align-items:center}
+.drawer-kids{display:flex;flex-direction:column;gap:4px}
+.drawer-kids[hidden]{display:none}
+.drawer a.sub{padding-left:30px}
 .tb-right{margin-left:auto;display:flex;align-items:center;gap:12px;flex:none}
 .search{position:relative}
 .search input{width:200px;height:38px;border-radius:999px;background:var(--bg);border:1px solid transparent;padding:0 16px;font-size:13px;outline:none}
@@ -621,7 +634,7 @@ main.bleed{padding:0;max-width:none}
 .tk-emp{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer}
 .tk-card{display:flex;flex-direction:column}
 /* the menu has 11 entries: tighten it on laptop widths so every entry stays visible */
-@media (min-width:1101px) and (max-width:1500px){.nav a{padding:8px 8px;font-size:13px}.topbar .brand .t{display:none}.topbar .brand .sep{display:none}}
+@media (min-width:1101px) and (max-width:1500px){.nav a,.nav .nav-grp{padding:8px 8px;font-size:13px}.topbar .brand .t{display:none}.topbar .brand .sep{display:none}}
 @media (min-width:1101px) and (max-width:1239px){.nav{display:none}.menu-btn{display:grid}}
 
 /* ---------- floor plan (ออกแบบผังงาน) ---------- */
