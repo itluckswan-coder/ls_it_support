@@ -522,7 +522,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูเ�
       const cnt = d => db.employees.filter(e => d === 'all' || e.dept === d).length;
       return `
 <div class="page-hd"><div><h1>พนักงานทั้งหมด</h1><div class="small muted">${db.employees.length} คน · ${D.DEPTS.filter(d => cnt(d.id)).map(d => d.short + ' ' + cnt(d.id)).join(' · ')}</div></div>
-  ${canEdit ? '<div class="row wrap"><button class="btn red" data-act="empNew">+ เพิ่มพนักงาน</button></div>' : ''}</div>
+  ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="empImport">นำเข้าไฟล์รายชื่อ</button><button class="btn red" data-act="empNew">+ เพิ่มพนักงาน</button></div>' : ''}</div>
 <div class="row wrap" style="margin-bottom:16px">
   <input class="input" style="max-width:260px;border-radius:999px" placeholder="ค้นหาชื่อ ตำแหน่ง เบอร์โทร…" value="${H(ui.q)}" data-change="empQ" aria-label="ค้นหาพนักงาน">
   <button class="chip ${ui.dept === 'all' ? 'on' : ''}" data-act="empDept" data-v="all">ทั้งหมด <span class="n">${cnt('all')}</span></button>
@@ -801,6 +801,93 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     });
   }
   // remove an employee from every shift and OT request in all plans
+  /* ---------- import the staff list from .xlsx / .csv ---------- */
+  const EHEAD = { name: /^(ชื่อ[-\s]*(นามสกุล|สกุล)?|ชื่อพนักงาน|name|full ?name)$/i, last: /^(นามสกุล|สกุล|last ?name|surname)$/i, role: /ตำแหน่ง|position|job|title/i, dept: /แผนก|ฝ่าย|dept|department/i, phone: /โทร|phone|mobile|tel/i, hours: /ชั่วโมง|ชม|hours?/i };
+  const normName = t => String(t || '').replace(/\s+/g, ' ').trim();
+  function parseEmps(rows) {
+    rows = rows.filter(r => r && r.some(c => String(c).trim() !== ''));
+    let map = { name: 0, role: 1, dept: 2, phone: 3, hours: 4 }, start = 0;
+    const hi = rows.findIndex((r, i) => i < 5 && r.some(c => EHEAD.name.test(String(c).trim())));
+    if (hi >= 0) {
+      map = {}; start = hi + 1;
+      rows[hi].forEach((c, i) => { const t = String(c).trim(); for (const k of ['last', 'name', 'dept', 'role', 'phone', 'hours']) if (map[k] == null && EHEAD[k].test(t)) { map[k] = i; break; } });
+    }
+    const seen = new Set();
+    return rows.slice(start).map((r, i) => {
+      const get = k => map[k] == null || r[map[k]] == null ? '' : String(r[map[k]]).trim();
+      const name = normName(get('name') + ' ' + get('last')), dRaw = get('dept'), h = get('hours');
+      const out = { line: start + i + 1, name, role: get('role'), dept: parseDept(dRaw), phone: get('phone'), hours: h === '' ? null : Math.max(0, Math.min(168, Math.round(Number(h) || 0))), errs: [] };
+      if (!out.name) out.errs.push('ไม่มีชื่อ');
+      if (!out.dept) out.errs.push(dRaw ? 'ไม่รู้จักแผนก "' + dRaw + '"' : 'ไม่ได้ระบุแผนก');
+      const key = out.name + '|' + out.dept;
+      if (out.name && out.dept) { if (seen.has(key)) out.errs.push('ชื่อซ้ำในไฟล์'); seen.add(key); }
+      out.match = out.errs.length ? null : Store.db.employees.find(e => normName(e.name) === out.name && e.dept === out.dept) || null;
+      return out;
+    });
+  }
+  const empTplRows = () => [['ชื่อ-นามสกุล', 'ตำแหน่ง', 'แผนก', 'เบอร์โทร', 'ชั่วโมงสะสม/สัปดาห์']].concat(Store.db.employees.length
+    ? Store.db.employees.map(e => [e.name, e.role || '', dept(e.dept).short, e.phone || '', Number(e.hours) || 0])
+    : [['สมชาย ใจดี', 'เชฟ', 'ครัว', '081-000-0000', 0], ['สมหญิง รักงาน', 'พนักงานจัดเลี้ยง', 'จัดเลี้ยง', '', 0]]);
+  App.ACT.empImport = () => {
+    if (!App.can('staff')) return;
+    const bg = App.modal(`<h2>นำเข้ารายชื่อพนักงานจากไฟล์</h2>
+      <div id="eiBody">
+        <ol style="margin:0 0 14px;padding-left:20px;line-height:1.8">
+          <li>ดาวน์โหลดแม่แบบ (มีรายชื่อปัจจุบันใส่ไว้ให้) หรือใช้ไฟล์ของคุณเอง</li>
+          <li>1 แถวต่อ 1 คน · คอลัมน์: <b>ชื่อ-นามสกุล, ตำแหน่ง, แผนก, เบอร์โทร, ชั่วโมงสะสม/สัปดาห์</b> (สลับลำดับได้ถ้ามีแถวหัวตาราง · แยกคอลัมน์ชื่อ/นามสกุลก็ได้)</li>
+          <li><b>แผนก</b> = ครัว, จัดเลี้ยง, ช่าง/AV, ส่วนหน้า, แม่บ้าน, บัญชี (ชื่อเต็มหรือภาษาอังกฤษก็ได้)</li>
+          <li>ชื่อที่มีอยู่แล้วในแผนกเดียวกัน จะอัปเดตตำแหน่ง/เบอร์โทร/ชั่วโมงให้ ไม่เพิ่มซ้ำ</li>
+        </ol>
+        <div class="row wrap" style="margin-bottom:12px"><button class="btn ghost sm" id="eiTplX">ดาวน์โหลดแม่แบบ Excel</button><button class="btn ghost sm" id="eiTplC">ดาวน์โหลดแม่แบบ CSV</button></div>
+        <label class="btn dark block" style="cursor:pointer">เลือกไฟล์ (.xlsx / .csv)<input type="file" id="eiF" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr"></label>
+        <div id="eiMsg" class="small red" style="margin-top:10px" role="alert"></div></div>
+      <div class="acts" id="eiActs"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`);
+    bg.querySelector('.modal').style.maxWidth = '820px';
+    bg.querySelector('#eiTplX').onclick = () => {
+      const blob = g.Sheet.writeXlsx(empTplRows(), { sheetName: 'พนักงาน', widths: [28, 22, 14, 16, 12] });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'รายชื่อพนักงาน.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+    };
+    bg.querySelector('#eiTplC').onclick = () => U.download('รายชื่อพนักงาน.csv', '﻿' + empTplRows().map(r => r.map(c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(',')).join('\r\n') + '\r\n', 'text/csv');
+    bg.querySelector('#eiF').onchange = async e => {
+      const f = e.target.files[0]; if (!f) return;
+      const msg = bg.querySelector('#eiMsg'); msg.textContent = 'กำลังอ่านไฟล์…';
+      let parsed;
+      try { parsed = parseEmps(await g.Sheet.readFile(f)); }
+      catch (err) { msg.textContent = err.message || 'อ่านไฟล์ไม่สำเร็จ'; e.target.value = ''; return; }
+      if (!parsed.length) { msg.textContent = 'ไม่พบข้อมูลในไฟล์'; return; }
+      const ok = parsed.filter(r => !r.errs.length), bad = parsed.length - ok.length, upd = ok.filter(r => r.match).length;
+      bg.querySelector('#eiBody').innerHTML = `
+        <div class="between" style="margin-bottom:10px;flex-wrap:wrap"><b>${H(f.name)}</b><span class="small"><span class="teal b">เพิ่มใหม่ ${ok.length - upd} คน</span> · อัปเดต ${upd} คน${bad ? ` · <span class="red b">มีปัญหา ${bad} แถว</span>` : ''}</span></div>
+        <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px"><table class="tbl compact" style="font-size:12.5px"><thead><tr><th>แถว</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>แผนก</th><th>เบอร์โทร</th><th class="r">ชม.</th><th></th></tr></thead><tbody>
+        ${parsed.map(r => `<tr style="${r.errs.length ? 'background:var(--red-tint)' : ''}"><td class="muted">${r.line}</td><td>${H(r.name) || '<span class="red">—</span>'}${r.errs.length ? `<div class="xs red">${r.errs.map(H).join(' · ')}</div>` : ''}</td>
+          <td>${H(r.role) || '<span class="muted">-</span>'}</td><td>${r.dept ? H(dept(r.dept).short) : '<span class="red">?</span>'}</td><td>${H(r.phone)}</td><td class="r">${r.hours == null ? '' : r.hours}</td>
+          <td>${r.errs.length ? '' : r.match ? '<span class="badge st-sent">อัปเดต</span>' : '<span class="badge st-confirmed">ใหม่</span>'}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="row wrap" style="margin-top:14px;gap:18px"><label class="row small"><input type="radio" name="mode" value="merge" checked style="accent-color:var(--teal);width:18px;height:18px"> เพิ่มต่อจากรายชื่อเดิม</label>
+          <label class="row small"><input type="radio" name="mode" value="replace" style="accent-color:var(--red);width:18px;height:18px"> แทนที่ทั้งหมด (ลบคนที่ไม่มีในไฟล์ และเอาออกจากรอบงาน)</label></div>`;
+      bg.querySelector('#eiActs').innerHTML = `<button class="btn ghost" id="eiBack">เลือกไฟล์ใหม่</button><button class="btn red" id="eiGo" ${ok.length ? '' : 'disabled'}>นำเข้า ${ok.length} คน</button>`;
+      bg.querySelector('#eiBack').onclick = () => { App.closeModal(); App.ACT.empImport(); };
+      bg.querySelector('#eiGo').onclick = () => {
+        const db = Store.db, replace = (bg.querySelector('input[name=mode]:checked') || {}).value === 'replace';
+        let next = Math.max(0, ...db.employees.map(x => parseInt(String(x.id).slice(1), 10) || 0));
+        const keep = new Set();
+        for (const r of ok) {
+          if (r.match) {
+            Object.assign(r.match, { role: r.role || r.match.role, phone: r.phone || r.match.phone || '' }, r.hours == null ? {} : { hours: r.hours });
+            keep.add(r.match.id);
+          } else {
+            const id = 'e' + (++next);
+            db.employees.push({ id, name: r.name, dept: r.dept, role: r.role, phone: r.phone, hours: r.hours || 0 }); keep.add(id);
+          }
+        }
+        let removed = 0;
+        if (replace) for (const x of db.employees.slice()) if (!keep.has(x.id)) { unassign(x.id); removed++; }
+        if (replace) db.employees = db.employees.filter(x => keep.has(x.id));
+        Store.save(); App.closeModal(); App.render();
+        App.toast(`นำเข้าแล้ว · ใหม่ ${ok.length - upd} · อัปเดต ${upd}${removed ? ' · ลบ ' + removed : ''}${bad ? ' · ข้าม ' + bad + ' แถว' : ''}`);
+      };
+    };
+  };
   function unassign(id) {
     for (const plan of Object.values(Store.db.staff)) {
       for (const day of Object.values(plan.days || {})) for (const s of Object.values(day).flat()) s.staff = s.staff.filter(x => x !== id);
