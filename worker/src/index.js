@@ -101,6 +101,7 @@ const leaveHead = (l, u) => (u.role === 'head' || u.role === 'manager') && sameD
 const leaveSeen = (l, u) => !!l && (l.by === u.id || can(u, 'leave_hr') || leaveHead(l, u));
 // every signature and the approval on a leave request is the admin's
 const leaveSigner = u => u.role === 'admin';
+const leaveUnsigned = l => !Object.keys((l && l.sign) || {}).length;
 async function state(env, since, user) {
   const docs = since
     ? (await env.DB.prepare('SELECT kind, id, data, version, deleted, updated_at FROM docs WHERE updated_at >= ?').bind(since).all()).results
@@ -187,8 +188,10 @@ async function applyRules(env, user, kind, id, data, prev) {
       Object.assign(data, { by: user.id, byName: user.name, at: now(), status: 'pending', sign: {} });
     } else {
       if (!leaveSeen(prev, user)) fail(403, 'คุณไม่มีสิทธิ์แก้ไขใบลานี้');
-      const keep = ({ status, sign, ...rest }) => rest;
-      if (JSON.stringify(keep(prev)) !== JSON.stringify(keep(data))) fail(403, 'แก้ไขรายละเอียดใบลาที่ส่งแล้วไม่ได้');
+      const keep = ({ status, sign, ...rest }) => rest, fixed = ({ id, no, type, by, byName, at }) => JSON.stringify({ id, no, type, by, byName, at });
+      // the requester may still change the details while nobody has signed; who, when and the number stay as sent
+      const ownEdit = prev.by === user.id && prev.status === 'pending' && leaveUnsigned(prev) && data.status === 'pending' && leaveUnsigned(data) && fixed(prev) === fixed(data);
+      if (!ownEdit && JSON.stringify(keep(prev)) !== JSON.stringify(keep(data))) fail(403, 'แก้ไขรายละเอียดใบลาที่ลงนามแล้วไม่ได้');
       const ps = prev.sign || {}, ns = data.sign || {}, steps = ['head', 'gm', 'dgm', 'hr'];
       const added = steps.filter(k => JSON.stringify(ps[k] || null) !== JSON.stringify(ns[k] || null));
       if (added.length > 1 || added.some(k => ps[k])) fail(409, 'ใบลานี้ถูกลงนามไปแล้ว — โหลดใหม่แล้วลองอีกครั้ง');
@@ -238,8 +241,15 @@ async function putDoc(req, env, user, kind, id) {
 }
 
 async function deleteDoc(env, user, kind, id) {
-  if (user.role !== 'admin' && !(RANK[user.role] >= RANK.manager)) fail(403, 'เฉพาะผู้จัดการขึ้นไปที่ลบข้อมูลได้');
-  if ((kind === 'task' || kind === 'leave') && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบข้อมูลนี้ได้');
+  if (kind === 'leave' && user.role !== 'admin') {
+    // the requester may delete their own request while nobody has signed it
+    const row = await env.DB.prepare('SELECT data FROM docs WHERE kind = ? AND id = ? AND deleted = 0').bind(kind, id).first();
+    const l = row && JSON.parse(row.data);
+    if (!l || l.by !== user.id || !leaveUnsigned(l) || !['pending', 'cancelled'].includes(l.status)) fail(403, 'ลบได้เฉพาะใบของตัวเองที่ยังไม่มีผู้ลงนาม');
+  } else {
+    if (user.role !== 'admin' && !(RANK[user.role] >= RANK.manager)) fail(403, 'เฉพาะผู้จัดการขึ้นไปที่ลบข้อมูลได้');
+    if (kind === 'task' && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบข้อมูลนี้ได้');
+  }
   await env.DB.prepare('UPDATE docs SET deleted = 1, version = version + 1, updated_at = ?, updated_by = ? WHERE kind = ? AND id = ?').bind(now(), user.id, kind, id).run();
   await audit(env, user, kind, id, 'delete');
   return json({ ok: true });

@@ -23,6 +23,14 @@
   const mayHr = me => isAdmin(me) || !!(me.perms && me.perms.leave_hr);
   const headOf = (l, me) => (me.role === 'head' || me.role === 'manager') && sameDept(l.dept, me.dept);
   const visible = (l, me) => l.by === me.id || mayHr(me) || headOf(l, me);
+  // the requester may change or delete a request until anyone has signed it; a cancelled one may be deleted; admins delete any
+  const unsigned = l => !Object.keys(l.sign || {}).length;
+  const mayEdit = (l, me) => l.by === me.id && l.status === 'pending' && unsigned(l);
+  const mayDel = (l, me) => isAdmin(me) || (l.by === me.id && unsigned(l) && (l.status === 'pending' || l.status === 'cancelled'));
+  const ICON_EDIT = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const ICON_DEL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+  const rowActs = (l, me) => (mayEdit(l, me) ? `<button class="icon-btn us-edit" data-act="lvEdit" data-id="${H(l.id)}" title="แก้ไข" aria-label="แก้ไข ${H(l.no)}">${ICON_EDIT}</button>` : '')
+    + (mayDel(l, me) ? `<button class="icon-btn us-edit emp-del" data-act="lvDel" data-id="${H(l.id)}" title="ลบ" aria-label="ลบ ${H(l.no)}">${ICON_DEL}</button>` : '');
   const waitingOn = (l, me) => maySign(me) && ['pending', 'gm', 'approved'].includes(l.status);
   App.leaveWaiting = () => { const me = App.me(); return me ? leaves().filter(l => waitingOn(l, me)) : []; };
 
@@ -66,8 +74,8 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
   <table class="tbl resp"><thead><tr><th>เลขที่ / ประเภท</th><th>ผู้ขอ</th><th>รายละเอียด</th><th>สถานะ</th></tr></thead><tbody>
   ${list.map(l => `<tr class="clickable" data-act="lvOpen" data-id="${H(l.id)}" style="cursor:pointer">
     <td><div style="font-weight:500">${H(TYPES[l.type].name)}</div><div class="sub">${H(l.no)} · ${U.fmtD((l.at || '').slice(0, 10), { year: false })}</div></td>
-    <td class="hide-m">${H(who(l))}<div class="sub">${H(l.position || '')}${l.dept ? ' · ' + H(l.dept) : ''}</div></td>
-    <td class="hide-m small">${summary(l)}</td><td>${badge(l)}</td></tr>`).join('') || `<tr><td colspan="4"><div class="empty">${ui.tab === 'wait' ? 'ไม่มีใบที่รอคุณลงนาม' : 'ยังไม่มีใบแจ้ง — เลือกประเภทด้านบนเพื่อแจ้ง'}</div></td></tr>`}
+    <td class="hide-m">${H(who(l))}<div class="sub">${H([l.position, l.dept].filter(Boolean).join(' · '))}</div></td>
+    <td class="hide-m small">${summary(l)}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap">${badge(l)}${rowActs(l, me)}</div></td></tr>`).join('') || `<tr><td colspan="4"><div class="empty">${ui.tab === 'wait' ? 'ไม่มีใบที่รอคุณลงนาม' : 'ยังไม่มีใบแจ้ง — เลือกประเภทด้านบนเพื่อแจ้ง'}</div></td></tr>`}
   </tbody></table>
 </section>`}
 <div class="note" style="margin-top:14px">หมายเหตุ: อนุญาตให้ทำหรือใช้ QT จะต้องทำหรือใช้ 2 ชั่วโมงขึ้นไป · ไม่อนุญาตให้ทำหรือใช้ QT ก่อนเวลาเข้างาน จะถือว่าเปลี่ยนเวลาทำงาน · การเปลี่ยนวันหยุด/เวลาทำงาน ตรวจสอบจากตารางเวรที่มีการประกาศทุกครั้ง</div>`;
@@ -149,7 +157,7 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
   };
 
   /* ---------------- request form ---------------- */
-  function form(type) {
+  function form(type, ed) {
     const me = App.me(), emp = Store.db.employees.find(e => e.name.replace(/\s+/g, ' ') === (me.name || '').replace(/\s+/g, ' '));
     const last = leaves().filter(l => l.by === me.id).sort((a, b) => (b.at || '').localeCompare(a.at || ''))[0] || {};
     const today = U.today(), t = TYPES[type];
@@ -180,9 +188,17 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
       </div>
       ${type === 'qt' ? '<div class="xs muted" style="margin-top:8px">ทำหรือใช้ QT ได้ตั้งแต่ 2 ชั่วโมงขึ้นไป · ห้ามทำหรือใช้ QT ก่อนเวลาเข้างาน (ถือเป็นการเปลี่ยนเวลาทำงาน)</div>' : ''}
       <div class="small red" id="lvErr" style="min-height:20px;margin-top:6px" role="alert"></div>
-      <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="lvOk">ส่งใบแจ้ง</button></div>`, bg => {
+      <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="lvOk">${ed ? 'บันทึกการแก้ไข' : 'ส่งใบแจ้ง'}</button></div>`, bg => {
       const q = n => bg.querySelector(`[name=${n}]`);
-      if (type === 'qt') { const upd = () => { q('hours').value = hoursOf(q('from').value, q('to').value) || ''; }; q('from').oninput = q('to').oninput = upd; }
+      // editing: fill the form with what was sent
+      if (ed) {
+        const set = (n, v) => { const x = q(n); if (x && v != null) x.value = v; }, check = (n, v) => { const x = bg.querySelector(`[name=${n}][value="${v}"]`); if (x) x.checked = true; };
+        ['fullName', 'nick', 'position', 'dept', 'branch', 'reason'].forEach(n => set(n, ed[n] || ''));
+        const d = ed.qt || ed.ch || ed.sc || {};
+        Object.keys(d).forEach(k => k === 'mode' || k === 'cause' ? check(k, d[k]) : set(k, d[k]));
+        if (ed.ch && ed.ch.mode === 'time') { bg.querySelector('.lv-day').style.display = 'none'; bg.querySelector('.lv-time').style.display = 'contents'; }
+      }
+      if (type === 'qt') { const upd = () => { q('hours').value = hoursOf(q('from').value, q('to').value) || ''; }; q('from').oninput = q('to').oninput = upd; upd(); }
       if (type === 'change') bg.querySelectorAll('[name=mode]').forEach(r => r.onchange = () => {
         const day = bg.querySelector('[name=mode]:checked').value === 'day';
         bg.querySelector('.lv-day').style.display = day ? 'contents' : 'none'; bg.querySelector('.lv-time').style.display = day ? 'none' : 'contents';
@@ -208,6 +224,13 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
           l.sc = { cause: pick('cause'), inTime: f.inTime, outTime: f.outTime, date: f.date, witness: f.witness.trim(), witnessPos: f.witnessPos.trim() };
         }
         if (!l.reason && type !== 'scan') { err.textContent = 'กรุณากรอกเหตุผล'; return; }
+        if (ed) {
+          const cur = leaves().find(x => x.id === ed.id);
+          if (!cur || !mayEdit(cur, me)) { err.textContent = 'ใบนี้ถูกลงนามแล้ว แก้ไขไม่ได้'; return; }
+          ['fullName', 'nick', 'position', 'dept', 'branch', 'reason'].forEach(k => { cur[k] = l[k]; });
+          delete cur.qt; delete cur.ch; delete cur.sc; Object.assign(cur, l.qt ? { qt: l.qt } : l.ch ? { ch: l.ch } : { sc: l.sc });
+          Store.save(); App.closeModal(); App.render(); App.toast('บันทึกการแก้ไข ' + cur.no + ' แล้ว'); return;
+        }
         leaves().push(l); Store.save(); App.closeModal();
         App.state.ui.leave = { tab: 'mine' }; if (App.state.route !== 'leave') App.go('#/leave'); else App.render();
         App.toast('ส่ง' + TYPES[type].name + ' ' + l.no + ' แล้ว');
@@ -237,6 +260,8 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
     if (can.dgm) acts.push(`<button class="btn ghost" data-act="lvSign" data-id="${H(l.id)}" data-step="dgm" data-ok="1">ลงนามรองผู้จัดการทั่วไป</button>`);
     if (can.hr) acts.push(`<button class="btn teal" data-act="lvSign" data-id="${H(l.id)}" data-step="hr" data-ok="1">ฝ่ายบุคคลรับทราบ</button>`);
     if (l.by === me.id && (l.status === 'pending' || l.status === 'gm')) acts.unshift(`<button class="btn ghost red" data-act="lvCancel" data-id="${H(l.id)}">ยกเลิกใบนี้</button>`);
+    if (mayDel(l, me)) acts.unshift(`<button class="btn ghost red" data-act="lvDel" data-id="${H(l.id)}">ลบเอกสาร</button>`);
+    if (mayEdit(l, me)) acts.unshift(`<button class="btn ghost" data-act="lvEdit" data-id="${H(l.id)}">แก้ไข</button>`);
     const kv = (k, v) => `<div class="tk-kv"><span class="muted">${k}</span><span>${v}</span></div>`;
     App.modal(`<div class="between" style="align-items:flex-start;gap:10px"><div><h2 style="margin:0">${H(TYPES[l.type].name)}</h2><div class="small muted">${H(l.no)}</div></div>${badge(l)}</div>
       <div class="tk-kvs" style="margin-top:12px">
@@ -252,6 +277,18 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
     lvTab(el) { App.state.ui.leave.tab = el.dataset.v; App.render(); },
     lvNew(el) { form(el.dataset.v); },
     lvOpen(el) { const l = leaves().find(x => x.id === el.dataset.id); if (l) view(l); },
+    lvEdit(el) {
+      const l = leaves().find(x => x.id === el.dataset.id); if (!l) return;
+      if (!mayEdit(l, App.me())) { App.toast('ใบนี้ถูกลงนามแล้ว แก้ไขไม่ได้'); return; }
+      App.closeModal(); form(l.type, l);
+    },
+    lvDel(el) {
+      const l = leaves().find(x => x.id === el.dataset.id); if (!l) return;
+      if (!mayDel(l, App.me())) { App.toast('ใบนี้ถูกลงนามแล้ว ลบไม่ได้'); return; }
+      App.confirm('ลบ' + TYPES[l.type].name + ' ' + l.no + '? ลบแล้วกู้คืนไม่ได้', () => {
+        Store.db.leaves = leaves().filter(x => x.id !== l.id); Store.save(); App.closeModal(); App.render(); App.toast('ลบ ' + l.no + ' แล้ว');
+      }, 'ลบเอกสาร');
+    },
     lvCancel(el) {
       const l = leaves().find(x => x.id === el.dataset.id); if (!l) return;
       App.confirm('ยกเลิก' + TYPES[l.type].name + ' ' + l.no + '?', () => { l.status = 'cancelled'; Store.save(); App.render(); App.toast('ยกเลิกแล้ว'); }, 'ยกเลิกใบนี้');
