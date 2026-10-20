@@ -18,12 +18,12 @@
   const leaves = () => Store.db.leaves || (Store.db.leaves = []);
   const isAdmin = me => !!me && me.role === 'admin';
   const sameDept = (a, b) => !!a && !!b && String(a).trim() === String(b).trim();
-  // who may sign which line: admins everything; หัวหน้าแผนก (or the sales manager) for their own department; the rest by permission
-  const mayHead = (l, me) => isAdmin(me) || ((me.role === 'head' || me.role === 'manager' || (me.perms && me.perms.leave_head)) && sameDept(l.dept, me.dept) && l.by !== me.id);
-  const mayGm = me => isAdmin(me) || !!(me.perms && me.perms.leave_gm);
+  // only admins sign and approve (every line of the form); HR (leave_hr) reads everything; a head of department sees their department's requests
+  const maySign = me => isAdmin(me);
   const mayHr = me => isAdmin(me) || !!(me.perms && me.perms.leave_hr);
-  const visible = (l, me) => l.by === me.id || mayGm(me) || mayHr(me) || mayHead(l, me);
-  const waitingOn = (l, me) => (l.status === 'pending' && mayHead(l, me)) || (l.status === 'gm' && mayGm(me)) || (l.status === 'approved' && mayHr(me));
+  const headOf = (l, me) => (me.role === 'head' || me.role === 'manager') && sameDept(l.dept, me.dept);
+  const visible = (l, me) => l.by === me.id || mayHr(me) || headOf(l, me);
+  const waitingOn = (l, me) => maySign(me) && ['pending', 'gm', 'approved'].includes(l.status);
   App.leaveWaiting = () => { const me = App.me(); return me ? leaves().filter(l => waitingOn(l, me)) : []; };
 
   const be = iso => { if (!iso) return ['', '', '']; const d = U.d(iso); return [d.getDate(), U.ML[d.getMonth()], d.getFullYear() + 543]; };
@@ -50,8 +50,8 @@
     render() {
       const me = App.me(), ui = App.state.ui.leave || (App.state.ui.leave = { tab: 'mine' });
       const all = leaves().filter(l => visible(l, me)).sort((a, b) => ((b.at || '') + b.no).localeCompare((a.at || '') + a.no));
-      const wait = all.filter(l => waitingOn(l, me)), approver = all.some(l => l.by !== me.id) || mayGm(me) || mayHr(me) || me.role === 'head';
-      const tabs = [['mine', 'ใบของฉัน', all.filter(l => l.by === me.id).length]].concat(approver ? [['wait', 'รอฉันลงนาม', wait.length], ['all', 'ทั้งหมด', all.length]] : [])
+      const wait = all.filter(l => waitingOn(l, me)), others = all.some(l => l.by !== me.id) || mayHr(me);
+      const tabs = [['mine', 'ใบของฉัน', all.filter(l => l.by === me.id).length]].concat(maySign(me) ? [['wait', 'รออนุมัติ', wait.length]] : []).concat(others ? [['all', 'ทั้งหมด', all.length]] : [])
         .concat(mayHr(me) ? [['info', 'ข้อมูลรายละเอียด', 0]] : []);
       if (!tabs.some(t => t[0] === ui.tab)) ui.tab = 'mine';
       const list = ui.tab === 'mine' ? all.filter(l => l.by === me.id) : ui.tab === 'wait' ? wait : all;
@@ -226,10 +226,10 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
         <div style="flex:1"><b>${label}</b><div class="small muted">${x ? `${x.ok === false ? 'ไม่อนุมัติ' : k === 'gm' ? 'อนุมัติ' : 'ลงนามแล้ว'} · ${H(x.byName)} · ${H((x.at || '').slice(0, 16).replace('T', ' '))}${x.note ? ' · ' + H(x.note) : ''}` : k === 'dgm' ? 'ไม่บังคับ' : 'รอลงนาม'}</div></div></div>`;
     };
     const can = {
-      head: l.status === 'pending' && mayHead(l, me),
-      gm: l.status === 'gm' && mayGm(me),
-      dgm: (l.status === 'approved' || l.status === 'done') && !s.dgm && mayGm(me),
-      hr: l.status === 'approved' && mayHr(me)
+      head: l.status === 'pending' && maySign(me),
+      gm: l.status === 'gm' && maySign(me),
+      dgm: (l.status === 'approved' || l.status === 'done') && !s.dgm && maySign(me),
+      hr: l.status === 'approved' && maySign(me)
     };
     const acts = [];
     if (can.head) acts.push(`<button class="btn ghost red" data-act="lvSign" data-id="${H(l.id)}" data-step="head" data-ok="0">ไม่อนุมัติ</button><button class="btn teal" data-act="lvSign" data-id="${H(l.id)}" data-step="head" data-ok="1">ลงนามหัวหน้าแผนก</button>`);
@@ -258,7 +258,7 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
     },
     lvSign(el) {
       const l = leaves().find(x => x.id === el.dataset.id), me = App.me(), step = el.dataset.step, ok = el.dataset.ok === '1'; if (!l) return;
-      const allowed = { head: l.status === 'pending' && mayHead(l, me), gm: l.status === 'gm' && mayGm(me), dgm: mayGm(me) && !(l.sign || {}).dgm, hr: l.status === 'approved' && mayHr(me) }[step];
+      const allowed = maySign(me) && { head: l.status === 'pending', gm: l.status === 'gm', dgm: !(l.sign || {}).dgm, hr: l.status === 'approved' }[step];
       if (!allowed) { App.toast('คุณลงนามขั้นนี้ไม่ได้'); return; }
       const done = note => {
         l.sign = Object.assign({}, l.sign, { [step]: { by: me.id, byName: me.name, at: U.nowTH(), ok, note: note || '' } });
