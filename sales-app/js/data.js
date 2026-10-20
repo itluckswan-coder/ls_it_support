@@ -123,6 +123,14 @@
 
     { id: 'ln-buffet', cat: 'lunch', name: 'Thai–International Buffet', price: 650, unit: 'ท่าน/มื้อ', place: 'Swan Café', tags: ['halal'], feat: ['อาหารไทย-นานาชาติ 12 รายการ', 'สลัดบาร์ ของหวาน ผลไม้'] },
     { id: 'ln-bento', cat: 'lunch', name: 'Healthy Bento Set', price: 420, unit: 'ท่าน/มื้อ', tags: ['gf'], feat: ['เซตเบนโตะ 5 ช่อง', 'น้ำผลไม้'] },
+    { id: 'lb-250', cat: 'lunch', name: 'บุฟเฟ่ต์อาหารกลางวัน 250', price: 250, unit: 'ท่าน/มื้อ', rc: true, tags: [], feat: ['บุฟเฟ่ต์อาหารกลางวัน'] },
+    { id: 'lb-300', cat: 'lunch', name: 'บุฟเฟ่ต์อาหารกลางวัน 300', price: 300, unit: 'ท่าน/มื้อ', rc: true, tags: [], feat: ['บุฟเฟ่ต์อาหารกลางวัน'] },
+    { id: 'lb-350', cat: 'lunch', name: 'บุฟเฟ่ต์อาหารกลางวัน 350', price: 350, unit: 'ท่าน/มื้อ', rc: true, tags: [], feat: ['บุฟเฟ่ต์อาหารกลางวัน'] },
+    { id: 'lb-400', cat: 'lunch', name: 'บุฟเฟ่ต์อาหารกลางวัน 400', price: 400, unit: 'ท่าน/มื้อ', rc: true, tags: [], feat: ['บุฟเฟ่ต์อาหารกลางวัน'] },
+    { id: 'lb-450', cat: 'lunch', name: 'บุฟเฟ่ต์อาหารกลางวัน 450', price: 450, unit: 'ท่าน/มื้อ', rc: true, tags: [], feat: ['บุฟเฟ่ต์อาหารกลางวัน'] },
+    { id: 'cbk-50', cat: 'coffee', name: 'เบรก 50', price: 50, unit: 'ท่าน/รอบ', rc: true, tags: [], feat: ['ของว่าง / เบรกระหว่างวัน'] },
+    { id: 'cbk-60', cat: 'coffee', name: 'เบรก 60', price: 60, unit: 'ท่าน/รอบ', rc: true, tags: [], feat: ['ของว่าง / เบรกระหว่างวัน'] },
+    { id: 'cbk-70', cat: 'coffee', name: 'เบรก 70', price: 70, unit: 'ท่าน/รอบ', rc: true, tags: [], feat: ['ของว่าง / เบรกระหว่างวัน'] },
     { id: 'ln-thai7', cat: 'lunch', name: 'Thai Lunch 7 รายการ', price: 450, unit: 'ท่าน/มื้อ', tags: ['halal'], feat: ['เมนูไทย 7 รายการ (โต๊ะจีน/บุฟเฟต์)'] },
     { id: 'ln-northern', cat: 'lunch', name: 'Northern Thai Set', price: 520, unit: 'ท่าน/มื้อ', tags: [], feat: ['ข้าวซอย แกงฮังเล น้ำพริกหนุ่ม'] },
     { id: 'ln-veg', cat: 'lunch', name: 'Vegetarian Buffet', price: 480, unit: 'ท่าน/มื้อ', tags: ['veg', 'halal'], feat: ['อาหารมังสวิรัติ 9 รายการ'] },
@@ -216,7 +224,9 @@
   };
   // replace the menu list in place (every page holds a reference to FOOD)
   function applyCatalog(list) {
-    const src = Array.isArray(list) && list.length ? list : FOOD_DEFAULT;
+    let src = Array.isArray(list) && list.length ? list : FOOD_DEFAULT;
+    // a saved menu from before the buffet/break sets existed gets them added once (after that, the saved menu decides)
+    if (src !== FOOD_DEFAULT && !src.some(f => f && f.rc)) src = src.concat(FOOD_DEFAULT.filter(f => f.rc && !src.some(x => x && x.id === f.id)));
     FOOD.length = 0;
     for (const f of JSON.parse(JSON.stringify(src))) FOOD.push(normFood(f));
   }

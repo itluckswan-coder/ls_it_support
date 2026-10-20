@@ -97,7 +97,8 @@
          when the rest of the quote is 50,000 or more (before service and VAT), otherwise 5,000. */
       const isRoom = it => it.sec === 'meet' && D && D.MEETING_ROOMS.some(r => r.id === it.ref);
       const isMeeting = it => isRoom(it) && !['banquet', 'cocktail'].includes(it.layout);
-      const isMeal = it => it.sec === 'food' && D && ['lunch', 'coffee'].includes((D.FOOD.find(f => f.id === it.ref) || {}).cat);
+      // only menus marked "หักค่าห้องประชุมได้" (the lunch buffets and breaks, set on the catering page) count
+      const isMeal = it => it.sec === 'food' && !it.free && D && !!(D.FOOD.find(f => f.id === it.ref) || {}).rc;
       const isLed = it => it.ref === 'svc:ledk';
       const roomFee = items.filter(isMeeting).reduce((a, it) => a + U.lineTotal(it), 0);
       const meals = items.filter(isMeal).reduce((a, it) => a + U.lineTotal(it), 0);

@@ -60,7 +60,7 @@
   // photo carousel: swipe the image, or tap the small dots under it
   function gallery(f) {
     const slides = D.foodSlides(f);
-    const tag = f.best ? '<span class="tag">ขายดี</span>' : '';
+    const tag = (f.best ? '<span class="tag">ขายดี</span>' : '') + (f.rc ? '<span class="tag" style="background:var(--teal);color:#fff">หักค่าห้องประชุมได้</span>' : '');
     return `<div class="gal" data-gal>
       <div class="gal-track" tabindex="0" aria-label="ภาพเมนู ${H(f.name)}">${slides.map((sl, i) => `<figure class="gal-slide" aria-label="ภาพที่ ${i + 1} จาก ${slides.length}">
         ${sl.img ? `<img src="${H(sl.img)}" alt="${H(sl.cap)}" loading="lazy" draggable="false">` : `<div class="gal-ph"><span aria-hidden="true">🍽</span><b>${H(sl.cap)}</b><small>รอรูปเมนู</small></div>`}
@@ -218,7 +218,7 @@
       <div class="small muted">${r.area} ตร.ม. · รองรับ ${r.cap[ui.layout][0]}–${r.cap[ui.layout][1]} ท่าน · ผังตัวอย่าง ${pax} ที่</div>
       <div class="seat">${seatChart(ui.layout, Math.min(pax, 400))}</div>
       ${['banquet', 'cocktail'].includes(ui.layout) && r.minBanquet && pax < r.minBanquet ? `<div class="note red" style="margin:10px 0">งานเลี้ยงที่${H(r.th || r.name)} ต้องการันตีผู้เข้าร่วม ${r.minBanquet} ท่านขึ้นไป (ตอนนี้ ${pax} ท่าน)</div>` : ''}
-      <div class="xs muted" style="margin:8px 0 12px">เต็มวัน 08:00–17:00 · พักกลางวัน 12:00–13:00 · งานประชุมที่ทานอาหารกลางวัน/เบรก นำค่าอาหารมาหักค่าห้องได้ (ค่าอาหารถึงราคาห้อง = ห้องฟรี) · ใช้ห้องเกินเวลา ${U.n(2000)} บาท/ชม.</div>
+      <div class="xs muted" style="margin:8px 0 12px">เต็มวัน 08:00–17:00 · พักกลางวัน 12:00–13:00 · งานประชุมที่ทานบุฟเฟ่ต์กลางวัน/เบรก (เมนูที่ติดป้าย “หักค่าห้องประชุมได้”) นำค่าอาหารมาหักค่าห้องได้ (ค่าอาหารถึงราคาห้อง = ห้องฟรี) · ใช้ห้องเกินเวลา ${U.n(2000)} บาท/ชม.</div>
       <h3 style="font-size:14px;margin-bottom:10px">รวมในห้อง</h3>
       <div class="amen">${r.amen.map(a => `<span>${H(a)}</span>`).join('')}</div>
       <div class="card" style="padding:14px 16px;margin:16px 0;display:flex;align-items:center;gap:12px"><div style="flex:1"><b>AV Package</b><div class="small muted">โปรเจกเตอร์คู่ ไมค์ไร้สาย 4 · ช่าง</div></div>${App.sw('AV Package', ui.av, 'data-change="meetAv"')}</div>

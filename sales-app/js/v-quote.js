@@ -107,7 +107,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       <h2 style="margin-bottom:10px">สรุปยอด</h2>
       ${q.items.filter(i => i.sec === 'meet' && ['banquet', 'cocktail'].includes(i.layout)).map(i => D.MEETING_ROOMS.find(r => r.id === i.ref)).filter(r => r && r.minBanquet && Number(q.pax) < r.minBanquet).map(r => `<div class="note red" style="margin-bottom:10px">งานเลี้ยงที่${H(r.th || r.name)} ต้องการันตี ${r.minBanquet} ท่านขึ้นไป · ใบนี้ ${U.n(q.pax)} ท่าน</div>`).join('')}
       ${c.credit ? `<div class="sum-row"><span class="l">ยอดรวมรายการ</span><span class="num">${U.n2(c.gross)}</span></div>
-      <div class="sum-row"><span class="l">หักค่าห้องประชุมด้วยค่าอาหาร<br><span class="xs muted">${c.roomFree ? 'ค่าอาหารกลางวัน/เบรกครอบคลุมค่าห้อง → ห้องประชุมฟรี' : 'ค่าเช่าห้องส่วนต่าง ' + U.n2(c.roomFee - c.credit) + ' บาท'}</span></span><span class="num red">−${U.n2(c.credit)}</span></div>` : ''}
+      <div class="sum-row"><span class="l">หักค่าห้องประชุมด้วยค่าอาหาร<br><span class="xs muted">${c.roomFree ? 'ค่าบุฟเฟ่ต์กลางวัน/เบรกครอบคลุมค่าห้อง → ห้องประชุมฟรี' : 'ค่าเช่าห้องส่วนต่าง ' + U.n2(c.roomFee - c.credit) + ' บาท'}</span></span><span class="num red">−${U.n2(c.credit)}</span></div>` : ''}
       <div class="sum-row"><span class="l">ยอดรวมก่อนส่วนลด</span><span class="num">${U.n2(c.sub)}</span></div>
       <div class="sum-row"><span class="l">ส่วนลด</span><div class="seg" style="padding:3px">${['0', '5', '10'].map(v => `<button class="${dv === v ? 'on' : ''}" data-act="qDisc" data-v="${v}" style="height:28px">${v}%</button>`).join('')}<button class="${dv === 'custom' ? 'on' : ''}" data-act="qDisc" data-v="custom" style="height:28px">${dv === 'custom' ? (disc.type === 'amt' ? U.n(disc.value) + ' ฿' : disc.value + '%') : 'กำหนดเอง'}</button></div></div>
       <div class="sum-row" style="justify-content:flex-end"><span class="num red">−${U.n2(c.disc)}</span></div>
@@ -723,7 +723,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
   </tbody></table>
   <div style="display:flex;justify-content:flex-end;margin-top:12px"><table style="width:auto;min-width:260px">
-    ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าอาหารกลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
+    ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าบุฟเฟ่ต์กลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
     <tr><td>ยอดรวมก่อนส่วนลด</td><td class="r">${U.n2(c.sub)}</td></tr>
     ${c.disc ? `<tr><td>ส่วนลด ${q.discount.type === 'amt' ? '' : U.n(c.pct, c.pct % 1 ? 1 : 0) + '%'}</td><td class="r">−${U.n2(c.disc)}</td></tr>` : ''}
     <tr><td>ค่าบริการ (Service Charge) ${Math.round(S.service * 100)}%</td><td class="r">${U.n2(c.svc)}</td></tr>

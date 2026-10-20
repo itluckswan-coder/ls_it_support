@@ -62,6 +62,7 @@
           <div><label class="f">สถานที่ (ถ้ามี)</label><input class="input" data-top="place" value="${H(draft.place || '')}"></div>
           <div><label class="f">ป้ายและความเหมาะสม</label><div class="row wrap" style="gap:6px">
             <button type="button" class="chip ${draft.best ? 'on' : ''}" data-ce="best">ขายดี</button>
+            ${['lunch', 'coffee'].includes(draft.cat) ? `<button type="button" class="chip ${draft.rc ? 'on' : ''}" data-ce="rc" title="ใช้หักค่าห้องประชุมในงานประชุม">หักค่าห้องประชุมได้</button>` : ''}
             ${TAGS.map(([k, l]) => `<button type="button" class="chip ${draft.tags.includes(k) ? 'on-teal' : ''}" data-ce="tag" data-v="${k}">${l}</button>`).join('')}</div></div>
         </div>
 
@@ -112,6 +113,7 @@
       const b = e.target.closest('[data-ce]'); if (!b) return;
       const i = Number(b.dataset.i), act = b.dataset.ce;
       if (act === 'best') { draft.best = !draft.best; draw(); }
+      if (act === 'rc') { draft.rc = !draft.rc; draw(); }
       if (act === 'tag') { const k = b.dataset.v, j = draft.tags.indexOf(k); if (j >= 0) draft.tags.splice(j, 1); else draft.tags.push(k); draw(); }
       if (act === 'add') { draft.items.push({ name: '', qty: '', unit: '', detail: '', img: null }); draw(); const ins = modal.querySelectorAll('.ce-name'); ins[ins.length - 1].focus(); }
       if (act === 'del') { draft.items.splice(i, 1); draw(); }
@@ -135,6 +137,7 @@
         if (!draft.name) { err = 'กรุณาใส่ชื่อ'; draw(); return; }
         if (!(price >= 0)) { err = 'ราคาไม่ถูกต้อง'; draw(); return; }
         draft.price = price;
+        if (!['lunch', 'coffee'].includes(draft.cat)) delete draft.rc; else if (!draft.rc) delete draft.rc;
         draft.unit = String(draft.unit || '').trim() || 'ท่าน';
         draft.min = draft.min === '' || draft.min == null ? '' : Math.max(0, parseInt(draft.min, 10) || 0) || '';
         draft.items = draft.items.map(x => Object.assign(x, { name: String(x.name || '').trim(), unit: String(x.unit || '').trim(), detail: String(x.detail || '').trim() })).filter(x => x.name || x.detail || x.img);
