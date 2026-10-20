@@ -298,17 +298,38 @@
       const free = Math.floor(tot / 20);
       const cutoff = U.addDays(ui.ci, -14);
       const segs = D.roomStay(D.ROOM_TYPES[0], ui.ci, ui.nights, true), season = D.seasonOf(ui.ci);
-      const card = t => {
-        const c = ui.counts[t.id] || 0, pr = D.roomPrice(t, ui.ci, ui.abf), left = t.total;
-        return `<article class="card rcard ${c ? 'on' : ''}">
-      <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(t.fam)}</span>`}</div>
-      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(t.fam)}</h3><span class="badge">${H(t.bed)}</span></div>
-        <div class="small muted" style="margin:6px 0 12px">มี ${left} ห้อง · ราคาสำหรับ ${t.pax} ท่าน · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
-        <div class="between"><div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(pr)} ฿</span><span class="small muted"> / คืน</span></div>
+      // one card per room family; its bed types hang off it as branches, each with its own price and count
+      const branch = t => {
+        const c = ui.counts[t.id] || 0, pr = D.roomPrice(t, ui.ci, ui.abf);
+        return `<div class="rm-br ${c ? 'on' : ''}"><div class="rm-br-l"><b>${H(t.bed)}</b><div class="xs muted">มี ${t.total} ห้อง · ${t.pax} ท่าน/ห้อง</div>
+          <div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(pr)} ฿</span><span class="xs muted"> / คืน</span></div>${c > t.total ? `<div class="xs red">เกินจำนวนห้องที่มี (${t.total})</div>` : ''}</div>
+          <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด ${H(t.full)}">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.full)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม ${H(t.full)}">+</button></span></div>`;
+      };
+      // a family with one bed type keeps the plain card: bed badge, price and count, no branches
+      const single = t => {
+        const c = ui.counts[t.id] || 0, pr = D.roomPrice(t, ui.ci, ui.abf);
+        return `<div class="between" style="margin-top:6px"><div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(pr)} ฿</span><span class="small muted"> / คืน</span></div>
         <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.full)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม">+</button></span></div>
-        ${c > left ? `<div class="xs red" style="margin-top:6px">เกินจำนวนห้องที่มี (${left})</div>` : ''}
+        ${c > t.total ? `<div class="xs red" style="margin-top:6px">เกินจำนวนห้องที่มี (${t.total})</div>` : ''}`;
+      };
+      // bed types stay folded behind a button until it is pressed (or one of them is already picked)
+      const branches = (fam, list) => {
+        const open = (ui.open || {})[fam] || list.some(x => ui.counts[x.id] > 0), from = Math.min(...list.map(x => D.roomPrice(x, ui.ci, ui.abf)));
+        const picked = list.filter(x => ui.counts[x.id] > 0).map(x => x.bed + ' ' + ui.counts[x.id]).join(' · ');
+        return `<button class="rm-fold ${open ? 'open' : ''}" data-act="rmFold" data-v="${H(fam)}" aria-expanded="${open}"><span><b>เลือกแบบเตียง</b> <span class="xs muted">${list.map(x => H(x.bed)).join(' / ')}</span>${picked ? `<span class="xs red" style="display:block">เลือกแล้ว: ${H(picked)}</span>` : ''}</span>
+          <span class="rm-fold-r">${open ? '' : `<span class="xs muted">เริ่ม</span> <b class="num">${U.n(from)} ฿</b>`}<i class="rm-chev">▾</i></span></button>
+          ${open ? `<div class="rm-tree">${list.map(branch).join('')}</div>` : ''}`;
+      };
+      const card = fam => {
+        const list = D.ROOM_TYPES.filter(t => t.fam === fam), t = list[0], on = list.some(x => ui.counts[x.id] > 0);
+        return `<article class="card rcard ${on ? 'on' : ''}">
+      <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(fam)}</span>`}</div>
+      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(fam)}</h3>${list.length > 1 ? '' : `<span class="badge">${H(t.bed)}</span>`}</div>
+        <div class="small muted" style="margin:4px 0 6px">${list.length > 1 ? list.length + ' แบบเตียง · ' + list.reduce((a, x) => a + x.total, 0) + ' ห้อง' : 'มี ' + t.total + ' ห้อง · ราคาสำหรับ ' + t.pax + ' ท่าน'} · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
+        ${list.length > 1 ? branches(fam, list) : single(t)}
       </div></article>`;
       };
+      const fams = z => [...new Set(D.ROOM_TYPES.filter(t => t.zoneId === z).map(t => t.fam))];
       const zones = ['Resident', 'Resort'];
       return `
 <div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคาก่อน Service และ VAT · ช่วงราคา ${H(season.name)}${segs.length > 1 ? ' และ ' + segs.slice(1).map(x => H(x.season.name)).join(', ') + ' (คิดแยกตามคืน)' : ''}</div><div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
@@ -316,7 +337,7 @@
   <div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div></div></div>
 <div class="seg white" style="margin-bottom:14px" role="group" aria-label="อาหารเช้า"><button class="${ui.abf ? 'on' : ''}" data-act="rmAbf" data-v="1">With ABF · รวมอาหารเช้า</button><button class="${ui.abf ? '' : 'on'}" data-act="rmAbf" data-v="0">Room only · ไม่รวมอาหารเช้า</button></div>
 <div class="split">
-  <div>${zones.map(z => `<h2 class="rm-zone">Zone : ${z}</h2><div class="rcards" style="margin-bottom:18px">${D.ROOM_TYPES.filter(t => t.zoneId === z).map(card).join('')}</div>`).join('')}</div>
+  <div>${zones.map(z => `<h2 class="rm-zone">Zone : ${z}</h2><div class="rcards" style="margin-bottom:18px">${fams(z).map(card).join('')}</div>`).join('')}</div>
   <aside class="card pad sticky">
     <h2 style="margin-bottom:12px">Room block</h2>
     ${sel.length ? sel.map(t => `<div class="sum-row"><span>${H(t.name)} × ${ui.counts[t.id]}</span><span class="num">${U.n(ui.counts[t.id] * stayTotal(t, ui))}</span></div>`).join('') : '<div class="small muted">ยังไม่ได้เลือกห้อง</div>'}
@@ -337,6 +358,13 @@
       (desc || '') + (all.length > 1 ? (desc ? ' · ' : '') + 'คืนที่ ' + (k ? all.slice(0, k).reduce((a, y) => a + y.nights, 0) + 1 : 1) + '–' + all.slice(0, k + 1).reduce((a, y) => a + y.nights, 0) + ' ราคาช่วง ' + x.season.name : ''), t.id, { ci: x.from }));
   Object.assign(App.ACT, {
     rmStep(el) { const ui = App.state.ui.rooms, k = el.dataset.k; ui.counts[k] = U.clamp((ui.counts[k] || 0) + Number(el.dataset.v), 0, 999); App.render(); },
+    rmFold(el) {
+      const ui = App.state.ui.rooms, fam = el.dataset.v, list = D.ROOM_TYPES.filter(t => t.fam === fam);
+      ui.open = ui.open || {};
+      const isOpen = ui.open[fam] || list.some(x => ui.counts[x.id] > 0);
+      if (isOpen && list.some(x => ui.counts[x.id] > 0)) { App.toast('ตั้งจำนวนห้องเป็น 0 ก่อนจึงจะพับได้'); return; }
+      ui.open[fam] = !isOpen; App.render();
+    },
     rmAbf(el) { App.state.ui.rooms.abf = el.dataset.v === '1'; App.render(); },
     rmApply() {
       const ui = App.state.ui.rooms;
