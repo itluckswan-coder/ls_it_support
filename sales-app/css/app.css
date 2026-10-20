@@ -838,3 +838,6 @@ main.bleed{padding:0;max-width:none}
 .rm-fold-r{display:flex;align-items:center;gap:8px;white-space:nowrap}
 .rm-chev{font-style:normal;transition:transform .15s}
 .rm-fold.open .rm-chev{transform:rotate(180deg)}
+
+/* iOS/iPadOS gives date and time inputs a fixed intrinsic width; keep them inside their column */
+input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}

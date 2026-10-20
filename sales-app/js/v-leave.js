@@ -41,6 +41,7 @@
     if (l.type === 'change') return l.ch.mode === 'day' ? `เปลี่ยนวันหยุด ${dTH(l.ch.fromDate)} → ${dTH(l.ch.toDate)}` : `เปลี่ยนเวลาทำงาน ${H(l.ch.fromTime)} → ${H(l.ch.toTime)} น. · ${dTH(l.ch.date)}`;
     return `${H(CAUSES[l.sc.cause] || '')} · เข้า ${H(l.sc.inTime || '—')} ออก ${H(l.sc.outTime || '—')} · ${dTH(l.sc.date)}`;
   };
+  const who = l => l.fullName || l.byName; // the name written on the form (the account name when none was given)
   const badge = l => { const s = STATUS[l.status] || STATUS.pending; return `<span class="badge ${s[1]}">${s[0]}</span>`; };
 
   /* ---------------- page ---------------- */
@@ -64,7 +65,7 @@
   <table class="tbl resp"><thead><tr><th>เลขที่ / ประเภท</th><th>ผู้ขอ</th><th>รายละเอียด</th><th>สถานะ</th></tr></thead><tbody>
   ${list.map(l => `<tr class="clickable" data-act="lvOpen" data-id="${H(l.id)}" style="cursor:pointer">
     <td><div style="font-weight:500">${H(TYPES[l.type].name)}</div><div class="sub">${H(l.no)} · ${U.fmtD((l.at || '').slice(0, 10), { year: false })}</div></td>
-    <td class="hide-m">${H(l.byName)}<div class="sub">${H(l.position || '')}${l.dept ? ' · ' + H(l.dept) : ''}</div></td>
+    <td class="hide-m">${H(who(l))}<div class="sub">${H(l.position || '')}${l.dept ? ' · ' + H(l.dept) : ''}</div></td>
     <td class="hide-m small">${summary(l)}</td><td>${badge(l)}</td></tr>`).join('') || `<tr><td colspan="4"><div class="empty">${ui.tab === 'wait' ? 'ไม่มีใบที่รอคุณลงนาม' : 'ยังไม่มีใบแจ้ง — เลือกประเภทด้านบนเพื่อแจ้ง'}</div></td></tr>`}
   </tbody></table>
 </section>
@@ -77,7 +78,7 @@
     const me = App.me(), emp = Store.db.employees.find(e => e.name.replace(/\s+/g, ' ') === (me.name || '').replace(/\s+/g, ' '));
     const last = leaves().filter(l => l.by === me.id).sort((a, b) => (b.at || '').localeCompare(a.at || ''))[0] || {};
     const today = U.today(), t = TYPES[type];
-    const fld = (label, html, span) => `<div${span ? ' style="grid-column:1/-1"' : ''}><label class="f">${label}</label>${html}</div>`;
+    const fld = (label, html, span) => `<div style="min-width:0${span ? ';grid-column:1/-1' : ''}"><label class="f">${label}</label>${html}</div>`;
     const inp = (name, val, type2, extra) => `<input class="input" name="${name}" type="${type2 || 'text'}" value="${H(val == null ? '' : val)}" ${extra || ''}>`;
     const radio = (name, opts, cur) => `<div class="row wrap" style="gap:16px">${opts.map(([v, l]) => `<label class="row small"><input type="radio" name="${name}" value="${v}" ${v === cur ? 'checked' : ''} style="accent-color:var(--teal);width:18px;height:18px"> ${l}</label>`).join('')}</div>`;
     const body = type === 'qt' ? `
@@ -95,7 +96,7 @@
         ${fld('พยาน ชื่อ', inp('witness', ''))}${fld('ตำแหน่งพยาน', inp('witnessPos', ''))}`;
     const bg = App.modal(`<h2>${t.name}</h2><p class="muted" style="margin-top:-8px">${t.sub}</p>
       <div class="grid g2" style="gap:12px 14px">
-        ${fld('ชื่อ-สกุล', inp('name', me.name, 'text', 'readonly style="background:var(--bg2,#f4f3ee)"'))}${fld('ชื่อเล่น', inp('nick', last.nick || ''))}
+        ${fld('ชื่อ-สกุล', inp('fullName', last.fullName || ''))}${fld('ชื่อเล่น', inp('nick', last.nick || ''))}
         ${fld('ตำแหน่ง', inp('position', last.position || (emp && emp.role) || ''))}${fld('แผนก', inp('dept', last.dept || me.dept || ''))}
         ${fld('สาขา', inp('branch', last.branch || 'ลักษวรรณ รีสอร์ท'), 1)}
         <div style="grid-column:1/-1;border-top:1px solid var(--line);margin:4px 0 0"></div>
@@ -113,8 +114,9 @@
       });
       bg.querySelector('#lvOk').onclick = () => {
         const f = App.formData(bg), err = bg.querySelector('#lvErr'), pick = n => (bg.querySelector(`[name=${n}]:checked`) || {}).value;
-        const l = { id: U.uid('lv'), no: nextNo(), type, by: me.id, byName: me.name, nick: f.nick.trim(), position: f.position.trim(), dept: f.dept.trim(), branch: f.branch.trim(),
+        const l = { id: U.uid('lv'), no: nextNo(), type, by: me.id, byName: me.name, fullName: f.fullName.trim(), nick: f.nick.trim(), position: f.position.trim(), dept: f.dept.trim(), branch: f.branch.trim(),
           reason: f.reason.trim(), at: U.nowTH(), status: 'pending', sign: {} };
+        if (!l.fullName) { err.textContent = 'กรุณากรอกชื่อ-สกุล'; return; }
         if (type === 'qt') {
           const hours = hoursOf(f.from, f.to);
           if (!f.from || !f.to || !f.date) { err.textContent = 'กรุณากรอกเวลาและวันที่'; return; }
@@ -163,7 +165,7 @@
     const kv = (k, v) => `<div class="tk-kv"><span class="muted">${k}</span><span>${v}</span></div>`;
     App.modal(`<div class="between" style="align-items:flex-start;gap:10px"><div><h2 style="margin:0">${H(TYPES[l.type].name)}</h2><div class="small muted">${H(l.no)}</div></div>${badge(l)}</div>
       <div class="tk-kvs" style="margin-top:12px">
-        ${kv('ผู้ขอ', `${H(l.byName)}${l.nick ? ' (' + H(l.nick) + ')' : ''}`)}${kv('ตำแหน่ง/แผนก', H([l.position, l.dept].filter(Boolean).join(' · ') || '—'))}
+        ${kv('ผู้ขอ', `${H(who(l))}${l.nick ? ' (' + H(l.nick) + ')' : ''}`)}${kv('ตำแหน่ง/แผนก', H([l.position, l.dept].filter(Boolean).join(' · ') || '—'))}
         ${kv('รายละเอียด', summary(l))}${l.type === 'scan' && l.sc.witness ? kv('พยาน', H(l.sc.witness + (l.sc.witnessPos ? ' · ' + l.sc.witnessPos : ''))) : ''}
         ${l.reason ? kv(l.type === 'scan' ? 'หมายเหตุ' : 'เหตุผล', H(l.reason)) : ''}${kv('วันที่เขียน', H((l.at || '').slice(0, 16).replace('T', ' ')))}
       </div>
@@ -217,7 +219,7 @@
       <article class="doc lv-doc" style="font-size:12.5px">
         <table style="width:100%;border-collapse:collapse" border="1" cellpadding="0">
           <tr><td colspan="2" style="padding:8px 10px;text-align:center"><b style="font-size:14px">เอกสารใบขอใช้สิทธิการลา QT การเปลี่ยนแปลงเวลาทำงาน และ แจ้งเวลาเข้า-ออกงาน</b></td><td style="padding:8px 10px;width:30%">เลขที่เอกสาร <b>${H(l.no)}</b></td></tr>
-          ${row(`ชื่อ-สกุล ${u(l.byName)} ชื่อเล่น ${u(l.nick)} ตำแหน่ง/แผนก ${u([l.position, l.dept].filter(Boolean).join(' / '))} สาขา ${u(l.branch)}`)}
+          ${row(`ชื่อ-สกุล ${u(who(l))} ชื่อเล่น ${u(l.nick)} ตำแหน่ง/แผนก ${u([l.position, l.dept].filter(Boolean).join(' / '))} สาขา ${u(l.branch)}`)}
           ${row('<b>เปลี่ยนแปลงวันหยุด / เปลี่ยนแปลงเวลาทำงาน</b> <span style="color:#555">**ตรวจสอบจากตารางเวรที่มีการประกาศทุกครั้ง</span>')}
           ${row(`${box(l.type === 'qt' && qt.mode === 'do')}ทำ QT ${u(qt.mode === 'do' ? qt.hours : '')} ชม. เวลา ${u(qt.mode === 'do' ? qt.from : '')} น. ถึง เวลา ${u(qt.mode === 'do' ? qt.to : '')} น. ณ ${dt(qt.mode === 'do' ? qt.date : '')} เหตุผล ${qt.mode === 'do' ? why('qt') : u('')}`)}
           ${row(`${box(l.type === 'qt' && qt.mode === 'use')}ลา QT ${u(qt.mode === 'use' ? qt.hours : '')} ชม. เวลา ${u(qt.mode === 'use' ? qt.from : '')} น. ถึง เวลา ${u(qt.mode === 'use' ? qt.to : '')} น. ณ ${dt(qt.mode === 'use' ? qt.date : '')} เหตุผล ${qt.mode === 'use' ? why('qt') : u('')}`)}
@@ -225,7 +227,7 @@
           ${row(`${box(ch.mode === 'day')}เปลี่ยนวันหยุด จาก ${dt(ch.fromDate)} เป็น ${dt(ch.toDate)} เหตุผล ${ch.mode === 'day' ? why('change') : u('')}`)}
           ${row(`<b>สแกนนิ้วไม่ติด/ลืมสแกนนิ้ว/เริ่มงานโดยยังไม่มีลายนิ้วมือ</b>${l.type === 'scan' ? ' — ' + Object.entries(CAUSES).map(([k, v]) => box(sc.cause === k) + v).join(' &nbsp; ') : ''}`)}
           ${row(`ไม่ได้สแกนนิ้วเข้างาน/ออกงาน สาเหตุเพราะ ${u(l.type === 'scan' ? [CAUSES[sc.cause], l.reason].filter(Boolean).join(' · ') : '')} เข้างานตามจริง เข้างานเวลา ${u(sc.inTime)} น. ออกงาน เวลา ${u(sc.outTime)} น. ณ ${dt(sc.date)} พยาน ชื่อ ${u(sc.witness)} ลายเซ็น ${u('')} ตำแหน่ง ${u(sc.witnessPos)}`)}
-          <tr>${sig('พนักงาน', { byName: l.byName, at: l.at })}${sig('หัวหน้าแผนก', s.head)}${sig('ผู้จัดการทั่วไป', s.gm, true)}</tr>
+          <tr>${sig('พนักงาน', { byName: who(l), at: l.at })}${sig('หัวหน้าแผนก', s.head)}${sig('ผู้จัดการทั่วไป', s.gm, true)}</tr>
           <tr>${sig('รองผู้จัดการทั่วไป', s.dgm)}${sig('ฝ่ายบุคคล', s.hr)}<td></td></tr>
           ${row('<b>หมายเหตุ:</b> อนุญาตให้ทำหรือใช้ QT จะต้องทำหรือใช้ 2 ชั่วโมงขึ้นไป: ไม่อนุญาตให้ทำหรือใช้ QT ก่อนเวลาเข้างาน จะถือว่าเปลี่ยนเวลาทำงาน')}
         </table>
