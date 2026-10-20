@@ -305,13 +305,20 @@
           <div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(pr)} ฿</span><span class="xs muted"> / คืน</span></div>${c > t.total ? `<div class="xs red">เกินจำนวนห้องที่มี (${t.total})</div>` : ''}</div>
           <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด ${H(t.full)}">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.full)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม ${H(t.full)}">+</button></span></div>`;
       };
+      // a family with one bed type keeps the plain card: bed badge, price and count, no branches
+      const single = t => {
+        const c = ui.counts[t.id] || 0, pr = D.roomPrice(t, ui.ci, ui.abf);
+        return `<div class="between" style="margin-top:6px"><div><span class="strike num">${U.n(t.rack)}</span><span class="pr num">${U.n(pr)} ฿</span><span class="small muted"> / คืน</span></div>
+        <span class="stepper"><button class="minus" data-act="rmStep" data-k="${t.id}" data-v="-1" aria-label="ลด">−</button><input inputmode="numeric" value="${c}" data-change="rmSet" data-k="${t.id}" aria-label="จำนวนห้อง ${H(t.full)}"><button class="plus" data-act="rmStep" data-k="${t.id}" data-v="1" aria-label="เพิ่ม">+</button></span></div>
+        ${c > t.total ? `<div class="xs red" style="margin-top:6px">เกินจำนวนห้องที่มี (${t.total})</div>` : ''}`;
+      };
       const card = fam => {
         const list = D.ROOM_TYPES.filter(t => t.fam === fam), t = list[0], on = list.some(x => ui.counts[x.id] > 0);
         return `<article class="card rcard ${on ? 'on' : ''}">
       <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(fam)}</span>`}</div>
-      <div class="bd"><h3 style="font-size:18px">${H(fam)}</h3>
-        <div class="small muted" style="margin:4px 0 6px">${list.length > 1 ? list.length + ' แบบเตียง · ' : ''}${list.reduce((a, x) => a + x.total, 0)} ห้อง · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
-        <div class="rm-tree">${list.map(branch).join('')}</div>
+      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(fam)}</h3>${list.length > 1 ? '' : `<span class="badge">${H(t.bed)}</span>`}</div>
+        <div class="small muted" style="margin:4px 0 6px">${list.length > 1 ? list.length + ' แบบเตียง · ' + list.reduce((a, x) => a + x.total, 0) + ' ห้อง' : 'มี ' + t.total + ' ห้อง · ราคาสำหรับ ' + t.pax + ' ท่าน'} · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
+        ${list.length > 1 ? `<div class="rm-tree">${list.map(branch).join('')}</div>` : single(t)}
       </div></article>`;
       };
       const fams = z => [...new Set(D.ROOM_TYPES.filter(t => t.zoneId === z).map(t => t.fam))];
