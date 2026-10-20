@@ -78,7 +78,7 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
     <td class="hide-m small">${summary(l)}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap">${badge(l)}${rowActs(l, me)}</div></td></tr>`).join('') || `<tr><td colspan="4"><div class="empty">${ui.tab === 'wait' ? 'ไม่มีใบที่รอคุณลงนาม' : 'ยังไม่มีใบแจ้ง — เลือกประเภทด้านบนเพื่อแจ้ง'}</div></td></tr>`}
   </tbody></table>
 </section>`}
-<div class="note" style="margin-top:14px">หมายเหตุ: อนุญาตให้ทำหรือใช้ QT จะต้องทำหรือใช้ 2 ชั่วโมงขึ้นไป · ไม่อนุญาตให้ทำหรือใช้ QT ก่อนเวลาเข้างาน จะถือว่าเปลี่ยนเวลาทำงาน · การเปลี่ยนวันหยุด/เวลาทำงาน ตรวจสอบจากตารางเวรที่มีการประกาศทุกครั้ง</div>`;
+<div class="note" style="margin-top:14px">หมายเหตุ: อนุญาตให้ทำหรือใช้ QT จะต้องทำหรือใช้ 2 ชั่วโมงขึ้นไป · ไม่อนุญาตให้ทำหรือใช้ QT ก่อนเวลาเข้างาน จะถือว่าเปลี่ยนเวลาทำงาน · การเปลี่ยนวันหยุด/เวลาทำงาน ตรวจสอบจากตารางเวรที่มีการประกาศทุกครั้ง · ลงนามและอนุมัติใบลาได้เฉพาะผู้ดูแลระบบ</div>`;
     }
   };
 
@@ -246,7 +246,7 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
       const x = s[k];
       return `<div class="lv-step ${x ? 'on' : ''}" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)">
         <i class="dot" style="margin-top:6px;background:${x ? (x.ok === false ? 'var(--red)' : 'var(--teal)') : '#cfccc2'}"></i>
-        <div style="flex:1"><b>${label}</b><div class="small muted">${x ? `${x.ok === false ? 'ไม่อนุมัติ' : k === 'gm' ? 'อนุมัติ' : 'ลงนามแล้ว'} · ${H(x.byName)} · ${H((x.at || '').slice(0, 16).replace('T', ' '))}${x.note ? ' · ' + H(x.note) : ''}` : k === 'dgm' ? 'ไม่บังคับ' : 'รอลงนาม'}</div></div></div>`;
+        <div style="flex:1"><b>${label}</b><div class="small muted">${x ? `${x.ok === false ? 'ไม่อนุมัติ' : k === 'gm' ? 'อนุมัติ' : 'ลงนามแล้ว'} · ${H(x.byName)} · ${H((x.at || '').slice(0, 16).replace('T', ' '))}${x.note ? ' · ' + H(x.note) : ''}` : k === 'dgm' ? 'ไม่บังคับ · ผู้ดูแลระบบลงนาม' : 'รอผู้ดูแลระบบลงนาม'}</div></div></div>`;
     };
     const can = {
       head: l.status === 'pending' && maySign(me),
@@ -270,6 +270,7 @@ ${ui.tab === 'info' ? info(all) : `<section class="card" style="overflow:hidden"
         ${l.reason ? kv(l.type === 'scan' ? 'หมายเหตุ' : 'เหตุผล', H(l.reason)) : ''}${kv('วันที่เขียน', H((l.at || '').slice(0, 16).replace('T', ' ')))}
       </div>
       <div style="margin-top:12px">${STEPS.map(line).join('')}</div>
+      <div class="xs muted" style="margin-top:6px">ลงนามและอนุมัติใบลาได้เฉพาะผู้ดูแลระบบ</div>
       <div class="acts" style="flex-wrap:wrap"><a class="btn ghost" href="#/leaveprint/${encodeURIComponent(l.id)}" data-act="closeModal">พิมพ์ฟอร์ม</a>${acts.join('')}<button class="btn ghost" data-act="closeModal">ปิด</button></div>`);
   }
 
