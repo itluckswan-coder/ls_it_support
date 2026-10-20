@@ -29,6 +29,11 @@
       if (admin && t.status === 'done') out.push({ at: t.doneAt, title: (t.doneByName || 'ผู้รับงาน') + ' ยืนยันงานแล้ว', sub: t.title, href: '#/tasks', tone: 'teal' });
     }
     if (admin) for (const b of toApprove()) { const q = Store.quote(b.quoteId); out.push({ at: q.updatedAt || '', title: 'ใบฟังก์ชันรออนุมัติ', sub: b.id + ' · ' + q.client, href: '#/tasks/approve', tone: 'yellow' }); }
+    // meeting rooms booked over another booking's times: the admin is asked; the seller hears back once approved
+    for (const q of Store.db.quotes) {
+      if (admin && q.overlapReq && !q.overlapOk && q.status !== 'cancelled') out.push({ at: q.overlapReq.at, title: 'ขออนุมัติจองห้องประชุมทับเวลา', sub: q.id + ' · ' + q.client + ' · โดย ' + q.overlapReq.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'yellow' });
+      if (q.overlapOk && q.owner === me.id && q.overlapOk.by !== me.id) out.push({ at: q.overlapOk.at, title: 'อนุมัติจองห้องประชุมทับเวลาแล้ว', sub: q.id + ' · โดย ' + q.overlapOk.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'teal' });
+    }
     for (const b of Store.db.beos) {
       const a = b.approval || {};
       if (g.Approval && g.Approval.canDecide(b, me)) out.push({ at: a.requestedAt, title: 'การแก้ไขใบฟังก์ชันรออนุมัติ', sub: b.id + ' · แก้ไขโดย ' + (a.requestedByName || ''), href: '#/beo/' + encodeURIComponent(b.id), tone: 'yellow' });

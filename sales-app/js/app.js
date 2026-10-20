@@ -182,6 +182,34 @@
     calc(q) { return U.calc(q, Store.db.settings); },
     holding(q) { return q.status === 'tentative' || q.status === 'confirmed'; },
     // meeting room bookings on a date (other quotes)
+    /* meeting-room time slots a quote holds: [{ room, date, from, to }] — from each day's schedule, else the times in
+       the line's description (e.g. "เต็มวัน 08:00–17:00", "18:00–22:00"), else a full day 08:00–17:00 */
+    meetSlots(q) {
+      const out = [], days = U.daysOf(q.start, q.end), hm = t => String(t || '').replace('.', ':');
+      for (const it of q.items || []) {
+        if (it.sec !== 'meet' || !D.MEETING_ROOMS.some(r => r.id === it.ref)) continue;
+        const sch = (it.sched || []).filter(s => s.start);
+        if (sch.length) { for (const s of sch) { const d = days[(Number(s.day) || 1) - 1]; if (d) out.push({ room: it.ref, date: d, from: hm(s.start), to: hm(s.end) || '23:59' }); } continue; }
+        const m = /(\d{1,2}[:.]\d{2})\s*[–\-]\s*(\d{1,2}[:.]\d{2})/.exec(it.desc || ''), pad = t => t.length === 4 ? '0' + t : t;
+        const from = m ? pad(hm(m[1])) : '08:00', to = m ? pad(hm(m[2])) : '17:00';
+        for (const d of days.slice(0, Math.max(1, Math.min(days.length, Number(it.q1) || days.length)))) out.push({ room: it.ref, date: d, from, to });
+      }
+      return out;
+    },
+    // the same room on the same day at overlapping times as another held booking (จองชั่วคราว / ยืนยันแล้ว)
+    meetConflicts(q) {
+      const mine = App.meetSlots(q), out = [];
+      if (!mine.length) return out;
+      for (const o of Store.db.quotes) {
+        if (o.id === q.id || !App.holding(o)) continue;
+        for (const b of App.meetSlots(o)) for (const a of mine)
+          if (a.room === b.room && a.date === b.date && a.from < b.to && b.from < a.to) out.push({ room: a.room, date: a.date, mine: a.from + '–' + a.to, other: o, theirs: b.from + '–' + b.to });
+      }
+      return out;
+    },
+    overlapKey: list => JSON.stringify(list.map(c => [c.room, c.date, c.mine, c.other.id, c.theirs]).sort()),
+    // overlapping bookings need the admin's OK before the quote holds the room; a change of times needs it again
+    overlapOk(q) { const c = App.meetConflicts(q); return !c.length || !!(q.overlapOk && q.overlapOk.key === App.overlapKey(c)); },
     meetBooking(roomId, date, excludeId) {
       return Store.db.quotes.find(q => q.id !== excludeId && App.holding(q) && date >= q.start && date <= q.end &&
         q.items.some(it => it.sec === 'meet' && it.ref === roomId));
