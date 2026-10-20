@@ -34,6 +34,7 @@
       return { time: s ? s.start + (s.end ? ' - ' + s.end : '') + 'น.' : '', title: i.name, items: dishes.join('\n') };
     });
     const cost = q.items.filter(i => U.lineTotal(i)).map(i => `${i.name} ${money(i.price)} × ${i.q1}${i.q2 != null && i.q2 !== '' ? ' × ' + i.q2 : ''} = ${money(U.lineTotal(i))} บาท`);
+    if (c.credit) cost.push(`หักค่าห้องประชุมด้วยค่าอาหาร −${money(c.credit)} บาท${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}`);
     if (c.disc) cost.push(`ส่วนลด −${money(c.disc)} บาท`);
     if (c.svc) cost.push(`ค่าบริการ 10% ${money(c.svc)} บาท`);
     if (c.vat) cost.push(`VAT 7% ${money(c.vat)} บาท`);

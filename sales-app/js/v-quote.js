@@ -95,7 +95,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         <div style="min-width:0;cursor:pointer" data-act="itemEdit" data-id="${it.id}"><div class="name">${H(it.name)}${it.free ? ' <span class="badge st-confirmed">ฟรี</span>' : ''}</div><div class="desc">${H(it.desc || '')}</div></div>
         <div class="qcol"><span class="qty-chip"><input inputmode="numeric" data-change="itemF" data-id="${it.id}" data-f="q1" value="${H(it.q1)}" style="width:${String(it.q1).length + 1.5}ch" aria-label="จำนวน">${it.u1 && (it.q2 == null || it.sec !== 'food') ? ' ' + H(it.u1) : ''}${it.q2 != null ? ` × <input inputmode="numeric" data-change="itemF" data-id="${it.id}" data-f="q2" value="${H(it.q2)}" style="width:${String(it.q2).length + 1.5}ch" aria-label="จำนวนครั้ง"> ${H(it.u2 || '')}` : ''}</span></div>
         <div class="pcol"><input class="price-in num" inputmode="decimal" data-change="itemF" data-id="${it.id}" data-f="price" value="${U.n(it.price)}" aria-label="ราคาต่อหน่วย"></div>
-        <div class="tcol num b" style="text-align:right">${it.free ? 'แถม' : U.n(U.lineTotal(it))}</div>
+        <div class="tcol num b" style="text-align:right">${it.free ? 'แถม' : U.n(U.lineTotal(it))}${c.roomFree && it.sec === 'meet' && D.MEETING_ROOMS.some(r => r.id === it.ref) && !['banquet', 'cocktail'].includes(it.layout) ? '<div class="xs teal" style="font-weight:600">ฟรี · ไม่นำมาคิด</div>' : ''}</div>
         <button class="del" data-act="itemDel" data-id="${it.id}" aria-label="ลบรายการ">${ICON.trash}</button>
       </div>`).join('')}
       <button class="add-row" data-act="itemAdd" data-sec="${s.id}">+ เพิ่มรายการใน${s.name}</button></section>`;
@@ -105,6 +105,9 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   <aside class="sticky stack">
     <section class="card pad">
       <h2 style="margin-bottom:10px">สรุปยอด</h2>
+      ${q.items.filter(i => i.sec === 'meet' && ['banquet', 'cocktail'].includes(i.layout)).map(i => D.MEETING_ROOMS.find(r => r.id === i.ref)).filter(r => r && r.minBanquet && Number(q.pax) < r.minBanquet).map(r => `<div class="note red" style="margin-bottom:10px">งานเลี้ยงที่${H(r.th || r.name)} ต้องการันตี ${r.minBanquet} ท่านขึ้นไป · ใบนี้ ${U.n(q.pax)} ท่าน</div>`).join('')}
+      ${c.credit ? `<div class="sum-row"><span class="l">ยอดรวมรายการ</span><span class="num">${U.n2(c.gross)}</span></div>
+      <div class="sum-row"><span class="l">หักค่าห้องประชุมด้วยค่าอาหาร<br><span class="xs muted">${c.roomFree ? 'ค่าบุฟเฟ่ต์กลางวัน/เบรกครอบคลุมค่าห้อง → ห้องประชุมฟรี' : 'ค่าเช่าห้องส่วนต่าง ' + U.n2(c.roomFee - c.credit) + ' บาท'}</span></span><span class="num red">−${U.n2(c.credit)}</span></div>` : ''}
       <div class="sum-row"><span class="l">ยอดรวมก่อนส่วนลด</span><span class="num">${U.n2(c.sub)}</span></div>
       <div class="sum-row"><span class="l">ส่วนลด</span><div class="seg" style="padding:3px">${['0', '5', '10'].map(v => `<button class="${dv === v ? 'on' : ''}" data-act="qDisc" data-v="${v}" style="height:28px">${v}%</button>`).join('')}<button class="${dv === 'custom' ? 'on' : ''}" data-act="qDisc" data-v="custom" style="height:28px">${dv === 'custom' ? (disc.type === 'amt' ? U.n(disc.value) + ' ฿' : disc.value + '%') : 'กำหนดเอง'}</button></div></div>
       <div class="sum-row" style="justify-content:flex-end"><span class="num red">−${U.n2(c.disc)}</span></div>
@@ -132,6 +135,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       ${canDelQ() ? `<button class="btn ghost red sm" style="width:100%;margin-top:12px" data-act="qDelete" data-id="${H(q.id)}">ลบใบเสนอราคา</button>` : ''}
       ${q.history && q.history.length ? `<div class="hr"></div><div class="small muted" style="margin-bottom:6px">ประวัติ</div>${q.history.slice(0, 5).map((h, i) => `<div class="row small" style="padding:4px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('')}` : ''}
     </section>
+    ${App.otCard ? App.otCard(q) : ''}
   </aside>
 </div>`;
     },
@@ -719,6 +723,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
   </tbody></table>
   <div style="display:flex;justify-content:flex-end;margin-top:12px"><table style="width:auto;min-width:260px">
+    ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าบุฟเฟ่ต์กลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
     <tr><td>ยอดรวมก่อนส่วนลด</td><td class="r">${U.n2(c.sub)}</td></tr>
     ${c.disc ? `<tr><td>ส่วนลด ${q.discount.type === 'amt' ? '' : U.n(c.pct, c.pct % 1 ? 1 : 0) + '%'}</td><td class="r">−${U.n2(c.disc)}</td></tr>` : ''}
     <tr><td>ค่าบริการ (Service Charge) ${Math.round(S.service * 100)}%</td><td class="r">${U.n2(c.svc)}</td></tr>
@@ -777,4 +782,81 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     docT(el) { DU()[el.dataset.f] = el.checked; App.render(); },
     docValid(el) { const q = Store.quote(App.state.params[0]); q.validUntil = el.value; App.touch(q); App.render(); }
   });
+  /* ---------- meeting-room overtime: a separate bill on a confirmed quote ----------
+   * 2,000 baht per room per hour past 17:00 (or past the booked end); the bill refers back to the agreed quote */
+  const OT_RATE = 2000;
+  const otRooms = q => q.items.filter(i => i.sec === 'meet' && D.MEETING_ROOMS.some(r => r.id === i.ref)).map(i => D.MEETING_ROOMS.find(r => r.id === i.ref)).filter((r, k, all) => all.indexOf(r) === k);
+  const otCalc = bill => { const S = Store.db.settings, sub = (Number(bill.hours) || 0) * (Number(bill.rate) || OT_RATE), svc = Math.round(sub * S.service * 100) / 100, vat = Math.round((sub + svc) * S.vat * 100) / 100; return { sub, svc, vat, net: Math.round((sub + svc + vat) * 100) / 100 }; };
+  const canOT = q => q.status === 'confirmed' && App.salesRole() && otRooms(q).length;
+  App.otCard = q => {
+    const bills = q.otBills || [];
+    if (q.status !== 'confirmed' && !bills.length) return '';
+    return `<section class="card pad"><div class="between" style="margin-bottom:8px"><h3>ค่าล่วงเวลาห้องประชุม</h3>${canOT(q) ? '<button class="btn ghost sm" data-act="otNew">+ ออกบิล</button>' : ''}</div>
+      <div class="xs muted" style="margin-bottom:8px">ใช้ห้องเกินเวลา ${U.n(OT_RATE)} บาท/ห้อง/ชั่วโมง · ออกบิลแยกจากใบเสนอราคา</div>
+      ${bills.map(b => { const c = otCalc(b); return `<div class="between" style="padding:8px 0;border-top:1px solid var(--line)"><span class="small"><b>${H(b.no)}</b> · ${H(b.roomName)} · ${U.fmtD(b.date, { year: false })} · ${b.hours} ชม.<br><span class="xs muted">${H(b.byName || '')} · ${H((b.at || '').slice(0, 16).replace('T', ' '))}</span></span>
+        <span class="row" style="gap:6px;flex-wrap:nowrap"><b class="num small">฿${U.n2(c.net)}</b><a class="btn ghost sm" href="#/otbill/${encodeURIComponent(q.id)}/${encodeURIComponent(b.id)}">ดู/พิมพ์</a></span></div>`; }).join('') || '<div class="small muted">ยังไม่มีบิลค่าล่วงเวลา</div>'}</section>`;
+  };
+  Object.assign(App.ACT, {
+    otNew() {
+      const q = Store.quote(App.state.params[0]); if (!q || !canOT(q)) return;
+      const rooms = otRooms(q), days = U.daysOf(q.start, q.end);
+      App.modal(`<h2>ออกบิลค่าล่วงเวลา</h2><p class="muted" style="margin-top:-8px">${H(q.id)} · ${H(q.client)} · ${H(q.title)}</p>
+        <div class="grid g2"><div><label class="f" for="otRoom">ห้องประชุม</label><select class="input" id="otRoom">${rooms.map(r => `<option value="${r.id}">${H(r.th || r.name)}</option>`).join('')}</select></div>
+          <div><label class="f" for="otDate">วันที่ใช้ห้องเกินเวลา</label><select class="input" id="otDate">${days.map(d => `<option value="${d}" ${d === U.today() ? 'selected' : ''}>${U.fmtD(d)}</option>`).join('')}</select></div></div>
+        <div class="grid g2" style="margin-top:14px"><div><label class="f" for="otFrom">เวลาเลิกตามกำหนด</label><input class="input" id="otFrom" type="time" value="17:00"></div><div><label class="f" for="otTo">เวลาเลิกจริง</label><input class="input" id="otTo" type="time" value="19:00"></div></div>
+        <div class="field" style="margin-top:14px"><label class="f" for="otHours">จำนวนชั่วโมงที่คิดเงิน</label><input class="input" id="otHours" type="number" min="0.5" max="24" step="0.5" value="2"><div class="xs muted" style="margin-top:4px">คิดจากเวลาให้อัตโนมัติ ปัดขึ้นทีละครึ่งชั่วโมง แก้ได้</div></div>
+        <div class="field"><label class="f" for="otNote">หมายเหตุ</label><input class="input" id="otNote" placeholder="เช่น ประชุมต่อเนื่องจากช่วงบ่าย"></div>
+        <div class="note" id="otSum" style="margin-top:6px"></div>
+        <div class="small red" id="otErr" role="alert"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="otOk">ออกบิล</button></div>`, bg => {
+        const $ = id => bg.querySelector('#' + id);
+        const sum = () => { const h = Number($('otHours').value) || 0, c = otCalc({ hours: h, rate: OT_RATE }); $('otSum').innerHTML = `${h} ชม. × ${U.n(OT_RATE)} = ${U.n2(c.sub)} · ค่าบริการ ${U.n2(c.svc)} · VAT ${U.n2(c.vat)} · <b>สุทธิ ${U.n2(c.net)} บาท</b>`; };
+        const fromTimes = () => { const [a, b] = [$('otFrom').value, $('otTo').value].map(t => { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; }); const mins = b - a; if (mins > 0) $('otHours').value = Math.ceil(mins / 30) / 2; sum(); };
+        $('otFrom').onchange = fromTimes; $('otTo').onchange = fromTimes; $('otHours').oninput = sum; sum();
+        $('otOk').onclick = () => {
+          const h = Number($('otHours').value);
+          if (!(h > 0 && h <= 24)) { $('otErr').textContent = 'จำนวนชั่วโมงต้องอยู่ระหว่าง 0.5–24'; return; }
+          const r = D.MEETING_ROOMS.find(x => x.id === $('otRoom').value), me = App.me(), bills = q.otBills || (q.otBills = []);
+          const b = { id: 'ot' + Date.now().toString(36), no: 'OT-' + q.id.replace(/^QT-/, '') + '-' + (bills.length + 1), room: r.id, roomName: r.th || r.name, date: $('otDate').value, from: $('otFrom').value, to: $('otTo').value, hours: h, rate: OT_RATE, note: $('otNote').value.trim().slice(0, 200), at: U.nowTH(), by: me.id, byName: me.name };
+          bills.push(b); App.closeModal(); App.touch(q, `ออกบิลค่าล่วงเวลา ${b.no} (${r.th || r.name} ${h} ชม.)`);
+          App.go('#/otbill/' + encodeURIComponent(q.id) + '/' + encodeURIComponent(b.id));
+        };
+      });
+    },
+    otDel(el) {
+      const q = Store.quote(App.state.params[0]); if (!q || !App.salesRole()) return;
+      const b = (q.otBills || []).find(x => x.id === el.dataset.id); if (!b) return;
+      App.confirm('ลบบิล ' + b.no + '?', () => { q.otBills = q.otBills.filter(x => x !== b); App.touch(q, 'ลบบิลค่าล่วงเวลา ' + b.no); App.go('#/quote/' + encodeURIComponent(q.id)); }, 'ลบบิล');
+    }
+  });
+  // the printable overtime bill, with the agreed quote it belongs to
+  App.V.otbill = {
+    nav: 'quote', title: 'บิลค่าล่วงเวลา',
+    render(p) {
+      const q = Store.quote(p[0]), b = q && (q.otBills || []).find(x => x.id === p[1]);
+      if (!b) return '<div class="empty">ไม่พบบิล — <a href="#/quotes">กลับ</a></div>';
+      const S = Store.db.settings, c = otCalc(b), qc = App.calc(q);
+      return `<div class="page-hd no-print"><div><div class="small"><a class="link" href="#/quote/${encodeURIComponent(q.id)}">← ${H(q.id)}</a></div><h1>บิลค่าล่วงเวลา ${H(b.no)}</h1></div>
+        <div class="row">${App.salesRole() ? `<button class="btn ghost red" data-act="otDel" data-id="${H(b.id)}">ลบบิล</button>` : ''}<button class="btn red" onclick="window.print()">พิมพ์ / PDF</button></div></div>
+      <article class="doc">
+        <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start"><div><b>${H(S.company)}</b><br>${H(S.address)}<br>โทร ${H(S.phone || '')}</div><img src="img/logo-wide.png" alt="Luck Swan Resort" style="width:170px;flex:none"></div>
+        <div class="blue b" style="margin:16px 0 10px;font-size:13px">Overtime Invoice<br>ใบแจ้งค่าล่วงเวลาห้องประชุม</div>
+        <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px 14px;margin-bottom:14px">
+          <b>ผู้รับบริการ</b><b>เลขที่บิล</b><b>วันที่ออกบิล</b>
+          <span>${H(q.clientFull || q.client)}<br>${H(q.contact || '')} ${H(q.phone || '')}</span><span class="it">${H(b.no)}</span><span class="it">${U.fmtD(b.at.slice(0, 10))}</span>
+        </div>
+        <div style="background:#f5f5f5;padding:8px 10px;margin-bottom:12px;font-size:12px"><b>อ้างอิงใบเสนอราคาที่ตกลงไว้</b> · ${H(q.id)} · ${H(q.title)} · วันงาน ${U.fmtRange(q.start, q.end)} · ${U.n(q.pax)} ท่าน · ยอดตามใบเสนอราคา ${U.n2(qc.net)} บาท</div>
+        <table><thead><tr><th>รายการ</th><th class="c">วันที่</th><th class="c">เวลา</th><th class="c">ชั่วโมง</th><th class="c">ราคา/ชม.</th><th class="r">จำนวนเงิน</th></tr></thead><tbody>
+          <tr><td>ค่าล่วงเวลาห้องประชุม ${H(b.roomName)}${b.note ? `<br><span style="color:#666">${H(b.note)}</span>` : ''}</td><td class="c">${U.fmtD(b.date)}</td><td class="c">${H(b.from || '')}–${H(b.to || '')}</td><td class="c">${b.hours}</td><td class="c">${U.n(b.rate)}</td><td class="r">${U.n2(c.sub)}</td></tr>
+        </tbody></table>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px"><table style="width:auto;min-width:260px">
+          <tr><td>รวม</td><td class="r">${U.n2(c.sub)}</td></tr>
+          <tr><td>ค่าบริการ (Service Charge) ${Math.round(S.service * 100)}%</td><td class="r">${U.n2(c.svc)}</td></tr>
+          <tr><td>ภาษีมูลค่าเพิ่ม (VAT) ${Math.round(S.vat * 100)}%</td><td class="r">${U.n2(c.vat)}</td></tr></table></div>
+        <div style="display:flex;justify-content:space-between;gap:12px;border-top:1px solid #999;margin-top:10px;padding-top:10px;flex-wrap:wrap"><b>ยอดชำระ (รวมค่าบริการและภาษีมูลค่าเพิ่ม)</b><div style="text-align:right" class="blue"><b style="font-size:14px">${U.n2(c.net)} บาท</b><br><b>(${U.bahtText(c.net)})</b></div></div>
+        <div style="margin-top:14px;color:#444;font-size:11px">ห้องประชุมเต็มวัน 08:00–17:00 (พักกลางวัน 12:00–13:00) · ใช้ห้องเกินเวลา คิด ${U.n(OT_RATE)} บาท/ห้อง/ชั่วโมง · บิลนี้แยกจากใบเสนอราคา ${H(q.id)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:40px;text-align:center"><div><div style="border-bottom:1px solid #333;margin:0 30px 6px;height:30px"></div>ผู้รับบริการ</div><div><div style="border-bottom:1px solid #333;margin:0 30px 6px;height:30px"></div>${H(b.byName || '')}<br>ผู้ออกบิล</div></div>
+      </article>`;
+    }
+  };
 })(window);
