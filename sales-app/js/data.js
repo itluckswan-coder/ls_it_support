@@ -194,7 +194,7 @@
     { id: 'edit_prices', name: 'แก้ไขราคาและแพ็กเกจ', note: 'เฉพาะผู้ดูแลระบบ' },
     { id: 'leave_head', name: 'ลงนามใบลาในแผนก (หัวหน้าแผนก)' },
     { id: 'leave_gm', name: 'อนุมัติใบลา (ผู้จัดการทั่วไป / รองผู้จัดการทั่วไป)' },
-    { id: 'leave_hr', name: 'รับทราบใบลา (ฝ่ายบุคคล)' }
+    { id: 'leave_hr', name: 'รับทราบใบลา และดูข้อมูลรายละเอียดใบลา (ฝ่ายทรัพยากรบุคคล)' }
   ];
   const ROLE_PERMS = {
     sales: ['create_quote', 'discount10', 'view_beo', 'customers'],
