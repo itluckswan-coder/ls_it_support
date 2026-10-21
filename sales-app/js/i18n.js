@@ -68,6 +68,11 @@
     // a pattern for text with values in it: I18N.pattern(/^รวม (\d+) วัน$/, (m, L) => L === 'en' ? m[1] + ' days' : ...)
     pattern(re, fn) { PATTERNS.push([re, fn]); },
     piece(re, fn) { PIECES.push([re, fn]); },
+    // words swapped inside longer text (department and shift names, units): longest first
+    pieces(dict) {
+      const keys = Object.keys(dict).sort((x, y) => y.length - x.length);
+      for (const k of keys) PIECES.push([new RegExp(esc(k), 'g'), (m, L) => dict[k][L === 'en' ? 0 : 1]]);
+    },
     t(text) { return lang === 'th' ? text : (tr(text, lang) || text); },
     apply,
     set(next) {
