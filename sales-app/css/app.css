@@ -841,3 +841,16 @@ main.bleed{padding:0;max-width:none}
 
 /* iOS/iPadOS gives date and time inputs a fixed intrinsic width; keep them inside their column */
 input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit-appearance:none;appearance:none}
+
+/* interface language (js/i18n.js): Burmese gets its own font and a little more line height */
+:root[lang=my]{--fh:'Noto Sans Myanmar','Bai Jamjuree','IBM Plex Sans Thai',system-ui,sans-serif;--fb:'Noto Sans Myanmar','IBM Plex Sans Thai',system-ui,sans-serif}
+:root[lang=my] body{line-height:1.7}
+.lang-btn{position:relative}
+.lang-btn .lang-code{position:absolute;right:-4px;bottom:-4px;background:var(--ink);color:#fff;font:600 9px/14px var(--fb);padding:0 4px;border-radius:999px;letter-spacing:.02em}
+.lang-pop a{display:flex;align-items:center;gap:10px}
+.lang-pop .lang-code{display:inline-grid;place-items:center;min-width:28px;height:20px;border-radius:6px;background:var(--bg);color:var(--ink2);font:600 11px/1 'IBM Plex Sans Thai',system-ui,sans-serif}
+.lang-pop a.on .lang-code{background:rgba(255,255,255,.18);color:#fff}
+.lang-pop a[lang=my]{font-family:'Noto Sans Myanmar',system-ui,sans-serif}
+.login-side{position:relative}
+.login-lang{position:absolute;top:16px;right:16px;z-index:2}
+:root[lang=my] h1,:root[lang=my] h2,:root[lang=my] h3{line-height:1.55}
