@@ -391,6 +391,14 @@
     'เช่น พนักงานครัว': ['e.g. kitchen staff', 'ဥပမာ မီးဖိုချောင်ဝန်ထမ်း'],
     'กรุณากรอกชื่อพนักงาน': ['Please enter the name', 'ဝန်ထမ်းအမည် ဖြည့်ပါ'],
     'กรุณากรอกตำแหน่ง': ['Please enter the position', 'ရာထူး ဖြည့်ပါ'],
+    'รีสอร์ท': ['Resort', 'ရီဆော့'], 'บูติก': ['Boutique', 'ဘူတစ်'], 'ทุกสถานที่': ['All locations', 'နေရာအားလုံး'],
+    'เพิ่ม / แก้ไขสถานที่': ['Add / edit locations', 'နေရာ ထည့်ရန် / ပြင်ရန်'], 'สถานที่ทั้งหมด': ['All locations', 'နေရာအားလုံး'], 'ชื่อสถานที่ใหม่': ['New location name', 'နေရာအမည်သစ်'],
+    'แก้ไขสถานที่': ['Edit location', 'နေရာ ပြင်ရန်'], 'ลบสถานที่': ['Delete location', 'နေရာ ဖျက်ရန်'], 'กรุณากรอกชื่อสถานที่': ['Please enter a location name', 'နေရာအမည် ဖြည့်ပါ'],
+    'มีสถานที่นี้อยู่แล้ว': ['This location already exists', 'ဤနေရာ ရှိပြီးသား'], 'เปลี่ยนชื่อสถานที่แล้ว': ['Location renamed', 'နေရာအမည် ပြောင်းပြီး'],
+    'ลบสถานที่ได้เมื่อไม่มีพนักงานอยู่': ['A location can be deleted when no staff work there', 'ဝန်ထမ်းမရှိမှ နေရာကို ဖျက်နိုင်'],
+    'ยังไม่มีรายชื่อพนักงานของสถานที่นี้ — กด “+ เพิ่มพนักงาน”': ['No staff at this location yet — tap “+ Add staff”', 'ဤနေရာတွင် ဝန်ထမ်းစာရင်း မရှိသေး — “+ ဝန်ထမ်းထည့်ရန်” ကို နှိပ်ပါ'],
+    'ชื่อที่มีอยู่แล้วในแผนกและสถานที่เดียวกัน จะอัปเดตตำแหน่ง/เบอร์โทร/ชั่วโมงให้ ไม่เพิ่มซ้ำ': ['Names already in the same department and location get their position/phone/hours updated, not added again', 'ဌာနနှင့် နေရာတူတွင် ရှိပြီးသား အမည်များကို ရာထူး/ဖုန်း/နာရီ အပ်ဒိတ်လုပ်မည်၊ ထပ်မထည့်'],
+    'แทนที่ทั้งหมดของสถานที่ในไฟล์ (ลบคนที่ไม่มีในไฟล์ และเอาออกจากรอบงาน)': ['Replace all at the locations in the file (delete people not in the file and take them off shifts)', 'ဖိုင်ပါ နေရာများအတွက် အားလုံးအစားထိုးရန် (ဖိုင်တွင်မပါသူများကို ဖျက်ပြီး အလှည့်မှ ဖယ်မည်)'],
     'เพิ่ม / แก้ไขแผนก': ['Add / edit departments', 'ဌာန ထည့်ရန် / ပြင်ရန်'], 'แผนกทั้งหมด': ['All departments', 'ဌာနအားလုံး'], 'ชื่อแผนกใหม่': ['New department name', 'ဌာနအမည်သစ်'],
     'แก้ไขแผนก': ['Edit department', 'ဌာန ပြင်ရန်'], 'ลบแผนก': ['Delete department', 'ဌာန ဖျက်ရန်'], 'กรุณากรอกชื่อแผนก': ['Please enter a department name', 'ဌာနအမည် ဖြည့်ပါ'],
     'มีแผนกนี้อยู่แล้ว': ['This department already exists', 'ဤဌာန ရှိပြီးသား'], 'เปลี่ยนชื่อแผนกแล้ว': ['Department renamed', 'ဌာနအမည် ပြောင်းပြီး'],
@@ -915,4 +923,15 @@
   I18N.pattern(/^มีพนักงาน (\d+) คนในแผนกนี้ — ย้ายพนักงานไปแผนกอื่นก่อนจึงจะลบได้$/, (m, L) => L === 'en' ? m[1] + ' staff are in this department — move them to another department before deleting it' : 'ဤဌာနတွင် ဝန်ထမ်း ' + m[1] + ' ဦး ရှိသည် — မဖျက်မီ အခြားဌာနသို့ ရွှေ့ပါ');
   I18N.pattern(/^แก้ไขแผนก (.+)$/, (m, L) => L === 'en' ? 'Edit department ' + m[1] : 'ဌာန ' + m[1] + ' ပြင်ရန်');
   I18N.pattern(/^ลบแผนก (.+)$/, (m, L) => L === 'en' ? 'Delete department ' + m[1] : 'ဌာန ' + m[1] + ' ဖျက်ရန်');
+  I18N.pattern(/^(\d+) สถานที่$/, (m, L) => L === 'en' ? m[1] + (m[1] === '1' ? ' location' : ' locations') : 'နေရာ ' + m[1] + ' ခု');
+  I18N.pattern(/^เพิ่มสถานที่ (.+) แล้ว$/, (m, L) => L === 'en' ? 'Added location ' + m[1] : 'နေရာ ' + m[1] + ' ထည့်ပြီး');
+  I18N.pattern(/^ลบสถานที่ (.+) แล้ว$/, (m, L) => L === 'en' ? 'Deleted location ' + m[1] : 'နေရာ ' + m[1] + ' ဖျက်ပြီး');
+  I18N.pattern(/^มีพนักงาน (\d+) คนที่สถานที่นี้ — ย้ายพนักงานไปสถานที่อื่นก่อนจึงจะลบได้$/, (m, L) => L === 'en' ? m[1] + ' staff work at this location — move them to another location before deleting it' : 'ဤနေရာတွင် ဝန်ထမ်း ' + m[1] + ' ဦး ရှိသည် — မဖျက်မီ အခြားနေရာသို့ ရွှေ့ပါ');
+  I18N.pattern(/^แก้ไขสถานที่ (.+)$/, (m, L) => L === 'en' ? 'Edit location ' + m[1] : 'နေရာ ' + m[1] + ' ပြင်ရန်');
+  I18N.pattern(/^ลบสถานที่ (.+)$/, (m, L) => L === 'en' ? 'Delete location ' + m[1] : 'နေရာ ' + m[1] + ' ဖျက်ရန်');
+  I18N.pattern(/^ไม่รู้จักสถานที่ "(.*)"$/, (m, L) => L === 'en' ? 'Unknown location "' + m[1] + '"' : 'မသိသော နေရာ "' + m[1] + '"');
+  I18N.pattern(/^\(ไม่บังคับ\) = (.+) · ถ้าไม่ใส่ จะเป็น$/, (m, L, t) => L === 'en' ? '(optional) = ' + m[1].split(', ').map(t).join(', ') + ' · if left empty:' : '(မဖြစ်မနေမဟုတ်) = ' + m[1].split(', ').map(t).join('၊ ') + ' · မထည့်လျှင်');
+  I18N.pattern(/^นำเข้าแล้ว · ใหม่ (\d+) · อัปเดต (\d+)(?: · ลบ (\d+))?(?: · ข้าม (\d+) แถว)?$/, (m, L) => L === 'en'
+    ? 'Imported · new ' + m[1] + ' · updated ' + m[2] + (m[3] ? ' · deleted ' + m[3] : '') + (m[4] ? ' · skipped ' + m[4] + ' rows' : '')
+    : 'ထည့်သွင်းပြီး · အသစ် ' + m[1] + ' · အပ်ဒိတ် ' + m[2] + (m[3] ? ' · ဖျက် ' + m[3] : '') + (m[4] ? ' · ကျော် ' + m[4] + ' တန်း' : ''));
 })(window);
