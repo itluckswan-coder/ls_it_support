@@ -76,7 +76,7 @@
     add(dict) { for (const [k, v] of Object.entries(dict)) DICT.set(k, v); },
     // a pattern for text with values in it: I18N.pattern(/^รวม (\d+) วัน$/, (m, L) => L === 'en' ? m[1] + ' days' : ...)
     pattern(re, fn) { PATTERNS.push([re, fn]); },
-    piece(re, fn) { PIECES.push([re, fn, 1e9]); PIECES.sort((x, y) => y[2] - x[2]); },
+    piece(re, fn, first) { PIECES.push([re, fn, first ? 2e9 : 1e9]); PIECES.sort((x, y) => y[2] - x[2]); },
     // words swapped inside longer text (department and shift names, units): across all sections the longest
     // words go first, so "หัวหน้าแผนก" is replaced whole before "แผนก" on its own
     pieces(dict) {
