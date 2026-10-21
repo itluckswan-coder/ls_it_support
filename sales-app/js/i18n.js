@@ -56,7 +56,7 @@
     if (THAI.test(out)) { missing.add(t); return null; }
     return out !== t ? text.replace(t, out) : null;
   }
-  const SKIP = 'script,style,textarea,.doc,[contenteditable],[data-noi18n],.lang-pop';
+  const SKIP = 'script,style,textarea,.doc,.fnf-wrap,.ssf-wrap,[contenteditable],[data-noi18n],.lang-pop'; // printable forms stay Thai
   function apply(root) {
     if (lang === 'th' || !root) return;
     if (root.nodeType === 3) { if (!root.parentElement || !root.parentElement.closest(SKIP)) { const v = tr(root.nodeValue, lang); if (v != null) root.nodeValue = v; } return; }
