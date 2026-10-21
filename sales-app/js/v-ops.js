@@ -959,7 +959,9 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const name = normName(get('name') + ' ' + get('last')), dRaw = get('dept'), h = get('hours'), sRaw = get('site'), site = parseSite(sRaw);
       const out = { line: start + i + 1, name, site: site || defSite, role: get('role'), dept: parseDept(dRaw), phone: get('phone'), hours: h === '' ? null : Math.max(0, Math.min(168, Math.round(Number(h) || 0))), errs: [] };
       if (!out.name) out.errs.push('ไม่มีชื่อ');
-      if (!out.dept) out.errs.push(dRaw ? 'ไม่รู้จักแผนก "' + dRaw + '"' : 'ไม่ได้ระบุแผนก');
+      // a department the app does not know yet is added with the import (renamed or merged later on the staff form)
+      if (!out.dept && dRaw) { out.newDept = normName(dRaw); out.dept = 'new:' + out.newDept; }
+      if (!out.dept) out.errs.push('ไม่ได้ระบุแผนก');
       if (site === false) out.errs.push('ไม่รู้จักสถานที่ "' + sRaw + '"');
       const key = out.name + '|' + out.dept + '|' + out.site;
       if (out.name && out.dept) { if (seen.has(key)) out.errs.push('ชื่อซ้ำในไฟล์'); seen.add(key); }
@@ -978,7 +980,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         <ol style="margin:0 0 14px;padding-left:20px;line-height:1.8">
           <li>ดาวน์โหลดแม่แบบ (มีรายชื่อปัจจุบันใส่ไว้ให้) หรือใช้ไฟล์ของคุณเอง</li>
           <li>1 แถวต่อ 1 คน · คอลัมน์: <b>ชื่อ-นามสกุล, ตำแหน่ง, แผนก, เบอร์โทร, ชั่วโมงสะสม/สัปดาห์</b> (สลับลำดับได้ถ้ามีแถวหัวตาราง · แยกคอลัมน์ชื่อ/นามสกุลก็ได้)</li>
-          <li><b>แผนก</b> = ครัว, จัดเลี้ยง, ช่าง/AV, ส่วนหน้า, แม่บ้าน, บัญชี (ชื่อเต็มหรือภาษาอังกฤษก็ได้)</li>
+          <li><b>แผนก</b> = ครัว, จัดเลี้ยง, ช่าง/AV, ส่วนหน้า, แม่บ้าน, บัญชี (ชื่อเต็มหรือภาษาอังกฤษก็ได้) · ชื่อแผนกที่ยังไม่มีในระบบ จะเพิ่มเป็นแผนกใหม่ให้</li>
           <li><b>สถานที่</b> (ไม่บังคับ) = ${sites().map(x => H(x.name)).join(', ')} · ถ้าไม่ใส่ จะเป็น <b>${H(siteName(defSite))}</b></li>
           <li>ชื่อที่มีอยู่แล้วในแผนกและสถานที่เดียวกัน จะอัปเดตตำแหน่ง/เบอร์โทร/ชั่วโมงให้ ไม่เพิ่มซ้ำ</li>
         </ol>
@@ -1004,7 +1006,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         <div class="between" style="margin-bottom:10px;flex-wrap:wrap"><b>${H(f.name)}</b><span class="small"><span class="teal b">เพิ่มใหม่ ${ok.length - upd} คน</span> · อัปเดต ${upd} คน${bad ? ` · <span class="red b">มีปัญหา ${bad} แถว</span>` : ''}</span></div>
         <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px"><table class="tbl compact" style="font-size:12.5px"><thead><tr><th>แถว</th><th>ชื่อ-นามสกุล</th><th>สถานที่</th><th>ตำแหน่ง</th><th>แผนก</th><th>เบอร์โทร</th><th class="r">ชม.</th><th></th></tr></thead><tbody>
         ${parsed.map(r => `<tr style="${r.errs.length ? 'background:var(--red-tint)' : ''}"><td class="muted">${r.line}</td><td>${H(r.name) || '<span class="red">—</span>'}${r.errs.length ? `<div class="xs red">${r.errs.map(H).join(' · ')}</div>` : ''}</td>
-          <td>${H(siteName(r.site))}</td><td>${H(r.role) || '<span class="muted">-</span>'}</td><td>${r.dept ? H(dept(r.dept).short) : '<span class="red">?</span>'}</td><td>${H(r.phone)}</td><td class="r">${r.hours == null ? '' : r.hours}</td>
+          <td>${H(siteName(r.site))}</td><td>${H(r.role) || '<span class="muted">-</span>'}</td><td>${r.newDept ? H(r.newDept) + ' <span class="badge st-confirmed">แผนกใหม่</span>' : r.dept ? H(dept(r.dept).short) : '<span class="red">?</span>'}</td><td>${H(r.phone)}</td><td class="r">${r.hours == null ? '' : r.hours}</td>
           <td>${r.errs.length ? '' : r.match ? '<span class="badge st-sent">อัปเดต</span>' : '<span class="badge st-confirmed">ใหม่</span>'}</td></tr>`).join('')}
         </tbody></table></div>
         <div class="row wrap" style="margin-top:14px;gap:18px"><label class="row small"><input type="radio" name="mode" value="merge" checked style="accent-color:var(--teal);width:18px;height:18px"> เพิ่มต่อจากรายชื่อเดิม</label>
@@ -1015,6 +1017,13 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         const db = Store.db, replace = (bg.querySelector('input[name=mode]:checked') || {}).value === 'replace';
         let next = Math.max(0, ...db.employees.map(x => parseInt(String(x.id).slice(1), 10) || 0));
         const keep = new Set();
+        const added = [...new Set(ok.filter(r => r.newDept).map(r => r.newDept))];
+        if (added.length) {
+          const list = D.DEPTS.map(d => ({ id: d.id, name: d.name, short: d.short })), ids = {};
+          for (const name of added) { let id; do id = 'd' + Math.random().toString(36).slice(2, 8); while (list.some(d => d.id === id)); list.push({ id, name, short: name }); ids[name] = id; }
+          const st = db.settings || (db.settings = {}); st.depts = list; D.applyDepts(list);
+          for (const r of ok) if (r.newDept) r.dept = ids[r.newDept];
+        }
         for (const r of ok) {
           if (r.match) {
             Object.assign(r.match, { role: r.role || r.match.role, phone: r.phone || r.match.phone || '' }, r.hours == null ? {} : { hours: r.hours });
@@ -1030,7 +1039,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         for (const x of db.employees) if (drop(x)) { unassign(x.id); removed++; }
         db.employees = db.employees.filter(x => !drop(x));
         Store.save(); App.closeModal(); App.render();
-        App.toast(`นำเข้าแล้ว · ใหม่ ${ok.length - upd} · อัปเดต ${upd}${removed ? ' · ลบ ' + removed : ''}${bad ? ' · ข้าม ' + bad + ' แถว' : ''}`);
+        App.toast(`นำเข้าแล้ว · ใหม่ ${ok.length - upd} · อัปเดต ${upd}${removed ? ' · ลบ ' + removed : ''}${bad ? ' · ข้าม ' + bad + ' แถว' : ''}${added.length ? ' · แผนกใหม่ ' + added.length : ''}`);
       };
     };
   };
