@@ -135,7 +135,7 @@
       return out;
     },
     // menu entries this user may see (Dashboard is for admins only)
-    closeNavPop() { document.querySelectorAll('.nav-pop:not(.lang-pop)').forEach(x => x.remove()); document.querySelectorAll('[data-act=navGrp]').forEach(b => b.setAttribute('aria-expanded', 'false')); },
+    closeNavPop() { document.querySelectorAll('.nav-pop:not(.lang-pop):not(.theme-pop)').forEach(x => x.remove()); document.querySelectorAll('[data-act=navGrp]').forEach(b => b.setAttribute('aria-expanded', 'false')); },
     navItems() {
       const me = App.me();
       const hidden = App.navHidden();
@@ -154,6 +154,7 @@
     : `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}">${n[1]}</a>`).join('')}</nav>
   <div class="tb-right">
     ${g.I18N ? g.I18N.button() : ''}
+    ${g.THEME ? g.THEME.button() : ''}
     ${App.bellButton ? App.bellButton() : ''}
     <button class="search-btn" data-act="toggleSearch" aria-label="ค้นหา">${ICON.search}</button>
     <div class="search" id="searchBox"><input type="search" placeholder="ค้นหาลูกค้า, ใบเสนอราคา…" data-input="search" aria-label="ค้นหา" autocomplete="off"><div class="search-res hidden" id="searchRes"></div></div>
@@ -429,7 +430,7 @@
     <h2>ทำใบเสนอราคาสัมมนา<br>ครบในที่เดียว</h2>
     <p style="margin:0;opacity:.9">เลือกห้อง เมนู และห้องพัก ระบบรวมยอดพร้อมค่าบริการและ VAT ให้ทันที</p>
   </div>
-  <div class="login-side">${g.I18N ? `<div class="login-lang">${g.I18N.button()}</div>` : ''}<form class="login-box" id="loginForm" autocomplete="on">
+  <div class="login-side"><div class="login-lang">${g.I18N ? g.I18N.button() : ''}${g.THEME ? g.THEME.button() : ''}</div><form class="login-box" id="loginForm" autocomplete="on">
     <div class="brand"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort" style="width:116px;height:48px"><span class="sep" style="display:block"></span><span class="t" style="display:block">ลักษวรรณ รีสอร์ต<small>ฝ่ายขาย</small></span></div>
     <h1>เข้าสู่ระบบ</h1>
     <div class="muted" style="margin-bottom:22px">สำหรับพนักงานฝ่ายขายและการตลาด</div>
@@ -596,7 +597,7 @@
       }
     } else { Store.load(); App.restoreSession(); }
     window.addEventListener('hashchange', () => { App.closeNavPop(); App.render(); });
-    document.addEventListener('click', e => { if (document.querySelector('.nav-pop:not(.lang-pop)') && !e.target.closest('.nav-pop,[data-act=navGrp]')) App.closeNavPop(); }, true);
+    document.addEventListener('click', e => { if (document.querySelector('.nav-pop:not(.lang-pop):not(.theme-pop)') && !e.target.closest('.nav-pop,[data-act=navGrp]')) App.closeNavPop(); }, true);
     window.addEventListener('resize', () => App.closeNavPop());
     window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); App.deferredInstall = e; });
     if (!location.hash) location.replace(App.state.uid ? '#/home' : '#/login');
