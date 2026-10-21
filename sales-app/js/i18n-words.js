@@ -391,6 +391,10 @@
     'เช่น พนักงานครัว': ['e.g. kitchen staff', 'ဥပမာ မီးဖိုချောင်ဝန်ထမ်း'],
     'กรุณากรอกชื่อพนักงาน': ['Please enter the name', 'ဝန်ထမ်းအမည် ဖြည့်ပါ'],
     'กรุณากรอกตำแหน่ง': ['Please enter the position', 'ရာထူး ဖြည့်ပါ'],
+    'เพิ่ม / แก้ไขแผนก': ['Add / edit departments', 'ဌာန ထည့်ရန် / ပြင်ရန်'], 'แผนกทั้งหมด': ['All departments', 'ဌာနအားလုံး'], 'ชื่อแผนกใหม่': ['New department name', 'ဌာနအမည်သစ်'],
+    'แก้ไขแผนก': ['Edit department', 'ဌာန ပြင်ရန်'], 'ลบแผนก': ['Delete department', 'ဌာန ဖျက်ရန်'], 'กรุณากรอกชื่อแผนก': ['Please enter a department name', 'ဌာနအမည် ဖြည့်ပါ'],
+    'มีแผนกนี้อยู่แล้ว': ['This department already exists', 'ဤဌာန ရှိပြီးသား'], 'เปลี่ยนชื่อแผนกแล้ว': ['Department renamed', 'ဌာနအမည် ပြောင်းပြီး'],
+    'แผนกหลักของระบบแก้ชื่อได้แต่ลบไม่ได้ · แผนกที่เพิ่มเองลบได้เมื่อไม่มีพนักงาน': ['Built-in departments can be renamed but not deleted · added ones can be deleted when no staff are in them', 'စနစ်၏ ဌာနများကို အမည်ပြောင်းနိုင်သော်လည်း မဖျက်နိုင် · ထည့်ထားသော ဌာနကို ဝန်ထမ်းမရှိမှ ဖျက်နိုင်'],
     'เพิ่ม / แก้ไขตำแหน่ง': ['Add / edit positions', 'ရာထူး ထည့်ရန် / ပြင်ရန်'], '— เลือกตำแหน่ง —': ['— Choose a position —', '— ရာထူး ရွေးပါ —'],
     'ชื่อตำแหน่งใหม่': ['New position name', 'ရာထူးအမည်သစ်'], 'แก้ไขตำแหน่ง': ['Edit position', 'ရာထူး ပြင်ရန်'], 'ลบตำแหน่ง': ['Delete position', 'ရာထူး ဖျက်ရန်'],
     'ยังไม่มีตำแหน่งในแผนกนี้': ['No positions in this department yet', 'ဤဌာနတွင် ရာထူး မရှိသေး'], 'กรุณากรอกชื่อตำแหน่ง': ['Please enter a position name', 'ရာထူးအမည် ဖြည့်ပါ'],
@@ -905,4 +909,10 @@
   I18N.pattern(/^มีพนักงาน (\d+) คนใช้ตำแหน่งนี้ — เปลี่ยนตำแหน่งของพนักงานก่อนจึงจะลบได้$/, (m, L) => L === 'en' ? m[1] + ' staff hold this position — change their position before deleting it' : 'ဝန်ထမ်း ' + m[1] + ' ဦး ဤရာထူးကို သုံးနေသည် — မဖျက်မီ ၎င်းတို့၏ ရာထူးကို ပြောင်းပါ');
   I18N.pattern(/^แก้ไขตำแหน่ง (.+)$/, (m, L) => L === 'en' ? 'Edit position ' + m[1] : 'ရာထူး ' + m[1] + ' ပြင်ရန်');
   I18N.pattern(/^ลบตำแหน่ง (.+)$/, (m, L) => L === 'en' ? 'Delete position ' + m[1] : 'ရာထူး ' + m[1] + ' ဖျက်ရန်');
+  I18N.pattern(/^(\d+) แผนก$/, (m, L) => L === 'en' ? m[1] + (m[1] === '1' ? ' department' : ' departments') : 'ဌာန ' + m[1] + ' ခု');
+  I18N.pattern(/^เพิ่มแผนก (.+) แล้ว$/, (m, L) => L === 'en' ? 'Added department ' + m[1] : 'ဌာန ' + m[1] + ' ထည့်ပြီး');
+  I18N.pattern(/^ลบแผนก (.+) แล้ว$/, (m, L) => L === 'en' ? 'Deleted department ' + m[1] : 'ဌာန ' + m[1] + ' ဖျက်ပြီး');
+  I18N.pattern(/^มีพนักงาน (\d+) คนในแผนกนี้ — ย้ายพนักงานไปแผนกอื่นก่อนจึงจะลบได้$/, (m, L) => L === 'en' ? m[1] + ' staff are in this department — move them to another department before deleting it' : 'ဤဌာနတွင် ဝန်ထမ်း ' + m[1] + ' ဦး ရှိသည် — မဖျက်မီ အခြားဌာနသို့ ရွှေ့ပါ');
+  I18N.pattern(/^แก้ไขแผนก (.+)$/, (m, L) => L === 'en' ? 'Edit department ' + m[1] : 'ဌာန ' + m[1] + ' ပြင်ရန်');
+  I18N.pattern(/^ลบแผนก (.+)$/, (m, L) => L === 'en' ? 'Delete department ' + m[1] : 'ဌာန ' + m[1] + ' ဖျက်ရန်');
 })(window);

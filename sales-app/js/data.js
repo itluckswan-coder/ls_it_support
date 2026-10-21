@@ -167,7 +167,7 @@
     { id: 'shuttle', name: 'รถรับส่ง', desc: 'รถตู้ VIP พร้อมคนขับ', price: 2500, unit: 'เที่ยว' }
   ];
 
-  const DEPTS = [
+  const DEPTS_DEFAULT = [
     { id: 'kitchen', name: 'ครัว / อาหารและเครื่องดื่ม', short: 'ครัว/F&B', color: '#A8262D', bg: '#F8E1E1', fg: '#8E1F25' },
     { id: 'banquet', name: 'จัดเลี้ยง (Banquet)', short: 'จัดเลี้ยง', color: '#0E9F8E', bg: '#DDF3EF', fg: '#0B7C6F' },
     { id: 'av', name: 'ช่าง / ระบบเสียงและภาพ', short: 'ช่าง/AV', color: '#2B3F86', bg: '#E3E7F5', fg: '#2B3F86' },
@@ -175,6 +175,19 @@
     { id: 'hk', name: 'แม่บ้าน (Housekeeping)', short: 'แม่บ้าน', color: '#6B716E', bg: '#EDECE6', fg: '#4A524F' },
     { id: 'acc', name: 'บัญชี (Accounting)', short: 'บัญชี', color: '#17211F', bg: '#EDECE6', fg: '#17211F' }
   ];
+
+  // departments: the built-in six, renamed or added to on the staff form (settings.depts); pages hold a reference to DEPTS
+  const DEPTS = [];
+  const DEPT_TINTS = [['#7B4FA0', '#EFE6F6', '#5E3A7D'], ['#2F7D3A', '#E2F2E4', '#25632E'], ['#C2571A', '#FBE7DA', '#93410f'], ['#1F7FA8', '#DDF0F8', '#155f7f'], ['#9C2F6B', '#F7E1EC', '#7a2453']];
+  function applyDepts(list) {
+    const src = Array.isArray(list) && list.length ? list : DEPTS_DEFAULT;
+    DEPTS.length = 0;
+    src.forEach((d, i) => {
+      const base = DEPTS_DEFAULT.find(x => x.id === d.id), t = DEPT_TINTS[i % DEPT_TINTS.length];
+      DEPTS.push(Object.assign({ color: t[0], bg: t[1], fg: t[2] }, base, { id: d.id, name: d.name || (base && base.name) || d.id, short: d.short || d.name || (base && base.short) || d.id }));
+    });
+  }
+  applyDepts(null);
 
   const ROLES = [
     { id: 'sales', name: 'พนักงานขาย' },
@@ -481,7 +494,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyDepts(this.db && this.db.settings && this.db.settings.depts); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },
@@ -506,7 +519,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;
