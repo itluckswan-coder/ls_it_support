@@ -1,7 +1,8 @@
 /* Luck Swan Sales — interface language: ไทย (default), English (US), မြန်မာ.
  * The screens are written in Thai; after anything is drawn, Thai text and the placeholder / title / aria-label
  * attributes are swapped for the chosen language from the dictionaries (exact phrases first, then the few
- * patterns with numbers or dates in them). What people type (names, reasons, menus) is left as written, and
+ * patterns with numbers or dates in them, then dates and known words — but only when nothing Thai is left).
+ * What people type (names, reasons, task titles) is left exactly as written, and
  * printed documents (.doc) and editable boxes are never touched. Words missing from a dictionary stay Thai. */
 (function (g) {
   'use strict';
@@ -42,9 +43,17 @@
     const hit = DICT.get(t);
     if (hit && hit[idx(L)]) return text.replace(t, hit[idx(L)]);
     for (const [re, fn] of PATTERNS) { const m = re.exec(t); if (m) { const out = fn(m, L, x => tr(x, L) || x); if (out != null) return text.replace(t, out); } }
+    // a line made of parts ("name · role · department", "QT-… · customer · date"): each part on its own, so
+    // the system's parts are translated and a typed part (a name, a customer) stays as written
+    if (t.includes(' · ')) {
+      const parts = t.split(' · '), outs = parts.map(x => tr(x, L));
+      if (outs.some(Boolean)) { if (outs.some(x => !x)) missing.add(t); return text.replace(t, outs.map((x, i) => x == null ? parts[i] : x).join(' · ')); }
+    }
+    // dates and known words inside longer text — only when that translates all of it: anything left in Thai
+    // is something people typed (a task title, a reason, a name), and that stays exactly as written
     let out = dates(t, L);
     for (const [re, fn] of PIECES) out = out.replace(re, (...m) => fn(m, L));
-    if (THAI.test(out)) missing.add(t);
+    if (THAI.test(out)) { missing.add(t); return null; }
     return out !== t ? text.replace(t, out) : null;
   }
   const SKIP = 'script,style,textarea,.doc,[contenteditable],[data-noi18n],.lang-pop';
