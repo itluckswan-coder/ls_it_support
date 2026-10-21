@@ -769,9 +769,10 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     App.modal(`<h2>${isNew ? 'เพิ่มพนักงาน' : 'แก้ไขข้อมูลพนักงาน'}</h2>${isNew ? '' : `<p class="muted" style="margin-top:-8px">${H(e.name)} · รหัส ${H(e.id)}</p>`}
       <div class="field"><label class="f" for="emName">ชื่อ-นามสกุล</label><input class="input" id="emName" name="name" value="${H(e.name || '')}"></div>
       <div class="grid g2" style="margin-top:14px">
-        <div><label class="f" for="emDept">แผนก</label><select class="input" id="emDept" name="dept">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === e.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select></div>
+        <div><label class="f" for="emDept">แผนก</label><div class="row" style="gap:8px;flex-wrap:nowrap"><select class="input" id="emDept" name="dept" style="flex:1;min-width:0">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === e.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select><button type="button" class="icon-btn pos-plus" id="emDeptBtn" title="เพิ่ม / แก้ไขแผนก" aria-label="เพิ่ม / แก้ไขแผนก" aria-expanded="false" aria-controls="emDeptBox">+</button></div></div>
         <div><label class="f" for="emRole">ตำแหน่ง</label><div class="row" style="gap:8px;flex-wrap:nowrap"><select class="input" id="emRole" name="role" style="flex:1;min-width:0"></select><button type="button" class="icon-btn pos-plus" id="emPosBtn" title="เพิ่ม / แก้ไขตำแหน่ง" aria-label="เพิ่ม / แก้ไขตำแหน่ง" aria-expanded="false" aria-controls="emPos">+</button></div></div>
       </div>
+      <div class="pos-box" id="emDeptBox" hidden></div>
       <div class="pos-box" id="emPos" hidden></div>
       <div class="grid g2" style="margin-top:14px">
         <div><label class="f" for="emPhone">เบอร์โทร</label><input class="input" id="emPhone" type="tel" name="phone" value="${H(e.phone || '')}"></div>
@@ -823,6 +824,50 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       box.addEventListener('keydown', ev => { if (ev.key !== 'Enter') return; ev.preventDefault(); const b = box.querySelector(ev.target.id === 'emPosRen' ? '[data-pos=ren]' : '[data-pos=add]'); if (b) b.click(); });
       btn.onclick = () => { const open = box.hidden; box.hidden = !open; btn.setAttribute('aria-expanded', String(open)); btn.classList.toggle('on', open); if (open) { editing = null; drawBox(); box.querySelector('#emPosNew').focus(); } };
       role.onchange = () => { pick = role.value; };
+      // the + beside the department: add a department, rename one, or remove an added one nobody is in
+      const dBox = bg.querySelector('#emDeptBox'), dBtn = bg.querySelector('#emDeptBtn');
+      let dEditing = null;
+      const fillDept = () => { const cur = sel.value; sel.innerHTML = D.DEPTS.map(d => `<option value="${d.id}" ${d.id === cur ? 'selected' : ''}>${H(d.name)}</option>`).join(''); };
+      const deptSave = list => { const st = Store.db.settings || (Store.db.settings = {}); st.depts = list.map(d => ({ id: d.id, name: d.name, short: d.short })); D.applyDepts(st.depts); };
+      const drawDept = (msg) => {
+        const used = id => Store.db.employees.filter(x => x.dept === id).length, builtIn = id => D.DEPTS_DEFAULT.some(x => x.id === id);
+        dBox.innerHTML = `<div class="between" style="margin-bottom:8px"><b class="small">แผนกทั้งหมด</b><span class="xs muted">${D.DEPTS.length} แผนก</span></div>
+          <div class="pos-list">${D.DEPTS.map((d, i) => dEditing === i
+            ? `<div class="pos-row"><input class="input" id="emDeptRen" value="${H(d.name)}" aria-label="ชื่อแผนกใหม่"><button type="button" class="btn red sm" data-dp="ren" data-i="${i}">บันทึก</button><button type="button" class="btn ghost sm" data-dp="cancel">ยกเลิก</button></div>`
+            : `<div class="pos-row"><span class="dept-dot" style="background:${d.color}"></span><span class="pos-name">${H(d.name)}</span><span class="xs muted">${used(d.id) ? used(d.id) + ' คน' : ''}</span><button type="button" class="icon-btn" data-dp="edit" data-i="${i}" title="แก้ไขแผนก" aria-label="แก้ไขแผนก ${H(d.name)}">${PENCIL}</button>${builtIn(d.id) ? '<span class="icon-btn" style="visibility:hidden"></span>' : `<button type="button" class="icon-btn" data-dp="del" data-i="${i}" title="ลบแผนก" aria-label="ลบแผนก ${H(d.name)}">${TRASH}</button>`}</div>`).join('')}</div>
+          <div class="pos-row" style="margin-top:8px"><input class="input" id="emDeptNew" placeholder="ชื่อแผนกใหม่" aria-label="ชื่อแผนกใหม่"><button type="button" class="btn red sm" data-dp="add">+ เพิ่ม</button></div>
+          <div class="xs ${msg && msg.err ? 'red' : 'muted'}" style="min-height:16px;margin-top:6px" role="status">${H(msg ? msg.text : 'แผนกหลักของระบบแก้ชื่อได้แต่ลบไม่ได้ · แผนกที่เพิ่มเองลบได้เมื่อไม่มีพนักงาน')}</div>`;
+      };
+      const dDone = (text, pickDept) => { Store.save(); dEditing = null; fillDept(); if (pickDept) { sel.value = pickDept; pick = ''; } fill(); drawDept({ text }); if (!box.hidden) drawBox(); };
+      dBox.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-dp]'); if (!b) return;
+        const list = D.DEPTS.slice(), i = +b.dataset.i, act = b.dataset.dp, clash = (v, k) => list.some((d, j) => j !== k && d.name === v);
+        if (act === 'edit') { dEditing = i; drawDept(); const inp = dBox.querySelector('#emDeptRen'); inp.focus(); inp.select(); return; }
+        if (act === 'cancel') { dEditing = null; drawDept(); return; }
+        if (act === 'add') {
+          const v = dBox.querySelector('#emDeptNew').value.trim().replace(/\s+/g, ' ');
+          if (!v) return drawDept({ text: 'กรุณากรอกชื่อแผนก', err: 1 });
+          if (clash(v, -1)) return drawDept({ text: 'มีแผนกนี้อยู่แล้ว', err: 1 });
+          let id; do id = 'd' + Math.random().toString(36).slice(2, 8); while (list.some(d => d.id === id));
+          deptSave(list.concat({ id, name: v, short: v })); return dDone('เพิ่มแผนก ' + v + ' แล้ว', id);
+        }
+        if (act === 'ren') {
+          const v = dBox.querySelector('#emDeptRen').value.trim().replace(/\s+/g, ' ');
+          if (!v) return drawDept({ text: 'กรุณากรอกชื่อแผนก', err: 1 });
+          if (clash(v, i)) return drawDept({ text: 'มีแผนกนี้อยู่แล้ว', err: 1 });
+          if (v !== list[i].name) list[i] = Object.assign({}, list[i], { name: v, short: v });
+          deptSave(list); return dDone('เปลี่ยนชื่อแผนกแล้ว');
+        }
+        if (act === 'del') {
+          const d = list[i], n = Store.db.employees.filter(x => x.dept === d.id).length;
+          if (D.DEPTS_DEFAULT.some(x => x.id === d.id)) return;
+          if (n) return drawDept({ text: 'มีพนักงาน ' + n + ' คนในแผนกนี้ — ย้ายพนักงานไปแผนกอื่นก่อนจึงจะลบได้', err: 1 });
+          deptSave(list.filter((_, k) => k !== i));
+          return dDone('ลบแผนก ' + d.name + ' แล้ว', sel.value === d.id ? D.DEPTS[0].id : null);
+        }
+      });
+      dBox.addEventListener('keydown', ev => { if (ev.key !== 'Enter') return; ev.preventDefault(); const b = dBox.querySelector(ev.target.id === 'emDeptRen' ? '[data-dp=ren]' : '[data-dp=add]'); if (b) b.click(); });
+      dBtn.onclick = () => { const open = dBox.hidden; dBox.hidden = !open; dBtn.setAttribute('aria-expanded', String(open)); dBtn.classList.toggle('on', open); if (open) { dEditing = null; drawDept(); dBox.querySelector('#emDeptNew').focus(); } };
       fill(); sel.onchange = () => { pick = ''; editing = null; fill(); if (!box.hidden) drawBox(); };
       bg.querySelector('#emOk').onclick = () => {
         const f = App.formData(bg), err = bg.querySelector('#emErr');
