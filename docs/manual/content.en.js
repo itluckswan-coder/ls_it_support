@@ -215,14 +215,14 @@ window.MANUAL.en = {
       tips: []
     },
     {
-      id: 'shifts', group: 'people', icon: 'clock', title: 'Shifts and shift extensions (OT)', who: 'Heads of Department · Managers · Administrator',
+      id: 'shifts', group: 'people', icon: 'clock', title: 'Shifts and shift extensions (QT)', who: 'Heads of Department · Managers · Administrator',
       intro: 'Staff › Shifts is where you put people on shifts for each event. The system works out how many staff are needed from the number of guests.',
       steps: [
         'Choose the event at the top (tap the quotation name ▾) and choose the day.',
         'If there is no plan yet, tap “Create plan from the quotation” — or “Apply rules to this plan” to recalculate the numbers.',
         'Check the summary boxes: Staff needed · Assigned · Short-staffed · Extend shift.',
         'Department timelines: tap a shift (Morning shift/Afternoon shift) to set the number needed and the times, tick the staff, then tap “Save”.',
-        'Extend shift (OT): choose +1/+2/+3 hrs or a custom time, enter a reason, choose the staff, then send it for approval.',
+        'Extend shift (QT): choose +1/+2/+3 hrs or a custom time, enter a reason, choose the staff, then send it for approval.',
         'People with approval rights tap Approve / Send back on shift extension requests.'
       ],
       shots: [{ img: 'staff-shifts', cap: 'Shifts: summary, timeline and shift extensions' }, { img: 'staff-assign', cap: 'Assigning staff to a shift' }],
@@ -341,7 +341,7 @@ window.MANUAL.en = {
         'Review quotations with discounts over 10% and approve them.',
         'Check the Home page: monthly target and latest quotations.',
         'Assign work to the team: Assignment › “+ Assign task”.',
-        'Approve shift extension (OT) requests on the Shifts page.',
+        'Approve shift extension (QT) requests on the Shifts page.',
         'Add/edit users in the sales team and set their permissions.'
       ],
       shots: ['quote-edit', 'tasks', 'users'], links: ['quotes', 'tasks', 'shifts', 'users']
