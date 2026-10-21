@@ -61,6 +61,7 @@
   };
 
   /* ---------- the menu ---------- */
+  const DROP = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg>';
   const H = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function body() {
     const c = colours(cur), mine = cur.id === 'custom' ? cur : { accent: c.accent, bg: c.bg };
@@ -70,7 +71,10 @@
       <div class="tp-sec">ทุกสี</div>
       <div class="tp-hues">${HUES.map(h => `<button type="button" class="tp-hue ${cur.id === 'custom' && cur.accent.toUpperCase() === h ? 'on' : ''}" data-hue="${h}" style="background:${h}" aria-label="สี ${h}" title="${h}"></button>`).join('')}</div>
       <div class="tp-sec">ผสมสีเอง</div>
-      <div class="tp-mix"><label><input type="color" id="tpAccent" value="${H(mine.accent)}"><span>สีหลัก</span></label><label><input type="color" id="tpBg" value="${H(mine.bg)}"><span>สีพื้นหลัง</span></label></div>
+      <div class="tp-mix">${[['accent', 'สีหลัก'], ['bg', 'สีพื้นหลัง']].map(([k, name]) => `<div class="tp-row" data-slot="${k}">
+        <input type="color" class="tp-col" value="${H(mine[k])}" aria-label="${name}"><span class="tp-lab">${name}</span>
+        <input class="input tp-hex" value="${H(mine[k].toUpperCase())}" maxlength="22" spellcheck="false" autocapitalize="characters" inputmode="text" aria-label="โค้ดสี${name}" title="โค้ดสี เช่น #A8262D">
+        <button type="button" class="icon-btn tp-drop" data-drop="${k}" title="หลอดหยดสี — กดแล้วแตะสีที่ต้องการ" aria-label="หลอดหยดสี${name}">${DROP}</button></div>`).join('')}</div>
       <div class="xs muted" style="margin-top:6px">สีที่อ่อนหรือเข้มเกินไป ระบบจะปรับให้อ่านง่ายเอง · เอกสารที่พิมพ์ใช้สีมาตรฐานเสมอ</div>
       <button type="button" class="btn ghost sm block tp-reset" data-theme="std" ${cur.id === 'std' ? 'disabled' : ''}>กลับเป็นสีมาตรฐาน</button>`;
   }
@@ -93,15 +97,78 @@
     el.style.maxHeight = (innerHeight - r.bottom - 20) + 'px';
     el.innerHTML = body(); document.body.appendChild(el); b.setAttribute('aria-expanded', 'true');
   }, true);
-  // the colour pickers recolour as they move
-  document.addEventListener('input', e => {
-    if (e.target.id !== 'tpAccent' && e.target.id !== 'tpBg') return;
-    const pop = e.target.closest('.theme-pop');
-    cur = { id: 'custom', accent: pop.querySelector('#tpAccent').value.toUpperCase(), bg: pop.querySelector('#tpBg').value.toUpperCase() };
+  // a colour code: #RGB, #RRGGBB (the # may be left out) or rgb(r, g, b)
+  function parseCode(v) {
+    const t = String(v || '').trim();
+    let m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(t);
+    if (m) { const h = m[1].length === 3 ? m[1].replace(/./g, c => c + c) : m[1]; return '#' + h.toUpperCase(); }
+    m = /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/i.exec(t);
+    return m && m.slice(1, 4).every(x => +x <= 255) ? hex(m.slice(1, 4).map(Number)) : null;
+  }
+  // set one slot (main colour or background) of the mix and recolour
+  function setSlot(pop, k, h) {
+    const row = pop.querySelector(`.tp-row[data-slot=${k}]`);
+    row.querySelector('.tp-col').value = h.toLowerCase(); row.querySelector('.tp-hex').value = h; row.querySelector('.tp-hex').classList.remove('bad');
+    const v = k2 => pop.querySelector(`.tp-row[data-slot=${k2}] .tp-col`).value.toUpperCase();
+    cur = { id: 'custom', accent: v('accent'), bg: v('bg') };
     save(); apply();
     pop.querySelectorAll('.tp-pre.on,.tp-hue.on').forEach(x => x.classList.remove('on'));
     const rs = pop.querySelector('.tp-reset'); if (rs) rs.disabled = false;
+  }
+  // the colour pickers recolour as they move; a typed code applies once it is a whole colour
+  document.addEventListener('input', e => {
+    const pop = e.target.closest('.theme-pop'); if (!pop) return;
+    const row = e.target.closest('.tp-row'); if (!row) return;
+    if (e.target.classList.contains('tp-col')) setSlot(pop, row.dataset.slot, e.target.value.toUpperCase());
+    else if (e.target.classList.contains('tp-hex')) { const h = parseCode(e.target.value); if (h && /^#?[0-9a-f]{6}$|^rgb/i.test(e.target.value.trim())) setSlot(pop, row.dataset.slot, h); }
   });
+  document.addEventListener('change', e => {
+    if (!e.target.classList || !e.target.classList.contains('tp-hex')) return;
+    const pop = e.target.closest('.theme-pop'), row = e.target.closest('.tp-row'), h = parseCode(e.target.value);
+    if (h) setSlot(pop, row.dataset.slot, h); else e.target.classList.add('bad');
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('tp-hex')) { e.preventDefault(); e.target.blur(); } });
+
+  /* ---------- the dropper: pick a colour from anywhere ---------- */
+  // where the browser has one (Chrome, Edge) its own dropper picks from the whole screen; elsewhere (Safari, iPad)
+  // the menu steps aside and the next tap on the page picks the colour there: the pixel of a picture, an icon's colour,
+  // otherwise the colour behind the thing tapped
+  const solid = c => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return null; const p = m[1].split(',').map(x => parseFloat(x)); return p.length > 3 && p[3] < .5 ? null : hex(p.slice(0, 3)); };
+  function colourAt(el, x, y) {
+    if (el && el.tagName === 'IMG' && el.complete && el.naturalWidth) {
+      try {
+        const r = el.getBoundingClientRect(), cv = document.createElement('canvas'); cv.width = cv.height = 1;
+        const cx = cv.getContext('2d'); cx.drawImage(el, (x - r.left) * el.naturalWidth / r.width, (y - r.top) * el.naturalHeight / r.height, 1, 1, 0, 0, 1, 1);
+        const d = cx.getImageData(0, 0, 1, 1).data; if (d[3] > 127) return hex([d[0], d[1], d[2]]);
+      } catch (e) { /* a picture from elsewhere cannot be read — fall back to the element */ }
+    }
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const cs = getComputedStyle(n), bg = solid(cs.backgroundColor);
+      if (bg) return bg;
+      const grad = /(#[0-9a-f]{6}|rgba?\([^)]+\))/i.exec(cs.backgroundImage || ''); if (grad) return grad[1][0] === '#' ? grad[1].toUpperCase() : solid(grad[1]);
+      if (n === el && n.closest('svg')) { const f = solid(cs.fill) || solid(cs.stroke); if (f) return f; }
+    }
+    return solid(getComputedStyle(document.body).backgroundColor);
+  }
+  async function drop(k, btn) {
+    const pop = btn.closest('.theme-pop');
+    if (g.EyeDropper) {
+      try { const r = await new g.EyeDropper().open(); const h = parseCode(r.sRGBHex); if (h) setSlot(pop, k, h); } catch (e) { /* cancelled */ }
+      return;
+    }
+    pop.classList.add('tp-away');
+    const tip = document.createElement('div'); tip.className = 'tp-tip'; tip.innerHTML = `${DROP}<span>แตะสีที่ต้องการ</span><button type="button">ยกเลิก</button>`;
+    document.body.appendChild(tip); document.documentElement.classList.add('tp-picking'); if (g.I18N) g.I18N.apply(tip);
+    const end = () => { window.removeEventListener('click', pick, true); tip.remove(); document.documentElement.classList.remove('tp-picking'); pop.classList.remove('tp-away'); };
+    const pick = e => {
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      if (e.target.closest('.tp-tip')) { end(); return; }
+      const h = colourAt(document.elementFromPoint(e.clientX, e.clientY), e.clientX, e.clientY);
+      end(); if (h) setSlot(pop, k, h);
+    };
+    setTimeout(() => window.addEventListener('click', pick, true), 0);
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('.tp-drop'); if (b) { e.preventDefault(); drop(b.dataset.drop, b); } });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
   window.addEventListener('resize', close);
   window.addEventListener('hashchange', close);

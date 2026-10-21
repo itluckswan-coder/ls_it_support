@@ -886,10 +886,18 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .tp-hues{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
 .tp-hue{aspect-ratio:1;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
 .tp-hue.on{box-shadow:0 0 0 2px var(--ink)}
-.tp-mix{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.tp-mix label{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:12px;font-size:12.5px;cursor:pointer}
-.tp-mix input[type=color]{width:30px;height:30px;padding:0;border:0;border-radius:50%;background:none;flex:none;cursor:pointer}
-.tp-mix input[type=color]::-webkit-color-swatch-wrapper{padding:0}
-.tp-mix input[type=color]::-webkit-color-swatch{border:1px solid rgba(0,0,0,.12);border-radius:50%}
+.tp-mix{display:grid;gap:6px}
+.tp-row{display:flex;align-items:center;gap:8px;padding:5px 6px 5px 8px;border:1px solid var(--line);border-radius:12px}
+.tp-lab{font-size:12.5px;flex:1;min-width:0}
+.tp-row input[type=color]{width:30px;height:30px;padding:0;border:0;border-radius:50%;background:none;flex:none;cursor:pointer}
+.tp-row input[type=color]::-webkit-color-swatch-wrapper{padding:0}
+.tp-row input[type=color]::-webkit-color-swatch{border:1px solid rgba(0,0,0,.12);border-radius:50%}
+.tp-hex{width:92px;height:32px;padding:0 8px;font:500 13px/1 var(--mono);text-transform:uppercase;border-radius:8px;flex:none}
+.tp-hex.bad{border-color:var(--red);background:var(--red-tint)}
+.tp-row .tp-drop{width:32px;height:32px;flex:none}
+.theme-pop.tp-away{visibility:hidden}
+.tp-picking,.tp-picking *{cursor:crosshair!important}
+.tp-tip{position:fixed;left:50%;bottom:calc(20px + var(--safe-b));transform:translateX(-50%);z-index:90;display:flex;align-items:center;gap:10px;background:var(--ink);color:#fff;padding:10px 10px 10px 16px;border-radius:999px;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:14px;white-space:nowrap}
+.tp-tip button{background:rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px}
 .tp-reset{margin-top:10px}
 .tp-reset.btn{height:38px;font-size:13px}
