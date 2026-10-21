@@ -76,11 +76,12 @@
     add(dict) { for (const [k, v] of Object.entries(dict)) DICT.set(k, v); },
     // a pattern for text with values in it: I18N.pattern(/^รวม (\d+) วัน$/, (m, L) => L === 'en' ? m[1] + ' days' : ...)
     pattern(re, fn) { PATTERNS.push([re, fn]); },
-    piece(re, fn) { PIECES.push([re, fn]); },
-    // words swapped inside longer text (department and shift names, units): longest first
+    piece(re, fn) { PIECES.push([re, fn, 1e9]); PIECES.sort((x, y) => y[2] - x[2]); },
+    // words swapped inside longer text (department and shift names, units): across all sections the longest
+    // words go first, so "หัวหน้าแผนก" is replaced whole before "แผนก" on its own
     pieces(dict) {
-      const keys = Object.keys(dict).sort((x, y) => y.length - x.length);
-      for (const k of keys) PIECES.push([new RegExp(esc(k), 'g'), (m, L) => dict[k][L === 'en' ? 0 : 1]]);
+      for (const k of Object.keys(dict)) PIECES.push([new RegExp(esc(k), 'g'), (m, L) => dict[k][L === 'en' ? 0 : 1], k.length]);
+      PIECES.sort((x, y) => y[2] - x[2]);
     },
     t(text) { return lang === 'th' ? text : (tr(text, lang) || text); },
     apply,
