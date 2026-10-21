@@ -1,0 +1,246 @@
+<title>คู่มือระบบงานขายลักษวรรณ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Sans+Myanmar:wght@400;600&display=swap">
+<style>
+/* Layout: sticky brand bar + chapter index on the left, one long scrolling manual on the right; quick guides as department cards */
+:root {
+  --bg: #F6F3EC; --paper: #FFFDF8; --ink: #1E2522; --ink2: #4C5550; --muted: #7A7F78; --line: #E6E0D2;
+  --red: #A8262D; --red-soft: #F7E3E2; --gold: #B98A12; --gold-soft: #FBF0D2; --teal: #0E8A7C; --teal-soft: #DCF1EC;
+  --shadow: 0 1px 2px rgba(40,30,10,.05), 0 6px 20px rgba(40,30,10,.06);
+  --fd: 'Bai Jamjuree', 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --fb: 'IBM Plex Sans Thai', 'Noto Sans Myanmar', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #171A19; --paper: #202523; --ink: #EEE9DF; --ink2: #C5C2B8; --muted: #9A9C94; --line: #343A37;
+  --red: #E0646A; --red-soft: #3A2224; --gold: #E2B54A; --gold-soft: #3A3120; --teal: #4CC2B2; --teal-soft: #1C3632;
+  --shadow: 0 1px 2px rgba(0,0,0,.3); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #171A19; --paper: #202523; --ink: #EEE9DF; --ink2: #C5C2B8; --muted: #9A9C94; --line: #343A37;
+  --red: #E0646A; --red-soft: #3A2224; --gold: #E2B54A; --gold-soft: #3A3120; --teal: #4CC2B2; --teal-soft: #1C3632;
+  --shadow: 0 1px 2px rgba(0,0,0,.3); color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.7 var(--fb); -webkit-font-smoothing: antialiased }
+:lang(my) body, html[lang=my] body { line-height: 1.95 }
+html[lang=my] { --fd: 'Noto Sans Myanmar', 'Bai Jamjuree', system-ui, sans-serif; --fb: 'Noto Sans Myanmar', 'IBM Plex Sans Thai', system-ui, sans-serif }
+h1, h2, h3 { font-family: var(--fd); line-height: 1.25; margin: 0; text-wrap: balance }
+a { color: var(--teal) }
+button { font: inherit; color: inherit; cursor: pointer }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper) }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); border-bottom: 1px solid var(--line) }
+.bar-in { max-width: 1240px; margin: 0 auto; padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; align-items: center; gap: 14px; flex-wrap: wrap }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 }
+.mark { width: 38px; height: 38px; border-radius: 11px; background: var(--red); display: grid; place-items: center; flex: none }
+.brand b { font-family: var(--fd); font-size: 17px; display: block; line-height: 1.2 }
+.brand small { color: var(--muted); font-size: 12.5px; display: block; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px }
+.seg button { border: 0; background: none; border-radius: 999px; padding: 6px 13px; font-size: 14px; color: var(--ink2); white-space: nowrap }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper) }
+.seg.lang button { font-weight: 600; letter-spacing: .02em }
+@media (max-width: 640px) { .brand { flex-basis: 100% } .brand small { display: none } .seg button { padding: 6px 10px; font-size: 13.5px } }
+
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 36px; align-items: start }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr) } .toc { position: static !important; max-height: none !important } .toc h4, .toc a { display: none } }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 78px); max-height: calc(100vh - 100px); overflow: auto; padding-right: 6px }
+.search { width: 100%; border: 1px solid var(--line); background: var(--paper); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 14.5px; color: var(--ink) }
+.toc h4 { font: 600 12px/1 var(--fb); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 18px 0 8px; display: flex; align-items: center; gap: 8px }
+.toc h4 i { width: 9px; height: 9px; border-radius: 3px; display: inline-block }
+.toc a { display: block; padding: 6px 10px; border-radius: 9px; color: var(--ink2); text-decoration: none; font-size: 14.5px; line-height: 1.4 }
+.toc a:hover, .toc a.on { background: var(--paper); color: var(--ink); box-shadow: var(--shadow) }
+
+.hero { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; padding: 26px 28px; margin-bottom: 26px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; align-items: center }
+@media (max-width: 640px) { .hero { grid-template-columns: minmax(0, 1fr) } }
+.hero h1 { font-size: clamp(26px, 4vw, 36px) }
+.hero p { color: var(--ink2); margin: 10px 0 0; max-width: 68ch }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px }
+.pill { font-size: 13px; padding: 4px 11px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); color: var(--ink2); white-space: nowrap }
+.pill.red { background: var(--red-soft); border-color: transparent; color: var(--red) }
+.hero .url { white-space: normal; font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--teal); word-break: break-all }
+.legend { display: grid; gap: 6px; font-size: 13.5px; color: var(--ink2) }
+.legend span { display: flex; align-items: center; gap: 8px }
+.legend i { width: 12px; height: 12px; border-radius: 4px }
+
+.chap { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; margin-bottom: 22px; overflow: hidden; scroll-margin-top: 90px }
+.chap-hd { display: flex; gap: 14px; align-items: flex-start; padding: 22px 26px 6px }
+.ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; flex: none; color: #fff }
+.ico svg { width: 24px; height: 24px }
+.chap-hd h2 { font-size: 23px }
+.who { font-size: 13.5px; color: var(--muted); margin-top: 4px }
+.who b { color: var(--ink2); font-weight: 600 }
+.chap-bd { padding: 6px 26px 24px; display: grid; gap: 16px }
+.intro { color: var(--ink2); margin: 0; max-width: 72ch }
+.steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 8px }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start }
+.steps li::before { content: counter(s); width: 28px; height: 28px; border-radius: 50%; background: var(--c, var(--red)); color: #fff; font: 600 14px/28px var(--fd); text-align: center; margin-top: 1px }
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 14px }
+.shots.one { grid-template-columns: minmax(0, 1fr) }
+figure { margin: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg) }
+figure button { border: 0; padding: 0; background: none; display: block; width: 100% }
+figure img { display: block; width: 100%; height: auto; aspect-ratio: 1280 / 820; object-fit: cover; object-position: top }
+.shots.one figure img { aspect-ratio: auto }
+figcaption { font-size: 13.5px; padding: 9px 12px; color: var(--ink2); border-top: 1px solid var(--line); background: var(--paper) }
+.tips { background: var(--gold-soft); border-radius: 14px; padding: 12px 16px; display: grid; gap: 4px }
+.tips b { font-family: var(--fd); color: var(--gold); font-size: 14px }
+.tips ul { margin: 0; padding-left: 18px; color: var(--ink2); font-size: 14.5px }
+
+.qgrid { display: grid; gap: 22px }
+.qcard { background: var(--paper); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; scroll-margin-top: 90px }
+.qcard-hd { padding: 18px 24px; color: #fff; display: flex; gap: 12px; align-items: center; flex-wrap: wrap }
+.qcard-hd h2 { font-size: 21px; flex: 1; min-width: 0 }
+.qcard-hd small { display: block; font: 400 13px/1.4 var(--fb); opacity: .85; margin-top: 3px }
+.qcard-bd { padding: 18px 24px 22px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 22px }
+@media (max-width: 760px) { .qcard-bd { grid-template-columns: minmax(0, 1fr) } }
+.qcard h3 { font-size: 15px; margin-bottom: 8px; color: var(--ink2) }
+.can { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; font-size: 14.5px }
+.can li { display: flex; gap: 8px; align-items: flex-start }
+.can li::before { content: ""; flex: none; width: 18px; height: 18px; margin-top: 4px; border-radius: 6px; background: var(--teal-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230E8A7C' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center/12px no-repeat }
+.qshots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px }
+.qshots figure img { aspect-ratio: 16 / 11 }
+.links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px }
+.links a { font-size: 13px; text-decoration: none; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink2) }
+.links a:hover { border-color: var(--teal); color: var(--teal) }
+.log { background: var(--paper); border: 1px dashed var(--line); border-radius: 16px; padding: 16px 20px; font-size: 14.5px; color: var(--ink2) }
+.log h3 { font-size: 16px; color: var(--ink); margin-bottom: 6px }
+.empty { color: var(--muted); padding: 30px 0; text-align: center }
+
+.lb { position: fixed; inset: 0; z-index: 20; background: rgba(10,12,11,.86); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)) }
+.lb img { max-width: 100%; max-height: 82vh; border-radius: 10px; background: #fff }
+.lb p { color: #f2efe6; text-align: center; margin: 10px 0 0; font-size: 14.5px }
+.lb button { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 14px); right: calc(env(safe-area-inset-right, 0px) + 14px); width: 42px; height: 42px; border-radius: 50%; border: 0; background: #fff; color: #111; font-size: 22px; line-height: 1 }
+.top { position: fixed; right: calc(env(safe-area-inset-right, 0px) + 18px); bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); font-size: 18px }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth } }
+</style>
+
+<header class="bar"><div class="bar-in">
+  <div class="brand"><span class="mark" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2"/><path d="M8 7h6M8 11h5"/></svg></span>
+    <div style="min-width:0"><b id="tTitle"></b><small id="tSub"></small></div></div>
+  <div class="seg" role="group" id="modeSeg"><button id="mFull" aria-pressed="true"></button><button id="mQuick" aria-pressed="false"></button></div>
+  <div class="seg lang" role="group" aria-label="Language / ภาษา"><button data-l="th" lang="th">ไทย</button><button data-l="en" lang="en">EN</button><button data-l="my" lang="my">မြန်မာ</button></div>
+</div></header>
+
+<div class="wrap">
+  <nav class="toc" id="toc" aria-label="contents"></nav>
+  <main id="main" style="min-width:0"></main>
+</div>
+<button class="top" id="toTop" aria-label="top" hidden>↑</button>
+
+<script src="content.th.js"></script>
+<script src="content.en.js"></script>
+<script src="content.my.js"></script>
+<script>
+(function () {
+  'use strict';
+  const M = window.MANUAL || {};
+  const ICONS = {
+    key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M17 6l3 3M14 9l2 2"/>',
+    home: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+    meet: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    bed: '<path d="M3 18V7M21 18v-5a3 3 0 0 0-3-3H9v5"/><path d="M3 14h18"/><circle cx="6" cy="11" r="1.6"/>',
+    food: '<path d="M4 11h16a8 8 0 0 1-16 0z"/><path d="M12 7V4M8 8l-1-2M16 8l1-2"/>',
+    doc: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h7M9 16h5"/>',
+    plus: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    send: '<path d="M21 3 3 10l7 3 3 7z"/><path d="m10 13 4-4"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><circle cx="17.5" cy="17.5" r="3.5"/>',
+    print: '<path d="M7 9V3h10v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
+    cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',
+    sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+    check: '<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>',
+    leave: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/><path d="m15 17 1.5 1.5L19 16"/>',
+    shield: '<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>'
+  };
+  const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k] || ICONS.doc}</svg>`;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } } };
+
+  let lang = ['th', 'en', 'my'].includes(store.get('lsManual.lang')) ? store.get('lsManual.lang') : 'th';
+  let mode = store.get('lsManual.mode') === 'quick' ? 'quick' : 'full';
+  let q = '';
+  const D = () => M[lang] || M.th;
+  const img = (name) => `img/${name}-${M[lang] ? lang : 'th'}.webp`;
+  const grp = id => D().groups.find(g => g.id === id) || { color: '#A8262D', title: '' };
+  const chap = id => D().chapters.find(c => c.id === id);
+
+  function fig(name, cap) {
+    return `<figure><button type="button" data-zoom="${esc(name)}" data-cap="${esc(cap)}" aria-label="${esc(cap)}"><img src="${img(name)}" alt="${esc(cap)}" loading="lazy" width="1100" height="705"></button>${cap ? `<figcaption>${esc(cap)}</figcaption>` : ''}</figure>`;
+  }
+  const match = c => !q || JSON.stringify(c).toLowerCase().includes(q);
+
+  function render() {
+    const d = D(), u = d.ui;
+    document.documentElement.lang = lang;
+    document.title = d.meta.title;
+    document.getElementById('tTitle').textContent = d.meta.title;
+    document.getElementById('tSub').textContent = d.meta.subtitle;
+    document.getElementById('mFull').textContent = u.full; document.getElementById('mQuick').textContent = u.quick;
+    document.getElementById('mFull').setAttribute('aria-pressed', mode === 'full'); document.getElementById('mQuick').setAttribute('aria-pressed', mode === 'quick');
+    document.querySelectorAll('[data-l]').forEach(b => b.setAttribute('aria-pressed', b.dataset.l === lang));
+    document.getElementById('toTop').setAttribute('aria-label', u.top);
+
+    const hero = `<section class="hero"><div><h1>${esc(mode === 'full' ? d.meta.title : u.quick)}</h1><p>${esc(d.meta.intro)}</p>
+      <div class="meta"><span class="pill red">${esc(u.version)} ${esc(d.meta.version)}</span><span class="pill">${esc(u.updated)} ${esc(d.meta.updated)}</span><span class="pill url">${esc(d.meta.url)}</span></div></div>
+      <div class="legend">${d.groups.map(g => `<span><i style="background:${g.color}"></i>${esc(g.title)}</span>`).join('')}</div></section>`;
+
+    let toc = `<input class="search" id="q" type="search" placeholder="${esc(u.search)}" value="${esc(q)}" aria-label="${esc(u.search)}">`;
+    let body = hero;
+    if (mode === 'full') {
+      const list = d.chapters.filter(match);
+      for (const g of d.groups) {
+        const cs = list.filter(c => c.group === g.id); if (!cs.length) continue;
+        toc += `<h4><i style="background:${g.color}"></i>${esc(g.title)}</h4>` + cs.map(c => `<a href="#${c.id}" data-go="${c.id}">${esc(c.title)}</a>`).join('');
+      }
+      body += list.map(c => {
+        const col = grp(c.group).color;
+        return `<article class="chap" id="${c.id}" style="--c:${col}"><div class="chap-hd"><span class="ico" style="background:${col}">${svg(c.icon)}</span><div style="min-width:0"><h2>${esc(c.title)}</h2><div class="who"><b>${esc(u.who)}:</b> ${esc(c.who)}</div></div></div>
+          <div class="chap-bd"><p class="intro">${esc(c.intro)}</p>
+          <ol class="steps">${c.steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}</ol>
+          ${c.shots.length ? `<div class="shots ${c.shots.length === 1 ? 'one' : ''}">${c.shots.map(s => fig(s.img, s.cap)).join('')}</div>` : ''}
+          ${c.tips.length ? `<div class="tips"><b>${esc(u.tips)}</b><ul>${c.tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul></div>` : ''}</div></article>`;
+      }).join('') || `<p class="empty">${esc(u.noresult)}</p>`;
+      body += `<div class="log"><h3>${esc(u.changelog)}</h3>${d.changelog.map(l => `<div><b>${esc(u.version)} ${esc(l.v)}</b> · ${esc(l.date)} — ${esc(l.text)}</div>`).join('')}</div>`;
+    } else {
+      const list = d.quick.filter(match);
+      toc += `<h4><i style="background:var(--red)"></i>${esc(u.quick)}</h4>` + list.map(c => `<a href="#${c.id}" data-go="${c.id}">${esc(c.title)}</a>`).join('');
+      body += `<div class="qgrid">${list.map(c => `<article class="qcard" id="${c.id}" style="--c:${c.color}">
+        <div class="qcard-hd" style="background:${c.color}"><h2>${esc(c.title)}<small>${esc(u.menu)}: ${esc(c.menus)}</small></h2></div>
+        <div class="qcard-bd"><div><h3>${esc(u.can)}</h3><ul class="can">${c.can.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+          <div class="links">${c.links.map(id => chap(id) ? `<a href="#${id}" data-open="${id}">${esc(chap(id).title)} →</a>` : '').join('')}</div></div>
+          <div><h3>${esc(u.daily)}</h3><ol class="steps">${c.steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}</ol>
+          <div class="qshots">${c.shots.map(n => fig(n, '')).join('')}</div></div></div></article>`).join('') || `<p class="empty">${esc(u.noresult)}</p>`}</div>`;
+    }
+    document.getElementById('toc').innerHTML = toc;
+    document.getElementById('main').innerHTML = body;
+    const qi = document.getElementById('q');
+    qi.addEventListener('input', () => { q = qi.value.trim().toLowerCase(); const pos = qi.selectionStart; render(); const n = document.getElementById('q'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) { /* ignore */ } });
+  }
+
+  function go(id) { const el = document.getElementById(id); if (el) el.scrollIntoView({ block: 'start' }); }
+  document.addEventListener('click', e => {
+    const l = e.target.closest('[data-l]'); if (l) { lang = l.dataset.l; store.set('lsManual.lang', lang); render(); return; }
+    if (e.target.closest('#mFull')) { mode = 'full'; store.set('lsManual.mode', mode); render(); scrollTo(0, 0); return; }
+    if (e.target.closest('#mQuick')) { mode = 'quick'; store.set('lsManual.mode', mode); render(); scrollTo(0, 0); return; }
+    const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); mode = 'full'; q = ''; store.set('lsManual.mode', mode); render(); go(o.dataset.open); return; }
+    const a = e.target.closest('[data-go]'); if (a) { e.preventDefault(); go(a.dataset.go); return; }
+    const z = e.target.closest('[data-zoom]');
+    if (z) {
+      const box = document.createElement('div'); box.className = 'lb'; box.setAttribute('role', 'dialog');
+      box.innerHTML = `<div><img src="${img(z.dataset.zoom)}" alt="${esc(z.dataset.cap)}">${z.dataset.cap ? `<p>${esc(z.dataset.cap)}</p>` : ''}</div><button type="button" aria-label="close">×</button>`;
+      box.addEventListener('click', () => box.remove()); document.body.appendChild(box); return;
+    }
+    if (e.target.closest('#toTop')) scrollTo(0, 0);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.lb').forEach(x => x.remove()); });
+  addEventListener('scroll', () => { document.getElementById('toTop').hidden = scrollY < 600; }, { passive: true });
+  render();
+  const h = location.hash.slice(1);
+  if (h) { if (D().quick.some(c => c.id === h)) { mode = 'quick'; render(); } setTimeout(() => go(h), 60); }
+})();
+</script>
