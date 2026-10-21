@@ -864,3 +864,10 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .pos-row .icon-btn{width:32px;height:32px;flex:none}
 .pos-name{flex:1;min-width:0;font-size:14px}
 .dept-dot{width:10px;height:10px;border-radius:50%;flex:none}
+/* staff list: one tab per workplace */
+.site-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:-4px 0 14px;padding:6px 10px;background:#fff;border:1px solid var(--line);border-radius:18px}
+.site-tabs>svg{color:var(--red);margin:0 4px 0 2px;flex:none}
+.site-tabs button{height:34px;padding:0 14px;border-radius:999px;font-size:13.5px;color:var(--ink2);white-space:nowrap}
+.site-tabs button .n{opacity:.6;margin-left:2px}
+.site-tabs button.on{background:var(--red);color:#fff}
+.site-tabs button.on .n{opacity:.85}

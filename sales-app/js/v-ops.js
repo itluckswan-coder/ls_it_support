@@ -515,14 +515,17 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูเ�
     renderEmps() {
       const db = Store.db, canEdit = App.can('staff');
       const ui = App.state.ui.emps || (App.state.ui.emps = { q: '', dept: 'all', page: 1 });
-      const list = db.employees.filter(e => (ui.dept === 'all' || e.dept === ui.dept) && (!ui.q || (e.name + ' ' + (e.role || '') + ' ' + (e.phone || '')).toLowerCase().includes(ui.q.toLowerCase())))
+      if (!ui.site || (ui.site !== 'all' && !sites().some(x => x.id === ui.site))) ui.site = SITES_DEFAULT[0].id;
+      const atSite = db.employees.filter(e => ui.site === 'all' || siteOf(e) === ui.site), sCnt = id => db.employees.filter(e => siteOf(e) === id).length;
+      const list = atSite.filter(e => (ui.dept === 'all' || e.dept === ui.dept) && (!ui.q || (e.name + ' ' + (e.role || '') + ' ' + (e.phone || '')).toLowerCase().includes(ui.q.toLowerCase())))
         .sort((a, b) => D.DEPTS.findIndex(d => d.id === a.dept) - D.DEPTS.findIndex(d => d.id === b.dept) || a.name.localeCompare(b.name, 'th'));
       const per = 15, pages = Math.max(1, Math.ceil(list.length / per)); ui.page = Math.min(ui.page, pages);
       const rows = list.slice((ui.page - 1) * per, ui.page * per);
-      const cnt = d => db.employees.filter(e => d === 'all' || e.dept === d).length;
+      const cnt = d => atSite.filter(e => d === 'all' || e.dept === d).length;
       return `
-<div class="page-hd"><div><h1>พนักงานทั้งหมด</h1><div class="small muted">${db.employees.length} คน · ${D.DEPTS.filter(d => cnt(d.id)).map(d => d.short + ' ' + cnt(d.id)).join(' · ')}</div></div>
+<div class="page-hd"><div><h1>พนักงานทั้งหมด</h1><div class="small muted">${ui.site === 'all' ? '' : H(siteName(ui.site)) + ' · '}${atSite.length} คน${atSite.length ? ' · ' : ''}${D.DEPTS.filter(d => cnt(d.id)).map(d => d.short + ' ' + cnt(d.id)).join(' · ')}</div></div>
   ${canEdit ? '<div class="row wrap"><button class="btn ghost" data-act="empImport">นำเข้าไฟล์รายชื่อ</button><button class="btn red" data-act="empNew">+ เพิ่มพนักงาน</button></div>' : ''}</div>
+<div class="site-tabs" role="tablist" aria-label="สถานที่">${PIN}${sites().map(x => `<button role="tab" aria-selected="${ui.site === x.id}" class="${ui.site === x.id ? 'on' : ''}" data-act="empSite" data-v="${x.id}">${H(x.name)} <span class="n">${sCnt(x.id)}</span></button>`).join('')}<button role="tab" aria-selected="${ui.site === 'all'}" class="${ui.site === 'all' ? 'on' : ''}" data-act="empSite" data-v="all">ทุกสถานที่ <span class="n">${db.employees.length}</span></button></div>
 <div class="row wrap" style="margin-bottom:16px">
   <input class="input" style="max-width:260px;border-radius:999px" placeholder="ค้นหาชื่อ ตำแหน่ง เบอร์โทร…" value="${H(ui.q)}" data-change="empQ" aria-label="ค้นหาพนักงาน">
   <button class="chip ${ui.dept === 'all' ? 'on' : ''}" data-act="empDept" data-v="all">ทั้งหมด <span class="n">${cnt('all')}</span></button>
@@ -531,12 +534,12 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูเ�
 <section class="card" style="overflow:hidden">
   <table class="tbl resp"><thead><tr><th>พนักงาน</th><th>ตำแหน่ง</th><th>แผนก</th><th>เบอร์โทร</th><th class="r">ชม.สะสม/สัปดาห์</th>${canEdit ? '<th class="r">จัดการ</th>' : ''}</tr></thead><tbody>
   ${rows.map(e => { const dp = dept(e.dept); return `<tr>
-    <td><div class="row"><span class="avatar sm" style="background:${dp.bg};color:${dp.fg}">${H(U.initials(e.name))}</span><div style="min-width:0"><div style="font-weight:500">${H(e.name)}</div><div class="sub">${H(e.role || '-')} · ${H(dp.short)}</div></div></div></td>
+    <td><div class="row"><span class="avatar sm" style="background:${dp.bg};color:${dp.fg}">${H(U.initials(e.name))}</span><div style="min-width:0"><div style="font-weight:500">${H(e.name)}</div><div class="sub">${H(e.role || '-')} · ${H(dp.short)}${ui.site === 'all' ? ' · ' + H(siteName(siteOf(e))) : ''}</div></div></div></td>
     <td class="hide-m">${H(e.role || '-')}</td>
     <td class="hide-m"><span class="role-badge" style="background:${dp.bg};color:${dp.fg}">${H(dp.short)}</span></td>
     <td class="hide-m small">${H(e.phone || '-')}</td>
     <td class="r hide-m">${Number(e.hours) || 0} ชม.</td>
-    ${canEdit ? `<td class="r"><div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:nowrap"><button class="icon-btn us-edit" data-act="empEdit" data-v="${e.id}" title="แก้ไข" aria-label="แก้ไข ${H(e.name)}">${PENCIL}</button><button class="icon-btn us-edit emp-del" data-act="empDel" data-v="${e.id}" title="ลบ" aria-label="ลบ ${H(e.name)}">${TRASH}</button></div></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="6"><div class="empty">${db.employees.length ? 'ไม่พบพนักงาน' : 'ยังไม่มีรายชื่อพนักงาน — กด “+ เพิ่มพนักงาน”'}</div></td></tr>`}
+    ${canEdit ? `<td class="r"><div class="row" style="gap:6px;justify-content:flex-end;flex-wrap:nowrap"><button class="icon-btn us-edit" data-act="empEdit" data-v="${e.id}" title="แก้ไข" aria-label="แก้ไข ${H(e.name)}">${PENCIL}</button><button class="icon-btn us-edit emp-del" data-act="empDel" data-v="${e.id}" title="ลบ" aria-label="ลบ ${H(e.name)}">${TRASH}</button></div></td>` : ''}</tr>`; }).join('') || `<tr><td colspan="6"><div class="empty">${atSite.length ? 'ไม่พบพนักงาน' : 'ยังไม่มีรายชื่อพนักงานของสถานที่นี้ — กด “+ เพิ่มพนักงาน”'}</div></td></tr>`}
   </tbody></table>
   <div class="between" style="padding:14px 22px;border-top:1px solid var(--line)"><span class="small muted">แสดง ${list.length ? (ui.page - 1) * per + 1 : 0}–${Math.min(ui.page * per, list.length)} จาก ${list.length} คน</span>
     <div class="pager"><button data-act="empPage" data-v="${ui.page - 1}" ${ui.page <= 1 ? 'disabled' : ''} aria-label="ก่อนหน้า">‹</button>${Array.from({ length: pages }, (_, i) => `<button class="${ui.page === i + 1 ? 'on' : ''}" data-act="empPage" data-v="${i + 1}">${i + 1}</button>`).join('')}<button data-act="empPage" data-v="${ui.page + 1}" ${ui.page >= pages ? 'disabled' : ''} aria-label="ถัดไป">›</button></div></div>
@@ -758,6 +761,12 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       }, 'จัดวันหยุด');
     }
   });
+  // workplaces: everyone already on the list is at the resort; sites can be added or renamed on the staff form (settings.sites)
+  const SITES_DEFAULT = [{ id: 'resort', name: 'รีสอร์ท' }, { id: 'boutique', name: 'บูติก' }, { id: 'maneein', name: 'มณีอินทร์' }, { id: 'chdrugs', name: 'ช.ดรักส์' }, { id: 'chhouse', name: 'ช.เฮ้าส์' }, { id: 'phumanee', name: 'ภูมณีพันธุ์' }];
+  const sites = () => { const s = Store.db.settings && Store.db.settings.sites; return Array.isArray(s) && s.length ? s : SITES_DEFAULT; };
+  const siteOf = e => e.site || SITES_DEFAULT[0].id;
+  const siteName = id => (sites().find(x => x.id === id) || { name: id }).name;
+  const PIN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
   const POSITIONS = { kitchen: ['เชฟ', 'ผู้ช่วยเชฟ', 'พนักงานครัว'], banquet: ['หัวหน้าจัดเลี้ยง', 'พนักงานจัดเลี้ยง'], av: ['หัวหน้าช่าง', 'ช่างเทคนิค'], front: ['หัวหน้าส่วนหน้า', 'พนักงานต้อนรับ'], hk: ['หัวหน้าแม่บ้าน', 'แม่บ้าน'], acc: ['หัวหน้าบัญชี', 'พนักงานบัญชี'] };
   // each department's positions: the list kept in settings.positions once someone edits it (else the defaults),
   // plus any position people already hold, so nobody's position goes missing from the choice
@@ -768,6 +777,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     const isNew = !e.id;
     App.modal(`<h2>${isNew ? 'เพิ่มพนักงาน' : 'แก้ไขข้อมูลพนักงาน'}</h2>${isNew ? '' : `<p class="muted" style="margin-top:-8px">${H(e.name)} · รหัส ${H(e.id)}</p>`}
       <div class="field"><label class="f" for="emName">ชื่อ-นามสกุล</label><input class="input" id="emName" name="name" value="${H(e.name || '')}"></div>
+      <div style="margin-top:14px"><label class="f" for="emSite">สถานที่</label><div class="row" style="gap:8px;flex-wrap:nowrap"><select class="input" id="emSite" name="site" style="flex:1;min-width:0">${sites().map(x => `<option value="${x.id}" ${x.id === siteOf(e) ? 'selected' : ''}>${H(x.name)}</option>`).join('')}</select><button type="button" class="icon-btn pos-plus" id="emSiteBtn" title="เพิ่ม / แก้ไขสถานที่" aria-label="เพิ่ม / แก้ไขสถานที่" aria-expanded="false" aria-controls="emSiteBox">+</button></div></div>
+      <div class="pos-box" id="emSiteBox" hidden></div>
       <div class="grid g2" style="margin-top:14px">
         <div><label class="f" for="emDept">แผนก</label><div class="row" style="gap:8px;flex-wrap:nowrap"><select class="input" id="emDept" name="dept" style="flex:1;min-width:0">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === e.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select><button type="button" class="icon-btn pos-plus" id="emDeptBtn" title="เพิ่ม / แก้ไขแผนก" aria-label="เพิ่ม / แก้ไขแผนก" aria-expanded="false" aria-controls="emDeptBox">+</button></div></div>
         <div><label class="f" for="emRole">ตำแหน่ง</label><div class="row" style="gap:8px;flex-wrap:nowrap"><select class="input" id="emRole" name="role" style="flex:1;min-width:0"></select><button type="button" class="icon-btn pos-plus" id="emPosBtn" title="เพิ่ม / แก้ไขตำแหน่ง" aria-label="เพิ่ม / แก้ไขตำแหน่ง" aria-expanded="false" aria-controls="emPos">+</button></div></div>
@@ -868,23 +879,62 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       });
       dBox.addEventListener('keydown', ev => { if (ev.key !== 'Enter') return; ev.preventDefault(); const b = dBox.querySelector(ev.target.id === 'emDeptRen' ? '[data-dp=ren]' : '[data-dp=add]'); if (b) b.click(); });
       dBtn.onclick = () => { const open = dBox.hidden; dBox.hidden = !open; dBtn.setAttribute('aria-expanded', String(open)); dBtn.classList.toggle('on', open); if (open) { dEditing = null; drawDept(); dBox.querySelector('#emDeptNew').focus(); } };
+      // the + beside the workplace: add a site or rename one; a site can go once nobody works there (the resort stays)
+      const sSel = bg.querySelector('#emSite'), sBox = bg.querySelector('#emSiteBox'), sBtn = bg.querySelector('#emSiteBtn');
+      let sEditing = null;
+      const fillSite = (to) => { const cur = to || sSel.value; sSel.innerHTML = sites().map(x => `<option value="${x.id}" ${x.id === cur ? 'selected' : ''}>${H(x.name)}</option>`).join(''); };
+      const drawSite = (msg) => {
+        const used = id => Store.db.employees.filter(x => siteOf(x) === id).length, list = sites();
+        sBox.innerHTML = `<div class="between" style="margin-bottom:8px"><b class="small">สถานที่ทั้งหมด</b><span class="xs muted">${list.length} สถานที่</span></div>
+          <div class="pos-list">${list.map((x, i) => sEditing === i
+            ? `<div class="pos-row"><input class="input" id="emSiteRen" value="${H(x.name)}" aria-label="ชื่อสถานที่ใหม่"><button type="button" class="btn red sm" data-st="ren" data-i="${i}">บันทึก</button><button type="button" class="btn ghost sm" data-st="cancel">ยกเลิก</button></div>`
+            : `<div class="pos-row"><span class="pos-name">${H(x.name)}</span><span class="xs muted">${used(x.id) ? used(x.id) + ' คน' : ''}</span><button type="button" class="icon-btn" data-st="edit" data-i="${i}" title="แก้ไขสถานที่" aria-label="แก้ไขสถานที่ ${H(x.name)}">${PENCIL}</button>${i === 0 ? '<span class="icon-btn" style="visibility:hidden"></span>' : `<button type="button" class="icon-btn" data-st="del" data-i="${i}" title="ลบสถานที่" aria-label="ลบสถานที่ ${H(x.name)}">${TRASH}</button>`}</div>`).join('')}</div>
+          <div class="pos-row" style="margin-top:8px"><input class="input" id="emSiteNew" placeholder="ชื่อสถานที่ใหม่" aria-label="ชื่อสถานที่ใหม่"><button type="button" class="btn red sm" data-st="add">+ เพิ่ม</button></div>
+          <div class="xs ${msg && msg.err ? 'red' : 'muted'}" style="min-height:16px;margin-top:6px" role="status">${H(msg ? msg.text : 'ลบสถานที่ได้เมื่อไม่มีพนักงานอยู่')}</div>`;
+      };
+      const siteSave = list => { const st = Store.db.settings || (Store.db.settings = {}); st.sites = list; };
+      const sDone = (text, to) => { Store.save(); sEditing = null; fillSite(to); drawSite({ text }); };
+      sBox.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-st]'); if (!b) return;
+        const list = sites().map(x => ({ id: x.id, name: x.name })), i = +b.dataset.i, act = b.dataset.st, clash = (v, k) => list.some((x, j) => j !== k && x.name === v);
+        if (act === 'edit') { sEditing = i; drawSite(); const inp = sBox.querySelector('#emSiteRen'); inp.focus(); inp.select(); return; }
+        if (act === 'cancel') { sEditing = null; drawSite(); return; }
+        const v = act === 'del' ? '' : (sBox.querySelector(act === 'add' ? '#emSiteNew' : '#emSiteRen').value || '').trim().replace(/\s+/g, ' ');
+        if (act !== 'del' && !v) return drawSite({ text: 'กรุณากรอกชื่อสถานที่', err: 1 });
+        if (act === 'add') {
+          if (clash(v, -1)) return drawSite({ text: 'มีสถานที่นี้อยู่แล้ว', err: 1 });
+          let id; do id = 's' + Math.random().toString(36).slice(2, 8); while (list.some(x => x.id === id));
+          siteSave(list.concat({ id, name: v })); return sDone('เพิ่มสถานที่ ' + v + ' แล้ว', id);
+        }
+        if (act === 'ren') {
+          if (clash(v, i)) return drawSite({ text: 'มีสถานที่นี้อยู่แล้ว', err: 1 });
+          list[i].name = v; siteSave(list); return sDone('เปลี่ยนชื่อสถานที่แล้ว');
+        }
+        if (act === 'del' && i > 0) {
+          const x = list[i], n = Store.db.employees.filter(y => siteOf(y) === x.id).length;
+          if (n) return drawSite({ text: 'มีพนักงาน ' + n + ' คนที่สถานที่นี้ — ย้ายพนักงานไปสถานที่อื่นก่อนจึงจะลบได้', err: 1 });
+          siteSave(list.filter((_, k) => k !== i)); return sDone('ลบสถานที่ ' + x.name + ' แล้ว', sSel.value === x.id ? list[0].id : null);
+        }
+      });
+      sBox.addEventListener('keydown', ev => { if (ev.key !== 'Enter') return; ev.preventDefault(); const b = sBox.querySelector(ev.target.id === 'emSiteRen' ? '[data-st=ren]' : '[data-st=add]'); if (b) b.click(); });
+      sBtn.onclick = () => { const open = sBox.hidden; sBox.hidden = !open; sBtn.setAttribute('aria-expanded', String(open)); sBtn.classList.toggle('on', open); if (open) { sEditing = null; drawSite(); sBox.querySelector('#emSiteNew').focus(); } };
       fill(); sel.onchange = () => { pick = ''; editing = null; fill(); if (!box.hidden) drawBox(); };
       bg.querySelector('#emOk').onclick = () => {
         const f = App.formData(bg), err = bg.querySelector('#emErr');
         f.name = f.name.trim(); f.role = f.role.trim(); f.phone = f.phone.trim();
         if (!f.name) { err.textContent = 'กรุณากรอกชื่อพนักงาน'; return; }
         if (!f.role) { err.textContent = 'กรุณากรอกตำแหน่ง'; return; }
-        if (Store.db.employees.some(x => x.id !== e.id && x.name.replace(/\s+/g, ' ') === f.name.replace(/\s+/g, ' ') && x.dept === f.dept)) { err.textContent = 'มีพนักงานชื่อนี้ในแผนกนี้อยู่แล้ว'; return; }
+        if (Store.db.employees.some(x => x.id !== e.id && x.name.replace(/\s+/g, ' ') === f.name.replace(/\s+/g, ' ') && x.dept === f.dept && siteOf(x) === f.site)) { err.textContent = 'มีพนักงานชื่อนี้ในแผนกนี้อยู่แล้ว'; return; }
         const hours = Math.max(0, Math.min(168, Math.round(Number(f.hours) || 0)));
         const db = Store.db;
         if (isNew) {
           const ids = db.employees.map(x => parseInt(String(x.id).slice(1), 10) || 0);
-          db.employees.push({ id: 'e' + (Math.max(0, ...ids) + 1), name: f.name, dept: f.dept, role: f.role, phone: f.phone, hours });
+          db.employees.push({ id: 'e' + (Math.max(0, ...ids) + 1), name: f.name, site: f.site, dept: f.dept, role: f.role, phone: f.phone, hours });
         } else {
           const cur = db.employees.find(x => x.id === e.id); if (!cur) { App.closeModal(); return; }
           // moving to another department takes the person off that department's old shifts
           if (cur.dept !== f.dept) unassign(cur.id);
-          Object.assign(cur, { name: f.name, dept: f.dept, role: f.role, phone: f.phone, hours });
+          Object.assign(cur, { name: f.name, site: f.site, dept: f.dept, role: f.role, phone: f.phone, hours });
         }
         Store.save(); App.closeModal(); App.render(); App.toast(isNew ? 'เพิ่ม ' + f.name + ' แล้ว' : 'บันทึกแล้ว');
       };
@@ -892,41 +942,45 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   }
   // remove an employee from every shift and OT request in all plans
   /* ---------- import the staff list from .xlsx / .csv ---------- */
-  const EHEAD = { name: /^(ชื่อ[-\s]*(นามสกุล|สกุล)?|ชื่อพนักงาน|name|full ?name)$/i, last: /^(นามสกุล|สกุล|last ?name|surname)$/i, role: /ตำแหน่ง|position|job|title/i, dept: /แผนก|ฝ่าย|dept|department/i, phone: /โทร|phone|mobile|tel/i, hours: /ชั่วโมง|ชม|hours?/i };
+  const EHEAD = { name: /^(ชื่อ[-\s]*(นามสกุล|สกุล)?|ชื่อพนักงาน|name|full ?name)$/i, last: /^(นามสกุล|สกุล|last ?name|surname)$/i, role: /ตำแหน่ง|position|job|title/i, dept: /แผนก|ฝ่าย|dept|department/i, phone: /โทร|phone|mobile|tel/i, hours: /ชั่วโมง|ชม|hours?/i, site: /สถานที่|สาขา|site|location|branch/i };
   const normName = t => String(t || '').replace(/\s+/g, ' ').trim();
-  function parseEmps(rows) {
+  const parseSite = t => { const v = normName(t).toLowerCase(); return !v ? null : (sites().find(x => x.id === v || normName(x.name).toLowerCase() === v) || {}).id || false; };
+  function parseEmps(rows, defSite) {
     rows = rows.filter(r => r && r.some(c => String(c).trim() !== ''));
-    let map = { name: 0, role: 1, dept: 2, phone: 3, hours: 4 }, start = 0;
+    let map = { name: 0, role: 1, dept: 2, phone: 3, hours: 4, site: 5 }, start = 0;
     const hi = rows.findIndex((r, i) => i < 5 && r.some(c => EHEAD.name.test(String(c).trim())));
     if (hi >= 0) {
       map = {}; start = hi + 1;
-      rows[hi].forEach((c, i) => { const t = String(c).trim(); for (const k of ['last', 'name', 'dept', 'role', 'phone', 'hours']) if (map[k] == null && EHEAD[k].test(t)) { map[k] = i; break; } });
+      rows[hi].forEach((c, i) => { const t = String(c).trim(); for (const k of ['site', 'last', 'name', 'dept', 'role', 'phone', 'hours']) if (map[k] == null && EHEAD[k].test(t)) { map[k] = i; break; } });
     }
     const seen = new Set();
     return rows.slice(start).map((r, i) => {
       const get = k => map[k] == null || r[map[k]] == null ? '' : String(r[map[k]]).trim();
-      const name = normName(get('name') + ' ' + get('last')), dRaw = get('dept'), h = get('hours');
-      const out = { line: start + i + 1, name, role: get('role'), dept: parseDept(dRaw), phone: get('phone'), hours: h === '' ? null : Math.max(0, Math.min(168, Math.round(Number(h) || 0))), errs: [] };
+      const name = normName(get('name') + ' ' + get('last')), dRaw = get('dept'), h = get('hours'), sRaw = get('site'), site = parseSite(sRaw);
+      const out = { line: start + i + 1, name, site: site || defSite, role: get('role'), dept: parseDept(dRaw), phone: get('phone'), hours: h === '' ? null : Math.max(0, Math.min(168, Math.round(Number(h) || 0))), errs: [] };
       if (!out.name) out.errs.push('ไม่มีชื่อ');
       if (!out.dept) out.errs.push(dRaw ? 'ไม่รู้จักแผนก "' + dRaw + '"' : 'ไม่ได้ระบุแผนก');
-      const key = out.name + '|' + out.dept;
+      if (site === false) out.errs.push('ไม่รู้จักสถานที่ "' + sRaw + '"');
+      const key = out.name + '|' + out.dept + '|' + out.site;
       if (out.name && out.dept) { if (seen.has(key)) out.errs.push('ชื่อซ้ำในไฟล์'); seen.add(key); }
-      out.match = out.errs.length ? null : Store.db.employees.find(e => normName(e.name) === out.name && e.dept === out.dept) || null;
+      out.match = out.errs.length ? null : Store.db.employees.find(e => normName(e.name) === out.name && e.dept === out.dept && siteOf(e) === out.site) || null;
       return out;
     });
   }
-  const empTplRows = () => [['ชื่อ-นามสกุล', 'ตำแหน่ง', 'แผนก', 'เบอร์โทร', 'ชั่วโมงสะสม/สัปดาห์']].concat(Store.db.employees.length
-    ? Store.db.employees.map(e => [e.name, e.role || '', dept(e.dept).short, e.phone || '', Number(e.hours) || 0])
-    : [['สมชาย ใจดี', 'เชฟ', 'ครัว', '081-000-0000', 0], ['สมหญิง รักงาน', 'พนักงานจัดเลี้ยง', 'จัดเลี้ยง', '', 0]]);
+  const empTplRows = () => [['ชื่อ-นามสกุล', 'ตำแหน่ง', 'แผนก', 'เบอร์โทร', 'ชั่วโมงสะสม/สัปดาห์', 'สถานที่']].concat(Store.db.employees.length
+    ? Store.db.employees.map(e => [e.name, e.role || '', dept(e.dept).short, e.phone || '', Number(e.hours) || 0, siteName(siteOf(e))])
+    : [['สมชาย ใจดี', 'เชฟ', 'ครัว', '081-000-0000', 0, siteName(SITES_DEFAULT[0].id)], ['สมหญิง รักงาน', 'พนักงานจัดเลี้ยง', 'จัดเลี้ยง', '', 0, siteName(SITES_DEFAULT[0].id)]]);
   App.ACT.empImport = () => {
     if (!App.can('staff')) return;
+    const st = App.state.ui.emps && App.state.ui.emps.site, defSite = st && st !== 'all' ? st : SITES_DEFAULT[0].id;
     const bg = App.modal(`<h2>นำเข้ารายชื่อพนักงานจากไฟล์</h2>
       <div id="eiBody">
         <ol style="margin:0 0 14px;padding-left:20px;line-height:1.8">
           <li>ดาวน์โหลดแม่แบบ (มีรายชื่อปัจจุบันใส่ไว้ให้) หรือใช้ไฟล์ของคุณเอง</li>
           <li>1 แถวต่อ 1 คน · คอลัมน์: <b>ชื่อ-นามสกุล, ตำแหน่ง, แผนก, เบอร์โทร, ชั่วโมงสะสม/สัปดาห์</b> (สลับลำดับได้ถ้ามีแถวหัวตาราง · แยกคอลัมน์ชื่อ/นามสกุลก็ได้)</li>
           <li><b>แผนก</b> = ครัว, จัดเลี้ยง, ช่าง/AV, ส่วนหน้า, แม่บ้าน, บัญชี (ชื่อเต็มหรือภาษาอังกฤษก็ได้)</li>
-          <li>ชื่อที่มีอยู่แล้วในแผนกเดียวกัน จะอัปเดตตำแหน่ง/เบอร์โทร/ชั่วโมงให้ ไม่เพิ่มซ้ำ</li>
+          <li><b>สถานที่</b> (ไม่บังคับ) = ${sites().map(x => H(x.name)).join(', ')} · ถ้าไม่ใส่ จะเป็น <b>${H(siteName(defSite))}</b></li>
+          <li>ชื่อที่มีอยู่แล้วในแผนกและสถานที่เดียวกัน จะอัปเดตตำแหน่ง/เบอร์โทร/ชั่วโมงให้ ไม่เพิ่มซ้ำ</li>
         </ol>
         <div class="row wrap" style="margin-bottom:12px"><button class="btn ghost sm" id="eiTplX">ดาวน์โหลดแม่แบบ Excel</button><button class="btn ghost sm" id="eiTplC">ดาวน์โหลดแม่แบบ CSV</button></div>
         <label class="btn dark block" style="cursor:pointer">เลือกไฟล์ (.xlsx / .csv)<input type="file" id="eiF" accept=".xlsx,.csv,.txt,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="sr"></label>
@@ -934,7 +988,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       <div class="acts" id="eiActs"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`);
     bg.querySelector('.modal').style.maxWidth = '820px';
     bg.querySelector('#eiTplX').onclick = () => {
-      const blob = g.Sheet.writeXlsx(empTplRows(), { sheetName: 'พนักงาน', widths: [28, 22, 14, 16, 12] });
+      const blob = g.Sheet.writeXlsx(empTplRows(), { sheetName: 'พนักงาน', widths: [28, 22, 14, 16, 12, 14] });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'รายชื่อพนักงาน.xlsx'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     };
     bg.querySelector('#eiTplC').onclick = () => U.download('รายชื่อพนักงาน.csv', '﻿' + empTplRows().map(r => r.map(c => /[",\n]/.test(String(c)) ? '"' + String(c).replace(/"/g, '""') + '"' : c).join(',')).join('\r\n') + '\r\n', 'text/csv');
@@ -942,19 +996,19 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const f = e.target.files[0]; if (!f) return;
       const msg = bg.querySelector('#eiMsg'); msg.textContent = 'กำลังอ่านไฟล์…';
       let parsed;
-      try { parsed = parseEmps(await g.Sheet.readFile(f)); }
+      try { parsed = parseEmps(await g.Sheet.readFile(f), defSite); }
       catch (err) { msg.textContent = err.message || 'อ่านไฟล์ไม่สำเร็จ'; e.target.value = ''; return; }
       if (!parsed.length) { msg.textContent = 'ไม่พบข้อมูลในไฟล์'; return; }
       const ok = parsed.filter(r => !r.errs.length), bad = parsed.length - ok.length, upd = ok.filter(r => r.match).length;
       bg.querySelector('#eiBody').innerHTML = `
         <div class="between" style="margin-bottom:10px;flex-wrap:wrap"><b>${H(f.name)}</b><span class="small"><span class="teal b">เพิ่มใหม่ ${ok.length - upd} คน</span> · อัปเดต ${upd} คน${bad ? ` · <span class="red b">มีปัญหา ${bad} แถว</span>` : ''}</span></div>
-        <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px"><table class="tbl compact" style="font-size:12.5px"><thead><tr><th>แถว</th><th>ชื่อ-นามสกุล</th><th>ตำแหน่ง</th><th>แผนก</th><th>เบอร์โทร</th><th class="r">ชม.</th><th></th></tr></thead><tbody>
+        <div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:12px"><table class="tbl compact" style="font-size:12.5px"><thead><tr><th>แถว</th><th>ชื่อ-นามสกุล</th><th>สถานที่</th><th>ตำแหน่ง</th><th>แผนก</th><th>เบอร์โทร</th><th class="r">ชม.</th><th></th></tr></thead><tbody>
         ${parsed.map(r => `<tr style="${r.errs.length ? 'background:var(--red-tint)' : ''}"><td class="muted">${r.line}</td><td>${H(r.name) || '<span class="red">—</span>'}${r.errs.length ? `<div class="xs red">${r.errs.map(H).join(' · ')}</div>` : ''}</td>
-          <td>${H(r.role) || '<span class="muted">-</span>'}</td><td>${r.dept ? H(dept(r.dept).short) : '<span class="red">?</span>'}</td><td>${H(r.phone)}</td><td class="r">${r.hours == null ? '' : r.hours}</td>
+          <td>${H(siteName(r.site))}</td><td>${H(r.role) || '<span class="muted">-</span>'}</td><td>${r.dept ? H(dept(r.dept).short) : '<span class="red">?</span>'}</td><td>${H(r.phone)}</td><td class="r">${r.hours == null ? '' : r.hours}</td>
           <td>${r.errs.length ? '' : r.match ? '<span class="badge st-sent">อัปเดต</span>' : '<span class="badge st-confirmed">ใหม่</span>'}</td></tr>`).join('')}
         </tbody></table></div>
         <div class="row wrap" style="margin-top:14px;gap:18px"><label class="row small"><input type="radio" name="mode" value="merge" checked style="accent-color:var(--teal);width:18px;height:18px"> เพิ่มต่อจากรายชื่อเดิม</label>
-          <label class="row small"><input type="radio" name="mode" value="replace" style="accent-color:var(--red);width:18px;height:18px"> แทนที่ทั้งหมด (ลบคนที่ไม่มีในไฟล์ และเอาออกจากรอบงาน)</label></div>`;
+          <label class="row small"><input type="radio" name="mode" value="replace" style="accent-color:var(--red);width:18px;height:18px"> แทนที่ทั้งหมดของสถานที่ในไฟล์ (ลบคนที่ไม่มีในไฟล์ และเอาออกจากรอบงาน)</label></div>`;
       bg.querySelector('#eiActs').innerHTML = `<button class="btn ghost" id="eiBack">เลือกไฟล์ใหม่</button><button class="btn red" id="eiGo" ${ok.length ? '' : 'disabled'}>นำเข้า ${ok.length} คน</button>`;
       bg.querySelector('#eiBack').onclick = () => { App.closeModal(); App.ACT.empImport(); };
       bg.querySelector('#eiGo').onclick = () => {
@@ -967,12 +1021,14 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
             keep.add(r.match.id);
           } else {
             const id = 'e' + (++next);
-            db.employees.push({ id, name: r.name, dept: r.dept, role: r.role, phone: r.phone, hours: r.hours || 0 }); keep.add(id);
+            db.employees.push({ id, name: r.name, site: r.site, dept: r.dept, role: r.role, phone: r.phone, hours: r.hours || 0 }); keep.add(id);
           }
         }
         let removed = 0;
-        if (replace) for (const x of db.employees.slice()) if (!keep.has(x.id)) { unassign(x.id); removed++; }
-        if (replace) db.employees = db.employees.filter(x => keep.has(x.id));
+        // replacing only touches the sites in the file: other workplaces' lists stay as they are
+        const inFile = new Set(ok.map(r => r.site)), drop = x => replace && !keep.has(x.id) && inFile.has(siteOf(x));
+        for (const x of db.employees) if (drop(x)) { unassign(x.id); removed++; }
+        db.employees = db.employees.filter(x => !drop(x));
         Store.save(); App.closeModal(); App.render();
         App.toast(`นำเข้าแล้ว · ใหม่ ${ok.length - upd} · อัปเดต ${upd}${removed ? ' · ลบ ' + removed : ''}${bad ? ' · ข้าม ' + bad + ' แถว' : ''}`);
       };
@@ -1017,12 +1073,14 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         Store.save(); App.render(); App.toast(n ? 'ปรับจำนวนที่ต้องใช้ตามเงื่อนไขแล้ว (คนที่มอบหมายไว้ยังอยู่)' : 'ยังไม่มีแผนกที่ตั้งเงื่อนไขไว้');
       }, 'ใช้เงื่อนไข');
     },
+    empSite(el) { Object.assign(App.state.ui.emps, { site: el.dataset.v, dept: 'all', page: 1 }); App.render(); },
     empDept(el) { App.state.ui.emps.dept = el.dataset.v; App.state.ui.emps.page = 1; App.render(); },
     empPage(el) { App.state.ui.emps.page = Number(el.dataset.v); App.render(); },
     empNew() {
       if (!App.can('staff')) return;
       const d = App.state.ui.emps && App.state.ui.emps.dept;
-      empForm({ dept: d && d !== 'all' ? d : D.DEPTS[0].id, hours: 0 });
+      const st = App.state.ui.emps && App.state.ui.emps.site;
+      empForm({ dept: d && d !== 'all' ? d : D.DEPTS[0].id, site: st && st !== 'all' ? st : SITES_DEFAULT[0].id, hours: 0 });
     },
     empEdit(el) { const e = Store.db.employees.find(x => x.id === el.dataset.v); if (e && App.can('staff')) empForm(e); },
     empDel(el) {
