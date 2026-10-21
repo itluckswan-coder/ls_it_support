@@ -43,11 +43,11 @@
     const hit = DICT.get(t);
     if (hit && hit[idx(L)]) return text.replace(t, hit[idx(L)]);
     for (const [re, fn] of PATTERNS) { const m = re.exec(t); if (m) { const out = fn(m, L, x => tr(x, L) || x); if (out != null) return text.replace(t, out); } }
-    // a line made of parts ("name · role · department", "QT-… · customer · date"): each part on its own, so
+    // a line made of parts ("name · role · department", "QT-… · customer · date", "… — …"): each part on its own, so
     // the system's parts are translated and a typed part (a name, a customer) stays as written
-    if (t.includes(' · ')) {
-      const parts = t.split(' · '), outs = parts.map(x => tr(x, L));
-      if (outs.some(Boolean)) { if (outs.some(x => !x)) missing.add(t); return text.replace(t, outs.map((x, i) => x == null ? parts[i] : x).join(' · ')); }
+    if (/ [·—] /.test(t)) {
+      const parts = t.split(/( [·—] )/), outs = parts.map((x, i) => i % 2 ? x : tr(x, L));
+      if (outs.some((x, i) => i % 2 === 0 && x)) { if (outs.some(x => x == null)) missing.add(t); return text.replace(t, outs.map((x, i) => x == null ? parts[i] : x).join('')); }
     }
     // dates and known words inside longer text — only when that translates all of it: anything left in Thai
     // is something people typed (a task title, a reason, a name), and that stays exactly as written
@@ -56,7 +56,7 @@
     if (THAI.test(out)) { missing.add(t); return null; }
     return out !== t ? text.replace(t, out) : null;
   }
-  const SKIP = 'script,style,textarea,.doc,[contenteditable],[data-noi18n],.lang-pop';
+  const SKIP = 'script,style,textarea,.doc,.fnf-wrap,.ssf-wrap,[contenteditable],[data-noi18n],.lang-pop'; // printable forms stay Thai
   function apply(root) {
     if (lang === 'th' || !root) return;
     if (root.nodeType === 3) { if (!root.parentElement || !root.parentElement.closest(SKIP)) { const v = tr(root.nodeValue, lang); if (v != null) root.nodeValue = v; } return; }
@@ -76,7 +76,7 @@
     add(dict) { for (const [k, v] of Object.entries(dict)) DICT.set(k, v); },
     // a pattern for text with values in it: I18N.pattern(/^รวม (\d+) วัน$/, (m, L) => L === 'en' ? m[1] + ' days' : ...)
     pattern(re, fn) { PATTERNS.push([re, fn]); },
-    piece(re, fn) { PIECES.push([re, fn, 1e9]); PIECES.sort((x, y) => y[2] - x[2]); },
+    piece(re, fn, first) { PIECES.push([re, fn, first ? 2e9 : 1e9]); PIECES.sort((x, y) => y[2] - x[2]); },
     // words swapped inside longer text (department and shift names, units): across all sections the longest
     // words go first, so "หัวหน้าแผนก" is replaced whole before "แผนก" on its own
     pieces(dict) {
