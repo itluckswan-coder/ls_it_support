@@ -1,8 +1,11 @@
 /* Luck Swan Sales — offline cache */
-const CACHE = 'ls-sales-v74';
+const CACHE = 'ls-sales-v75';
 const ASSETS = [
   'css/app.css',
   'fonts.css',
+  'fonts/NotoSansMyanmar-400.woff2',
+  'fonts/NotoSansMyanmar-500.woff2',
+  'fonts/NotoSansMyanmar-600.woff2',
   'fonts/BaiJamjuree-500-latin.woff2',
   'fonts/BaiJamjuree-500-thai.woff2',
   'fonts/BaiJamjuree-600-latin.woff2',
@@ -46,6 +49,8 @@ const ASSETS = [
   'js/salessum.js',
   'js/sheet.js',
   'js/util.js',
+  'js/i18n.js',
+  'js/i18n-words.js',
   'js/v-catalog.js',
   'js/v-dash.js',
   'js/v-ops.js',
