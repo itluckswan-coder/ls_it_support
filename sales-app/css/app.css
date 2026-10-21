@@ -854,3 +854,12 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .login-side{position:relative}
 .login-lang{position:absolute;top:16px;right:16px;z-index:2}
 :root[lang=my] h1,:root[lang=my] h2,:root[lang=my] h3{line-height:1.55}
+/* employee form: the + button beside the position and its panel */
+.pos-plus{flex:none;width:44px;height:44px;font-size:22px;line-height:1;color:var(--red)}
+.pos-plus.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.pos-box{margin-top:12px;padding:14px;border:1px solid var(--line);border-radius:14px;background:#faf9f6}
+.pos-list{display:grid;gap:6px;max-height:220px;overflow:auto}
+.pos-row{display:flex;align-items:center;gap:8px}
+.pos-row .input{flex:1;min-width:0;height:38px}
+.pos-row .icon-btn{width:32px;height:32px;flex:none}
+.pos-name{flex:1;min-width:0;font-size:14px}

@@ -391,6 +391,11 @@
     'เช่น พนักงานครัว': ['e.g. kitchen staff', 'ဥပမာ မီးဖိုချောင်ဝန်ထမ်း'],
     'กรุณากรอกชื่อพนักงาน': ['Please enter the name', 'ဝန်ထမ်းအမည် ဖြည့်ပါ'],
     'กรุณากรอกตำแหน่ง': ['Please enter the position', 'ရာထူး ဖြည့်ပါ'],
+    'เพิ่ม / แก้ไขตำแหน่ง': ['Add / edit positions', 'ရာထူး ထည့်ရန် / ပြင်ရန်'], '— เลือกตำแหน่ง —': ['— Choose a position —', '— ရာထူး ရွေးပါ —'],
+    'ชื่อตำแหน่งใหม่': ['New position name', 'ရာထူးအမည်သစ်'], 'แก้ไขตำแหน่ง': ['Edit position', 'ရာထူး ပြင်ရန်'], 'ลบตำแหน่ง': ['Delete position', 'ရာထူး ဖျက်ရန်'],
+    'ยังไม่มีตำแหน่งในแผนกนี้': ['No positions in this department yet', 'ဤဌာနတွင် ရာထူး မရှိသေး'], 'กรุณากรอกชื่อตำแหน่ง': ['Please enter a position name', 'ရာထူးအမည် ဖြည့်ပါ'],
+    'มีตำแหน่งนี้อยู่แล้ว': ['This position already exists', 'ဤရာထူး ရှိပြီးသား'], 'เปลี่ยนชื่อตำแหน่งแล้ว': ['Position renamed', 'ရာထူးအမည် ပြောင်းပြီး'],
+    'แก้ชื่อตำแหน่งแล้ว พนักงานที่ใช้ตำแหน่งนั้นจะเปลี่ยนตามให้': ['Renaming a position also updates the staff who hold it', 'ရာထူးအမည် ပြောင်းလျှင် ထိုရာထူးရှိ ဝန်ထမ်းများလည်း လိုက်ပြောင်းမည်'],
     'มีพนักงานชื่อนี้ในแผนกนี้อยู่แล้ว': ['Someone with this name is already in this department', 'ဤဌာနတွင် ဤအမည်ဖြင့် ဝန်ထမ်း ရှိပြီးသား'],
     'แก้ไขข้อมูลพนักงาน': ['Edit staff details', 'ဝန်ထမ်းအချက်အလက် ပြင်ရန်'],
     'ลบพนักงานคนนี้?': ['Delete this person?', 'ဤဝန်ထမ်းကို ဖျက်မလား?'],
@@ -892,4 +897,12 @@
   I.pattern(/^มัดจำ (\d+)%$/, (m, L) => L2(L, `Deposit ${m[1]}%`, `စရံ ${m[1]}%`));
   I.pattern(/^ออกเลขอัตโนมัติ \((.+)\)$/, (m, L) => L2(L, `Issue a number automatically (${m[1]})`, `နံပါတ် အလိုအလျောက်ထုတ် (${m[1]})`));
   I.add({ 'ยังไม่มี Function No. —': ['No function number yet —', 'Function No. မရှိသေး —'] });
+
+  I18N.pattern(/^ตำแหน่งในแผนก(.+)$/, (m, L, t) => L === 'en' ? 'Positions in ' + t(m[1]) : t(m[1]) + ' ရာထူးများ');
+  I18N.pattern(/^(\d+) ตำแหน่ง$/, (m, L) => L === 'en' ? m[1] + (m[1] === '1' ? ' position' : ' positions') : 'ရာထူး ' + m[1] + ' ခု');
+  I18N.pattern(/^เพิ่มตำแหน่ง (.+) แล้ว$/, (m, L) => L === 'en' ? 'Added position ' + m[1] : 'ရာထူး ' + m[1] + ' ထည့်ပြီး');
+  I18N.pattern(/^ลบตำแหน่ง (.+) แล้ว$/, (m, L) => L === 'en' ? 'Deleted position ' + m[1] : 'ရာထူး ' + m[1] + ' ဖျက်ပြီး');
+  I18N.pattern(/^มีพนักงาน (\d+) คนใช้ตำแหน่งนี้ — เปลี่ยนตำแหน่งของพนักงานก่อนจึงจะลบได้$/, (m, L) => L === 'en' ? m[1] + ' staff hold this position — change their position before deleting it' : 'ဝန်ထမ်း ' + m[1] + ' ဦး ဤရာထူးကို သုံးနေသည် — မဖျက်မီ ၎င်းတို့၏ ရာထူးကို ပြောင်းပါ');
+  I18N.pattern(/^แก้ไขตำแหน่ง (.+)$/, (m, L) => L === 'en' ? 'Edit position ' + m[1] : 'ရာထူး ' + m[1] + ' ပြင်ရန်');
+  I18N.pattern(/^ลบตำแหน่ง (.+)$/, (m, L) => L === 'en' ? 'Delete position ' + m[1] : 'ရာထူး ' + m[1] + ' ဖျက်ရန်');
 })(window);

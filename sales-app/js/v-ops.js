@@ -759,26 +759,71 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     }
   });
   const POSITIONS = { kitchen: ['เชฟ', 'ผู้ช่วยเชฟ', 'พนักงานครัว'], banquet: ['หัวหน้าจัดเลี้ยง', 'พนักงานจัดเลี้ยง'], av: ['หัวหน้าช่าง', 'ช่างเทคนิค'], front: ['หัวหน้าส่วนหน้า', 'พนักงานต้อนรับ'], hk: ['หัวหน้าแม่บ้าน', 'แม่บ้าน'], acc: ['หัวหน้าบัญชี', 'พนักงานบัญชี'] };
+  // each department's positions: the list kept in settings.positions once someone edits it (else the defaults),
+  // plus any position people already hold, so nobody's position goes missing from the choice
+  const posSaved = dp => { const s = Store.db.settings && Store.db.settings.positions; return s && Array.isArray(s[dp]) ? s[dp] : null; };
+  const posList = dp => [...new Set((posSaved(dp) || POSITIONS[dp] || []).concat(Store.db.employees.filter(x => x.dept === dp).map(x => x.role).filter(Boolean)))];
+  const posSave = (dp, list) => { const st = Store.db.settings || (Store.db.settings = {}); st.positions = Object.assign({}, st.positions, { [dp]: list }); };
   function empForm(e) {
     const isNew = !e.id;
     App.modal(`<h2>${isNew ? 'เพิ่มพนักงาน' : 'แก้ไขข้อมูลพนักงาน'}</h2>${isNew ? '' : `<p class="muted" style="margin-top:-8px">${H(e.name)} · รหัส ${H(e.id)}</p>`}
       <div class="field"><label class="f" for="emName">ชื่อ-นามสกุล</label><input class="input" id="emName" name="name" value="${H(e.name || '')}"></div>
       <div class="grid g2" style="margin-top:14px">
         <div><label class="f" for="emDept">แผนก</label><select class="input" id="emDept" name="dept">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === e.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select></div>
-        <div><label class="f" for="emRole">ตำแหน่ง</label><input class="input" id="emRole" name="role" value="${H(e.role || '')}" list="emRoles" placeholder="เช่น พนักงานครัว"><datalist id="emRoles"></datalist></div>
+        <div><label class="f" for="emRole">ตำแหน่ง</label><div class="row" style="gap:8px;flex-wrap:nowrap"><select class="input" id="emRole" name="role" style="flex:1;min-width:0"></select><button type="button" class="icon-btn pos-plus" id="emPosBtn" title="เพิ่ม / แก้ไขตำแหน่ง" aria-label="เพิ่ม / แก้ไขตำแหน่ง" aria-expanded="false" aria-controls="emPos">+</button></div></div>
       </div>
+      <div class="pos-box" id="emPos" hidden></div>
       <div class="grid g2" style="margin-top:14px">
         <div><label class="f" for="emPhone">เบอร์โทร</label><input class="input" id="emPhone" type="tel" name="phone" value="${H(e.phone || '')}"></div>
         <div><label class="f" for="emHours">ชั่วโมงทำงานสะสม/สัปดาห์</label><input class="input" id="emHours" type="number" min="0" max="168" step="1" name="hours" value="${Number(e.hours) || 0}"></div>
       </div>
       <div class="small red" id="emErr" style="min-height:20px;margin-top:6px" role="alert"></div>
       <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="emOk">${isNew ? 'เพิ่มพนักงาน' : 'บันทึก'}</button></div>`, bg => {
-      const sel = bg.querySelector('#emDept'), dl = bg.querySelector('#emRoles');
+      const sel = bg.querySelector('#emDept'), role = bg.querySelector('#emRole'), box = bg.querySelector('#emPos'), btn = bg.querySelector('#emPosBtn');
+      let pick = e.role || '', editing = null;
       const fill = () => {
-        const used = Store.db.employees.filter(x => x.dept === sel.value).map(x => x.role).filter(Boolean);
-        dl.innerHTML = [...new Set((POSITIONS[sel.value] || []).concat(used))].map(r => `<option value="${H(r)}">`).join('');
+        const list = posList(sel.value); if (pick && !list.includes(pick)) list.unshift(pick);
+        role.innerHTML = `<option value="">— เลือกตำแหน่ง —</option>` + list.map(r => `<option value="${H(r)}" ${r === pick ? 'selected' : ''}>${H(r)}</option>`).join('');
       };
-      fill(); sel.onchange = fill;
+      // the + panel: add a position to this department, rename one (people holding it move with it) or remove an unused one
+      const drawBox = (msg) => {
+        const dp = sel.value, list = posList(dp), used = r => Store.db.employees.filter(x => x.dept === dp && x.role === r).length;
+        box.innerHTML = `<div class="between" style="margin-bottom:8px"><b class="small">ตำแหน่งในแผนก${H(dept(dp).name)}</b><span class="xs muted">${list.length} ตำแหน่ง</span></div>
+          <div class="pos-list">${list.map((r, i) => editing === i
+            ? `<div class="pos-row"><input class="input" id="emPosRen" value="${H(r)}" aria-label="ชื่อตำแหน่งใหม่"><button type="button" class="btn red sm" data-pos="ren" data-i="${i}">บันทึก</button><button type="button" class="btn ghost sm" data-pos="cancel">ยกเลิก</button></div>`
+            : `<div class="pos-row"><span class="pos-name">${H(r)}</span><span class="xs muted">${used(r) ? used(r) + ' คน' : ''}</span><button type="button" class="icon-btn" data-pos="edit" data-i="${i}" title="แก้ไขตำแหน่ง" aria-label="แก้ไขตำแหน่ง ${H(r)}">${PENCIL}</button><button type="button" class="icon-btn" data-pos="del" data-i="${i}" title="ลบตำแหน่ง" aria-label="ลบตำแหน่ง ${H(r)}">${TRASH}</button></div>`).join('') || '<div class="xs muted">ยังไม่มีตำแหน่งในแผนกนี้</div>'}</div>
+          <div class="pos-row" style="margin-top:8px"><input class="input" id="emPosNew" placeholder="ชื่อตำแหน่งใหม่" aria-label="ชื่อตำแหน่งใหม่"><button type="button" class="btn red sm" data-pos="add">+ เพิ่ม</button></div>
+          <div class="xs ${msg && msg.err ? 'red' : 'muted'}" style="min-height:16px;margin-top:6px" role="status">${H(msg ? msg.text : 'แก้ชื่อตำแหน่งแล้ว พนักงานที่ใช้ตำแหน่งนั้นจะเปลี่ยนตามให้')}</div>`;
+      };
+      const done = (text) => { Store.save(); editing = null; fill(); drawBox({ text }); };
+      box.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-pos]'); if (!b) return;
+        const dp = sel.value, list = posList(dp), i = +b.dataset.i, act = b.dataset.pos;
+        if (act === 'edit') { editing = i; drawBox(); const inp = box.querySelector('#emPosRen'); inp.focus(); inp.select(); return; }
+        if (act === 'cancel') { editing = null; drawBox(); return; }
+        if (act === 'add') {
+          const v = box.querySelector('#emPosNew').value.trim().replace(/\s+/g, ' ');
+          if (!v) return drawBox({ text: 'กรุณากรอกชื่อตำแหน่ง', err: 1 });
+          if (list.includes(v)) return drawBox({ text: 'มีตำแหน่งนี้อยู่แล้ว', err: 1 });
+          posSave(dp, list.concat(v)); pick = v; return done('เพิ่มตำแหน่ง ' + v + ' แล้ว');
+        }
+        if (act === 'ren') {
+          const old = list[i], v = box.querySelector('#emPosRen').value.trim().replace(/\s+/g, ' ');
+          if (!v) return drawBox({ text: 'กรุณากรอกชื่อตำแหน่ง', err: 1 });
+          if (v !== old && list.includes(v)) return drawBox({ text: 'มีตำแหน่งนี้อยู่แล้ว', err: 1 });
+          Store.db.employees.forEach(x => { if (x.dept === dp && x.role === old) x.role = v; });
+          list[i] = v; posSave(dp, list); if (pick === old) pick = v; return done('เปลี่ยนชื่อตำแหน่งแล้ว');
+        }
+        if (act === 'del') {
+          const r = list[i], n = Store.db.employees.filter(x => x.dept === dp && x.role === r).length;
+          if (n) return drawBox({ text: 'มีพนักงาน ' + n + ' คนใช้ตำแหน่งนี้ — เปลี่ยนตำแหน่งของพนักงานก่อนจึงจะลบได้', err: 1 });
+          posSave(dp, list.filter((_, k) => k !== i)); if (pick === r) pick = ''; return done('ลบตำแหน่ง ' + r + ' แล้ว');
+        }
+      });
+      box.addEventListener('keydown', ev => { if (ev.key !== 'Enter') return; ev.preventDefault(); const b = box.querySelector(ev.target.id === 'emPosRen' ? '[data-pos=ren]' : '[data-pos=add]'); if (b) b.click(); });
+      btn.onclick = () => { const open = box.hidden; box.hidden = !open; btn.setAttribute('aria-expanded', String(open)); btn.classList.toggle('on', open); if (open) { editing = null; drawBox(); box.querySelector('#emPosNew').focus(); } };
+      role.onchange = () => { pick = role.value; };
+      fill(); sel.onchange = () => { pick = ''; editing = null; fill(); if (!box.hidden) drawBox(); };
       bg.querySelector('#emOk').onclick = () => {
         const f = App.formData(bg), err = bg.querySelector('#emErr');
         f.name = f.name.trim(); f.role = f.role.trim(); f.phone = f.phone.trim();
