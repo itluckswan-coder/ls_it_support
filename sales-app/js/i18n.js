@@ -43,11 +43,11 @@
     const hit = DICT.get(t);
     if (hit && hit[idx(L)]) return text.replace(t, hit[idx(L)]);
     for (const [re, fn] of PATTERNS) { const m = re.exec(t); if (m) { const out = fn(m, L, x => tr(x, L) || x); if (out != null) return text.replace(t, out); } }
-    // a line made of parts ("name · role · department", "QT-… · customer · date"): each part on its own, so
+    // a line made of parts ("name · role · department", "QT-… · customer · date", "… — …"): each part on its own, so
     // the system's parts are translated and a typed part (a name, a customer) stays as written
-    if (t.includes(' · ')) {
-      const parts = t.split(' · '), outs = parts.map(x => tr(x, L));
-      if (outs.some(Boolean)) { if (outs.some(x => !x)) missing.add(t); return text.replace(t, outs.map((x, i) => x == null ? parts[i] : x).join(' · ')); }
+    if (/ [·—] /.test(t)) {
+      const parts = t.split(/( [·—] )/), outs = parts.map((x, i) => i % 2 ? x : tr(x, L));
+      if (outs.some((x, i) => i % 2 === 0 && x)) { if (outs.some(x => x == null)) missing.add(t); return text.replace(t, outs.map((x, i) => x == null ? parts[i] : x).join('')); }
     }
     // dates and known words inside longer text — only when that translates all of it: anything left in Thai
     // is something people typed (a task title, a reason, a name), and that stays exactly as written
