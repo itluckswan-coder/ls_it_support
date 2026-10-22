@@ -38,7 +38,7 @@
   /* ---------- plan data ---------- */
   const curBeo = () => Store.db.beos.find(b => b.id === App.state.params[0]);
   const dayOf = () => Math.max(1, Number(App.state.params[1]) || 1);
-  const canEdit = () => App.can('create_quote') || App.can('staff');
+  const canEdit = () => App.canPlan();
   const isAdmin = () => { const me = App.me(); return !!me && me.role === 'admin'; };
   function planOf(b, day) { return b && b.plans && b.plans[day]; }
   // bounding box of an item in metres (rotation rounded to the nearest quarter turn, other angles use the longer side)
@@ -250,6 +250,7 @@
     render(params) {
       const b = curBeo(), q = b && Store.quote(b.quoteId);
       if (!b || !q) return '<div class="empty">ไม่พบใบฟังก์ชัน — <a href="#/beo">กลับไปหน้าใบฟังก์ชัน</a></div>';
+      if (!App.canPlan()) return `<div class="empty">ออกแบบผังงานใช้ได้เฉพาะผู้ดูแลระบบ และแผนก F&B — <a href="#/beo/${encodeURIComponent(b.id)}">กลับไปใบฟังก์ชัน</a></div>`;
       const days = U.daysOf(q.start, q.end), day = Math.min(dayOf(), days.length);
       const p = planOf(b, day), edit = canEdit();
       histSync();
