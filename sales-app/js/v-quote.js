@@ -111,7 +111,9 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       <div class="sum-row"><span class="l">ยอดรวมก่อนส่วนลด</span><span class="num">${U.n2(c.sub)}</span></div>
       <div class="sum-row"><span class="l">ส่วนลด</span><div class="seg" style="padding:3px">${['0', '5', '10'].map(v => `<button class="${dv === v ? 'on' : ''}" data-act="qDisc" data-v="${v}" style="height:28px">${v}%</button>`).join('')}<button class="${dv === 'custom' ? 'on' : ''}" data-act="qDisc" data-v="custom" style="height:28px">${dv === 'custom' ? (disc.type === 'amt' ? U.n(disc.value) + ' ฿' : disc.value + '%') : 'กำหนดเอง'}</button></div></div>
       <div class="sum-row" style="justify-content:flex-end"><span class="num red">−${U.n2(c.disc)}</span></div>
+      <div class="sum-row"><span class="l">ราคาก่อน Service Charge และ VAT</span><span class="num">${U.n2(c.base)}</span></div>
       <div class="sum-row"><span class="l">ค่าบริการ ${Math.round(Store.db.settings.service * 100)}%</span><span class="num">${U.n2(c.svc)}</span></div>
+      <div class="sum-row"><span class="l">รวมก่อน VAT</span><span class="num">${U.n2(c.pre)}</span></div>
       <div class="sum-row"><span class="l">ภาษีมูลค่าเพิ่ม ${Math.round(Store.db.settings.vat * 100)}%</span><span class="num">${U.n2(c.vat)}</span></div>
       <div class="net"><div class="small" style="opacity:.75">ยอดสุทธิ</div><div class="v num">฿${U.n2(c.net)}</div><div class="small" style="opacity:.75">เฉลี่ย ${U.n(Math.round(c.perPax))} บาท / ท่าน</div></div>
       ${over ? (q.approval === 'approved' ? `<div class="note" style="margin-top:12px;background:var(--teal-soft);color:var(--teal-d)">ส่วนลด ${U.n(c.pct, 1)}% อนุมัติแล้ว</div>` :
@@ -683,6 +685,17 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
      ===================================================================== */
   App.V.doc = {
     nav: 'quote', title: p => 'ใบเสนอราคา ' + p[0], bleed: true,
+    after() {
+      const pp = document.getElementById('qdPaper'); if (!pp || !DU() || !DU().edit) return;
+      // typing on the sheet goes into the draft as plain text (Enter = new line, pasted text comes in plain)
+      pp.addEventListener('input', e => {
+        const b = e.target.closest && e.target.closest('[data-qd]'), ui = DU(); if (!b || !ui.draft) return;
+        (ui.draft.t || (ui.draft.t = {}))[b.dataset.qd] = b.innerText.replace(/\u00a0/g, ' ').replace(/\n$/, '');
+        if (!ui.dirty) { ui.dirty = true; const s = document.getElementById('qdDirty'); if (s) { s.textContent = 'มีการแก้ไขที่ยังไม่บันทึก'; s.className = 'small red'; } }
+      });
+      pp.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest('[data-qd]')) { e.preventDefault(); document.execCommand('insertLineBreak'); } });
+      pp.addEventListener('paste', e => { if (!e.target.closest || !e.target.closest('[data-qd]')) return; e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain')); });
+    },
     render(p) {
       const q = Store.quote(p[0]);
       if (!q) return '<div class="empty">ไม่พบใบเสนอราคา</div>';
@@ -692,7 +705,9 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const pending = q.approval === 'pending' && App.calc(q).pct > 10;
       const chLabel = { email: 'ส่งใบเสนอราคา', line: 'ส่งทาง LINE', link: 'คัดลอกลิงก์', pdf: 'พิมพ์ / บันทึก PDF' }[ui.ch];
       return `<div class="doc-wrap">
-  <div class="doc-area"><div class="row no-print" style="max-width:820px;margin:0 auto 14px"><a class="link" href="#/quote/${qid(q.id)}">${ICON.back} กลับไปแก้ไข</a><span class="spacer"></span><button class="btn ghost sm" data-act="docPrint">พิมพ์ / PDF</button></div>
+  <div class="doc-area"><div class="row no-print" style="max-width:820px;margin:0 auto 14px;flex-wrap:wrap;gap:8px"><a class="link" href="#/quote/${qid(q.id)}">${ICON.back} กลับไปแก้ไข</a><span class="spacer"></span>${App.can('create_quote') ? `<div class="seg white"><button class="${ui.edit ? '' : 'on'}" data-act="qdTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${ui.edit ? 'on' : ''}" data-act="qdTab" data-v="edit">แก้ไขข้อมูล</button></div>` : ''}<button class="btn ghost sm" data-act="docPrint">พิมพ์ / PDF</button></div>
+    ${ui.edit ? `<div class="fnf-bar no-print" style="max-width:820px;margin:0 auto 14px"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ · กดที่รูปเพื่อเปลี่ยนรูป<div id="qdDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
+      <div class="row"><button class="btn ghost" data-act="qdCancel">ยกเลิก</button><button class="btn red" data-act="qdSave">บันทึกแก้ไขข้อมูล</button></div></div>` : ''}
     <div class="doc-scroll">${App.V.doc.doc(q, ui)}</div></div>
   <aside class="doc-side no-print">
     <h2 style="font-size:22px;margin-bottom:18px">ส่งใบเสนอราคา</h2>
@@ -712,55 +727,84 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     doc(q, ui) {
       const S = Store.db.settings, c = App.calc(q), owner = Store.db.users.find(u => u.id === q.owner) || App.me();
       const unit = ui.unit !== false;
+      // what was typed over the system's text (q.docEdit.t) and the meeting-room photo (q.docEdit.img); while editing, the draft
+      const ed = ui.edit ? ui.draft : null, X = ed || q.docEdit || {}, T = X.t || {};
+      const nl = t => H(t).replace(/\n/g, '<br>');
+      const F = (k, sys, ph = '') => {
+        sys = sys == null ? '' : String(sys);
+        const v = T[k] != null ? T[k] : sys;
+        if (!ed) return nl(v);
+        return `<span class="qd-ed">${T[k] != null && T[k] !== sys ? `<button type="button" class="qd-rv" data-act="qdRv" data-k="${H(k)}" title="ใช้ค่าจากระบบ">↺</button>` : ''}<span class="qd-in" contenteditable="true" spellcheck="false" data-qd="${H(k)}" data-ph="${H(ph)}">${nl(v)}</span></span>`;
+      };
+      const ik = it => 'i.' + (it.id || q.items.indexOf(it));
       const period = it => {
-        if (it.sec === 'room') return `IN ${U.d(q.start).getDate()} OUT ${U.fmtD(U.addDays(q.start, Number(it.q2) || 1))}<br>จำนวน ${it.q2 || 1} คืน`;
+        if (it.sec === 'room') return `IN ${U.d(q.start).getDate()} OUT ${U.fmtD(U.addDays(q.start, Number(it.q2) || 1))}\nจำนวน ${it.q2 || 1} คืน`;
         if (it.sched && it.sched.length === 1 && q.end !== q.start) return 'คืนวันที่ ' + it.sched[0].day + ' ' + U.fmtD(U.addDays(q.start, it.sched[0].day - 1), { year: false });
         return U.fmtRange(q.start, q.end);
       };
       const unitTxt = it => it.sec === 'room' ? 'บาท/ห้อง' : it.sec === 'meet' ? 'บาท' : it.q2 != null ? 'บาท/ท่าน/' + (it.u2 || 'มื้อ') : 'บาท/' + (it.u1 || 'ท่าน');
       const qtyTxt = it => it.sec === 'room' ? it.q1 + ' ห้อง' : it.sec === 'meet' ? '' : U.n(it.q1) + ' ' + (it.u1 || 'ท่าน');
-      const row = it => `<tr><td>- ${H(it.name)}${it.desc ? `<br><span style="color:#666">${H(it.desc)}</span>` : ''}</td><td class="c">${period(it)}</td><td class="c">${qtyTxt(it)}</td>
-        <td class="c">${unit ? (it.sec === 'meet' ? U.n(it.price) + ' บาท × ' + it.q1 + ' ' + (it.u1 || 'วัน') : U.n(it.price) + ' ' + unitTxt(it)) : ''}</td><td class="r"><b>${it.free ? '<span style="color:#c00">แถม</span>' : U.n(U.lineTotal(it)) + ' บาท'}</b></td></tr>`;
+      const priceTxt = it => it.sec === 'meet' ? U.n(it.price) + ' บาท × ' + it.q1 + ' ' + (it.u1 || 'วัน') : U.n(it.price) + ' ' + unitTxt(it);
+      const row = it => { const k = ik(it), desc = T[k + '.desc'] != null ? T[k + '.desc'] : it.desc || ''; return `<tr><td>- ${F(k + '.name', it.name, 'ชื่อรายการ')}${desc || ed ? `<br><span style="color:#666">${F(k + '.desc', it.desc || '', 'รายละเอียด')}</span>` : ''}</td><td class="c">${F(k + '.period', period(it))}</td><td class="c">${F(k + '.qty', qtyTxt(it))}</td>
+        <td class="c">${unit ? F(k + '.unit', priceTxt(it)) : ''}</td><td class="r"><b>${it.free ? '<span style="color:#c00">แถม</span>' : U.n(U.lineTotal(it)) + ' บาท'}</b></td></tr>`; };
+      // the meeting-room block: its photo (the room's cover unless one was uploaded or removed) and a note the sales person writes;
+      // the room's name and its service list are no longer printed on their own
+      const isRoomIt = it => D.MEETING_ROOMS.some(r => r.id === it.ref);
+      const meetAuto = r => r ? `${r.name}\n${r.desc}\n\nให้บริการ ดังนี้\n- โต๊ะพร้อมเก้าอี้ (รวมผ้าคลุม) สำหรับผู้เข้าร่วมประชุม\n- โต๊ะลงทะเบียนด้านหน้าห้อง\n- ${r.amen.join(' / ')}\n- น้ำดื่มบริการ และพนักงานบริการ` : '';
+      const meetBlock = (k, room) => {
+        const img = X.img !== undefined ? X.img : (room && room.img) || '';
+        const pic = ed ? `<div class="qd-img">${img ? `<img src="${H(img)}" alt="">` : '<span>📷<br>เพิ่มรูป</span>'}<button type="button" class="qd-img-btn" data-act="qdImg" aria-label="เปลี่ยนรูป"></button>${img ? '<button type="button" class="ce-x" data-act="qdImgDel" aria-label="ลบรูป">' + ICON.x + '</button>' : ''}${X.img !== undefined ? '<button type="button" class="qd-rv" data-act="qdImgRv" title="ใช้รูปของห้อง">↺</button>' : ''}</div>`
+          : img ? `<img src="${H(img)}" alt="" style="width:150px;border-radius:2px;flex:none">` : '';
+        const items = q.items.filter(i => i.sec === k).map(it => { const ky = ik(it), sysName = isRoomIt(it) ? '' : it.name, sysDesc = isRoomIt(it) ? '' : it.desc || '';
+          const name = T[ky + '.name'] != null ? T[ky + '.name'] : sysName, desc = T[ky + '.desc'] != null ? T[ky + '.desc'] : sysDesc;
+          return `<tr><td style="padding:3px 0">${name || ed ? `<b>${F(ky + '.name', sysName, 'ชื่อห้อง (ไม่บังคับ)')}</b>` : ''}${desc || ed ? '<br>' + F(ky + '.desc', sysDesc, 'รายละเอียด (ไม่บังคับ)') : ''}</td><td class="r" style="padding:3px 0;white-space:nowrap">${unit ? F(ky + '.unit', U.n(it.price) + ' บาท × ' + it.q1 + ' ' + (it.u1 || '')) : ''}</td><td class="r" style="padding:3px 0 3px 12px;white-space:nowrap"><b>${it.free ? '<span style="color:#c00">แถม</span>' : U.n(U.lineTotal(it)) + ' บาท'}</b></td></tr>`; }).join('');
+        const note = T.meetNote || '';
+        return `<tr><td colspan="5"><div style="display:flex;gap:14px;align-items:flex-start">${pic}<div style="flex:1"><table>${items}</table>
+          ${note || ed ? `<div style="margin-top:6px;color:#444">${F('meetNote', '', 'พิมพ์รายละเอียดห้องประชุมที่ต้องการแสดง (ไม่บังคับ)')}</div>` : ''}
+          ${ed && room && !note ? `<button type="button" class="link no-print" data-act="qdMeetAuto" style="margin-top:6px">+ ใส่รายละเอียดห้องจากระบบ</button>` : ''}</div></div></td></tr>`;
+      };
+      const condSys = [`- เพื่อเป็นการยืนยันการจัดงาน กรุณา เซ็นยืนยันใช้บริการในใบเสนอราคาและ/หรือ ชำระมัดจำ ${q.deposit || '30-50%'} จากยอดรวมตามใบเสนอราคาที่ ${S.bank}`,
+        `- เมื่อทำการชำระเงินเรียบร้อยแล้ว นำส่งหลักฐานการชำระเงินมาที่ ${S.email} หรือ Line Official : ${S.line}`,
+        '- หากมีการเปลี่ยนแปลงรายละเอียดการจัดงาน สามารถแจ้งที่เจ้าหน้าที่ฝ่ายขายล่วงหน้าอย่างน้อย 7 วัน',
+        '- กรณียกเลิกกรุณาแจ้งล่วงหน้าอย่างน้อย 14 วัน ก่อนวันงาน หากแจ้งยกเลิกหลังจากนั้นต้องทำการชำระเงิน 100% ของยอดใบเสนอราคา',
+        `- ยืนราคาถึงวันที่ ${U.fmtD(q.validUntil, { long: true })}${q.holdUntil ? ' · กันห้องประชุมไว้ชั่วคราวถึงวันที่ ' + U.fmtD(q.holdUntil, { long: true }) : ''}${q.items.some(i => i.sec === 'room') ? ' · วันปล่อยห้องพัก (cut-off) ' + U.fmtD(U.addDays(q.start, -14), { long: true }) : ''}`]
+        .concat(ui.online !== false ? ['- ลูกค้าสามารถยืนยันและลงนามออนไลน์ผ่านลิงก์ที่แนบในอีเมล'] : []).join('\n');
       const groups = [['room', 'ห้องพัก'], ['food', 'อาหารและเครื่องดื่ม'], ['meet', 'ห้องประชุม ณ โรงแรมลักษวรรณรีสอร์ท'], ['other', 'บริการอื่น ๆ']].filter(([k]) => q.items.some(i => i.sec === k));
       const mainRoom = D.MEETING_ROOMS.find(r => q.items.some(i => i.sec === 'meet' && i.ref === r.id));
-      return `<article class="doc">
+      App.state.ui.doc.meetAuto = meetAuto(mainRoom);
+      return `<article class="doc${ed ? ' qd-editing' : ''}" id="qdPaper">
   <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
-    <div><b>${H(S.company)}</b><br>${H(S.address)}<br>ติดต่อโรงแรม ${H(S.phone)} / ติดต่อสำนักงานใหญ่ ${H(S.hq)}<br>สาขา <span style="background:#cfe6fb;padding:1px 40px 1px 8px;color:#1a3fd8">ลักษวรรณ รีสอร์ต</span></div>
+    <div><b>${H(S.company)}</b><br>${H(S.address)}<br>ติดต่อโรงแรม ${H(S.phone)} / ติดต่อสำนักงานใหญ่ ${H(S.hq)}<br>สาขา <span style="background:#cfe6fb;padding:1px 40px 1px 8px;color:#1a3fd8">${F('branch', 'ลักษวรรณ รีสอร์ต')}</span></div>
     <img src="img/logo-wide.png" alt="Luck Swan Resort" style="width:170px;flex:none">
   </div>
   <div class="blue b" style="margin:16px 0 10px;font-size:13px">Quotation<br>ใบเสนอราคา</div>
   <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px 14px;margin-bottom:14px">
     <b>ผู้รับบริการ</b><b>ชื่อโครงการ/งาน</b><b>เสนอราคาโดย</b><b style="text-align:right">เลขที่ใบเสนอราคา</b>
-    <span>เรียน : <span class="it">${H(q.contact || '-')}</span></span><span class="it">${H(q.title)}</span><span class="it">${H(owner ? owner.name : '')}</span><span class="it" style="text-align:right">${H(q.id)}</span>
-    <span>ชื่อ บริษัท/หน่วยงาน : <span class="it">${H(q.clientFull || q.client)}</span></span><b>เบอร์ติดต่อ ผู้ประสานงาน</b><b style="text-align:center">วันที่จัดงาน</b><b style="text-align:right">วันที่เสนอราคา</b>
-    <span>ที่อยู่ : <span class="it">${H(q.address || '-')}</span><br>เลขผู้เสียภาษี : <span class="it">${H(q.taxId || '-')}</span></span><span class="it">${H(q.phone || '-')}</span><span class="it" style="text-align:center">${U.fmtRange(q.start, q.end, { long: true })}</span><span class="it" style="text-align:right">${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</span>
+    <span>เรียน : <span class="it">${F('contact', q.contact || '-')}</span></span><span class="it">${F('title', q.title)}</span><span class="it">${F('owner', owner ? owner.name : '')}</span><span class="it" style="text-align:right">${H(q.id)}</span>
+    <span>ชื่อ บริษัท/หน่วยงาน : <span class="it">${F('client', q.clientFull || q.client)}</span></span><b>เบอร์ติดต่อ ผู้ประสานงาน</b><b style="text-align:center">วันที่จัดงาน</b><b style="text-align:right">วันที่เสนอราคา</b>
+    <span>ที่อยู่ : <span class="it">${F('address', q.address || '-')}</span><br>เลขผู้เสียภาษี : <span class="it">${F('taxId', q.taxId || '-')}</span></span><span class="it">${F('phone', q.phone || '-')}</span><span class="it" style="text-align:center">${F('date', U.fmtRange(q.start, q.end, { long: true }))}</span><span class="it" style="text-align:right">${F('qdate', U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true }))}</span>
   </div>
   <table><thead><tr><th>คำอธิบาย/รายละเอียด</th><th class="c">ระยะเวลาการใช้บริการ</th><th class="c">จำนวน หน่วย</th><th class="c">${unit ? 'ราคาต่อหน่วย' : ''}</th><th class="r">ราคารวม</th></tr></thead><tbody>
   ${groups.map(([k, name], gi) => `<tr class="grp"><td colspan="5">${gi + 1}. ${name}</td></tr>` +
-    (k === 'meet' && mainRoom && mainRoom.img ? `<tr><td colspan="5"><div style="display:flex;gap:14px;align-items:flex-start"><img src="${mainRoom.img}" alt="" style="width:150px;border-radius:2px"><div style="flex:1"><table>${q.items.filter(i => i.sec === k).map(it => `<tr><td style="padding:3px 0"><b>${H(it.name)}</b>${it.desc ? '<br>' + H(it.desc) : ''}</td><td class="r" style="padding:3px 0;white-space:nowrap">${unit ? U.n(it.price) + ' บาท × ' + it.q1 + ' ' + H(it.u1 || '') : ''}</td><td class="r" style="padding:3px 0 3px 12px;white-space:nowrap"><b>${U.n(U.lineTotal(it))} บาท</b></td></tr>`).join('')}</table>
-      <div style="margin-top:6px;color:#444">ให้บริการ ดังนี้<br>- โต๊ะพร้อมเก้าอี้ (รวมผ้าคลุม) สำหรับผู้เข้าร่วมประชุม<br>- โต๊ะลงทะเบียนด้านหน้าห้อง<br>- ${H(mainRoom.amen.join(' / '))}<br>- น้ำดื่มบริการ และพนักงานบริการ</div></div></div></td></tr>` :
-      q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
+    (k === 'meet' && mainRoom ? meetBlock(k, mainRoom) : q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
   </tbody></table>
   <div style="display:flex;justify-content:flex-end;margin-top:12px"><table style="width:auto;min-width:260px">
     ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าบุฟเฟ่ต์กลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
-    <tr><td>ยอดรวมก่อนส่วนลด</td><td class="r">${U.n2(c.sub)}</td></tr>
+    ${c.disc || c.credit ? `<tr><td>ยอดรวมก่อนส่วนลด</td><td class="r">${U.n2(c.sub)}</td></tr>` : ''}
     ${c.disc ? `<tr><td>ส่วนลด ${q.discount.type === 'amt' ? '' : U.n(c.pct, c.pct % 1 ? 1 : 0) + '%'}</td><td class="r">−${U.n2(c.disc)}</td></tr>` : ''}
+    <tr><td>ราคาก่อนค่าบริการและภาษีมูลค่าเพิ่ม</td><td class="r">${U.n2(c.base)}</td></tr>
     <tr><td>ค่าบริการ (Service Charge) ${Math.round(S.service * 100)}%</td><td class="r">${U.n2(c.svc)}</td></tr>
+    <tr><td>รวมก่อนภาษีมูลค่าเพิ่ม</td><td class="r">${U.n2(c.pre)}</td></tr>
     <tr><td>ภาษีมูลค่าเพิ่ม (VAT) ${Math.round(S.vat * 100)}%</td><td class="r">${U.n2(c.vat)}</td></tr></table></div>
   <div style="display:flex;justify-content:space-between;gap:12px;border-top:1px solid #999;margin-top:10px;padding-top:10px;flex-wrap:wrap"><b>ราคารวม ภาษีมูลค่าเพิ่ม(Vat) และค่าบริการ(Service Charge) แล้ว</b>
     <div style="text-align:right" class="blue"><b style="font-size:14px">${U.n2(c.net)} บาท</b><br><b>(${U.bahtText(c.net)})</b></div></div>
   <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;margin-top:18px;color:#444;font-size:11px">
     <span>เงื่อนไขการจองห้องพัก และการชำระเงิน:</span>
-    <div>- เพื่อเป็นการยืนยันการจัดงาน กรุณา เซ็นยืนยันใช้บริการในใบเสนอราคาและ/หรือ ชำระมัดจำ ${H(q.deposit || '30-50%')} จากยอดรวมตามใบเสนอราคาที่ ${H(S.bank)}<br>
-    - เมื่อทำการชำระเงินเรียบร้อยแล้ว นำส่งหลักฐานการชำระเงินมาที่ ${H(S.email)} หรือ Line Official : ${H(S.line)}<br>
-    - หากมีการเปลี่ยนแปลงรายละเอียดการจัดงาน สามารถแจ้งที่เจ้าหน้าที่ฝ่ายขายล่วงหน้าอย่างน้อย 7 วัน<br>
-    - กรณียกเลิกกรุณาแจ้งล่วงหน้าอย่างน้อย 14 วัน ก่อนวันงาน หากแจ้งยกเลิกหลังจากนั้นต้องทำการชำระเงิน 100% ของยอดใบเสนอราคา<br>
-    - ยืนราคาถึงวันที่ ${U.fmtD(q.validUntil, { long: true })}${q.holdUntil ? ' · กันห้องประชุมไว้ชั่วคราวถึงวันที่ ' + U.fmtD(q.holdUntil, { long: true }) : ''}${q.items.some(i => i.sec === 'room') ? ' · วันปล่อยห้องพัก (cut-off) ' + U.fmtD(U.addDays(q.start, -14), { long: true }) : ''}
-    ${ui.online !== false ? '<br>- ลูกค้าสามารถยืนยันและลงนามออนไลน์ผ่านลิงก์ที่แนบในอีเมล' : ''}</div></div>
+    <div>${F('cond', condSys)}</div></div>
   <div class="sig">
     <div>(.................................................)<br>ผู้ยืนยันการจัดงาน/ผู้ชำระค่าบริการ<br>วันที่ ........./............./.................</div>
-    <div>(.....${H(S.gm)}.....)<br>ผู้จัดการทั่วไป<br>ผู้อนุมัติใบเสนอราคา ในนามบจก.ลักษวรรณ<br>วันที่ ........./............./.................</div>
-    <div>(${H(owner ? owner.name : '')})<br>พนักงานขายและการตลาด<br>Tel. ${H(owner && owner.phone || S.phone)}<br>ผู้เสนอราคา ในนามบจก.ลักษวรรณ<br>${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</div>
+    <div>(.....${F('gm', S.gm)}.....)<br>ผู้จัดการทั่วไป<br>ผู้อนุมัติใบเสนอราคา ในนามบจก.ลักษวรรณ<br>วันที่ ........./............./.................</div>
+    <div>(${F('sigOwner', owner ? owner.name : '')})<br>พนักงานขายและการตลาด<br>Tel. ${F('sigTel', owner && owner.phone || S.phone)}<br>ผู้เสนอราคา ในนามบจก.ลักษวรรณ<br>${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</div>
   </div>
 </article>`;
     }
@@ -770,6 +814,31 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     docCh(el) { DU().ch = el.dataset.v; App.render(); },
     docToDel(el) { DU().to.splice(Number(el.dataset.i), 1); App.render(); },
     docPrint() { window.print(); },
+    qdTab(el) {
+      const ui = DU(), q = Store.quote(App.state.params[0]);
+      if (el.dataset.v === 'edit') { if (!ui.edit) { ui.edit = true; ui.dirty = false; ui.draft = JSON.parse(JSON.stringify(q.docEdit || {})); } App.render(); return; }
+      if (!ui.edit) return;
+      const leave = () => { ui.edit = false; ui.draft = null; ui.dirty = false; App.render(); };
+      if (ui.dirty) App.confirm('ยังไม่ได้บันทึกการแก้ไข — ทิ้งการแก้ไขนี้?', leave, 'ทิ้งการแก้ไข'); else leave();
+    },
+    qdCancel() { const ui = DU(); ui.edit = false; ui.draft = null; ui.dirty = false; App.render(); },
+    qdSave() {
+      const ui = DU(), q = Store.quote(App.state.params[0]), d = ui.draft || {};
+      const out = {}; if (d.t && Object.keys(d.t).length) out.t = d.t; if (d.img !== undefined) out.img = d.img;
+      if (Object.keys(out).length) q.docEdit = out; else delete q.docEdit;
+      ui.edit = false; ui.draft = null; ui.dirty = false;
+      App.touch(q, 'แก้ไขข้อมูลบนใบเสนอราคา'); App.render(); App.toast('บันทึกการแก้ไขบนใบเสนอราคาแล้ว');
+    },
+    qdRv(el) { const d = DU().draft; if (d && d.t) { delete d.t[el.dataset.k]; DU().dirty = true; App.render(); } },
+    qdMeetAuto() { const ui = DU(), d = ui.draft; if (!d) return; (d.t || (d.t = {})).meetNote = ui.meetAuto || ''; ui.dirty = true; App.render(); },
+    async qdImg() {
+      const ui = DU(), d = ui.draft; if (!d || !g.CatalogImages) return;
+      const [f] = await g.CatalogImages.pickFiles(false); if (!f) return;
+      App.toast('กำลังอัปโหลดรูป…');
+      try { d.img = await g.CatalogImages.storeImage(f); ui.dirty = true; App.render(); } catch (e) { App.toast(e.message || 'อัปโหลดรูปไม่สำเร็จ'); }
+    },
+    qdImgDel() { const ui = DU(); if (ui.draft) { ui.draft.img = ''; ui.dirty = true; App.render(); } },
+    qdImgRv() { const ui = DU(); if (ui.draft) { delete ui.draft.img; ui.dirty = true; App.render(); } },
     docSend() {
       const q = Store.quote(App.state.params[0]), ui = DU(), c = App.calc(q);
       const subject = `ใบเสนอราคา ${q.id} · ${q.title} · ลักษวรรณ รีสอร์ต`;
