@@ -700,7 +700,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const q = Store.quote(p[0]);
       if (!q) return '<div class="empty">ไม่พบใบเสนอราคา</div>';
       const ui = App.state.ui.doc && App.state.ui.doc.id === q.id ? App.state.ui.doc :
-        (App.state.ui.doc = { id: q.id, ch: 'email', to: [q.email].concat(q.cc || []).filter(Boolean), unit: true, online: true, msg: null });
+        (App.state.ui.doc = { id: q.id, ch: 'email', to: [q.email].concat(q.cc || []).filter(Boolean), unit: true, online: true, full: false, msg: null });
       if (ui.msg == null) ui.msg = `เรียน ${q.contact || 'ลูกค้า'}\nขอบคุณที่ไว้วางใจ ลักษวรรณ รีสอร์ต ค่ะ แนบใบเสนอราคาสำหรับงาน${q.title} ${U.fmtRange(q.start, q.end)}${q.room ? ' ห้อง ' + ((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name || '') : ''}${q.holdUntil ? ' กันไว้ให้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''} ค่ะ`;
       const pending = q.approval === 'pending' && App.calc(q).pct > 10;
       const chLabel = { email: 'ส่งใบเสนอราคา', line: 'ส่งทาง LINE', link: 'คัดลอกลิงก์', pdf: 'พิมพ์ / บันทึก PDF' }[ui.ch];
@@ -711,6 +711,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     <div class="doc-scroll">${App.V.doc.doc(q, ui)}</div></div>
   <aside class="doc-side no-print">
     <h2 style="font-size:22px;margin-bottom:18px">ส่งใบเสนอราคา</h2>
+    <div class="f" style="margin-bottom:6px">รูปแบบใบเสนอราคา</div>
+    <div class="seg white qd-ver" role="radiogroup" style="margin-bottom:18px">${[[false, 'ใบเสนอราคาสำหรับลูกค้า'], [true, 'ใบเสนอราคาฉบับเต็ม']].map(([v, l]) => `<button class="${!!ui.full === v ? 'on' : ''}" data-act="docVer" data-v="${v ? 1 : 0}" role="radio" aria-checked="${!!ui.full === v}">${l}</button>`).join('')}</div>
     <div class="grid g4" style="gap:8px;grid-template-columns:repeat(4,1fr)">${[['email', 'อีเมล'], ['line', 'LINE'], ['link', 'ลิงก์'], ['pdf', 'PDF']].map(([k, l]) => `<button class="btn ${ui.ch === k ? 'dark' : 'ghost'}" style="border-radius:12px;padding:0 6px" data-act="docCh" data-v="${k}">${l}</button>`).join('')}</div>
     ${ui.ch === 'email' ? `<label class="f" style="margin-top:20px">ถึง</label><div class="mail-to">${ui.to.map((e, i) => `<span>${H(e)}<button data-act="docToDel" data-i="${i}" aria-label="ลบ">${ICON.x}</button></span>`).join('')}<input type="email" placeholder="เพิ่มอีเมล…" data-change="docToAdd" aria-label="เพิ่มอีเมล"></div>` : ''}
     <label class="f" style="margin-top:18px">ข้อความ</label><textarea class="input" rows="5" data-change="docMsg">${H(ui.msg)}</textarea>
@@ -792,10 +794,10 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าบุฟเฟ่ต์กลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
     ${c.disc || c.credit ? `<tr><td>ยอดรวมก่อนส่วนลด</td><td class="r">${U.n2(c.sub)}</td></tr>` : ''}
     ${c.disc ? `<tr><td>ส่วนลด ${q.discount.type === 'amt' ? '' : U.n(c.pct, c.pct % 1 ? 1 : 0) + '%'}</td><td class="r">−${U.n2(c.disc)}</td></tr>` : ''}
-    <tr><td>ราคาก่อนค่าบริการและภาษีมูลค่าเพิ่ม</td><td class="r">${U.n2(c.base)}</td></tr>
+    ${ui.full ? `<tr><td>ราคาก่อนค่าบริการและภาษีมูลค่าเพิ่ม</td><td class="r">${U.n2(c.base)}</td></tr>
     <tr><td>ค่าบริการ (Service Charge) ${Math.round(S.service * 100)}%</td><td class="r">${U.n2(c.svc)}</td></tr>
     <tr><td>รวมก่อนภาษีมูลค่าเพิ่ม</td><td class="r">${U.n2(c.pre)}</td></tr>
-    <tr><td>ภาษีมูลค่าเพิ่ม (VAT) ${Math.round(S.vat * 100)}%</td><td class="r">${U.n2(c.vat)}</td></tr></table></div>
+    <tr><td>ภาษีมูลค่าเพิ่ม (VAT) ${Math.round(S.vat * 100)}%</td><td class="r">${U.n2(c.vat)}</td></tr>` : ''}</table></div>
   <div style="display:flex;justify-content:space-between;gap:12px;border-top:1px solid #999;margin-top:10px;padding-top:10px;flex-wrap:wrap"><b>ราคารวม ภาษีมูลค่าเพิ่ม(Vat) และค่าบริการ(Service Charge) แล้ว</b>
     <div style="text-align:right" class="blue"><b style="font-size:14px">${U.n2(c.net)} บาท</b><br><b>(${U.bahtText(c.net)})</b></div></div>
   <div style="display:grid;grid-template-columns:110px 1fr;gap:8px;margin-top:18px;color:#444;font-size:11px">
@@ -814,6 +816,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     docCh(el) { DU().ch = el.dataset.v; App.render(); },
     docToDel(el) { DU().to.splice(Number(el.dataset.i), 1); App.render(); },
     docPrint() { window.print(); },
+    // the customer's copy leaves out the service charge / VAT breakdown; the full copy shows it
+    docVer(el) { DU().full = el.dataset.v === '1'; App.render(); },
     qdTab(el) {
       const ui = DU(), q = Store.quote(App.state.params[0]);
       if (el.dataset.v === 'edit') { if (!ui.edit) { ui.edit = true; ui.dirty = false; ui.draft = JSON.parse(JSON.stringify(q.docEdit || {})); } App.render(); return; }

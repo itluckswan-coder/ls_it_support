@@ -381,6 +381,7 @@ main.bleed{padding:0;max-width:none}
 .doc td{padding:7px 4px;vertical-align:top}
 .doc tr.grp td{background:#f1f1f1;font-weight:600}
 .doc .r{text-align:right}.doc .c{text-align:center}
+.qd-ver{display:flex;width:100%}.qd-ver button{flex:1;padding:0 8px;white-space:normal;line-height:1.2;min-height:38px}
 .qd-ed{position:relative;display:inline-block;min-width:40px;max-width:100%;vertical-align:top}
 .qd-in{display:inline-block;min-width:40px;max-width:100%;min-height:1.5em;padding:1px 5px;border:1px dashed #b9b4a6;border-radius:4px;background:#fffbea;outline:none;white-space:pre-wrap;text-align:inherit}
 .qd-in:focus{border-color:var(--teal);background:#fff}
