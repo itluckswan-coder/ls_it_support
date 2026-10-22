@@ -191,8 +191,8 @@
     const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b', xst(x, 'label'), xr(x, 'label'))}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด', '', xst(x, 'text'), xr(x, 'text'))}</div>`
       : `<div class="fnf-x">${x.label ? `<b${sa(xst(x, 'label'))}>${rtx(x.label, xr(x, 'label'))} :</b> ` : ''}${wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text')), 'span')}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
-    // the accounting / money part is for admins, sales managers and sales staff only; everyone else sees the front desk part alone
-    const showMoney = !!App.salesRole();
+    // the accounting / money part is for admins, sales managers, sales staff and accounting; everyone else sees the front desk part alone
+    const me = App.me(), showMoney = !!App.salesRole() || (!!me && me.role === 'acc' && !(App.roleOf && App.roleOf(me).custom));
     // "+" inside each section while editing: adds a heading + detail row shaped like the rows above it
     const add = sec => ed ? `<button class="fnf-add" data-act="fnDXAdd" data-sec="${sec}" title="เพิ่มหัวข้อ/ช่องข้อมูลในส่วนนี้">＋ เพิ่มช่อง</button>` : '';
     const addRow = (sec, span) => ed ? `<tr class="fnf-addrow"><td colspan="${span}">${add(sec)}</td></tr>` : '';
