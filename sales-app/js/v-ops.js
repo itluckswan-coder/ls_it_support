@@ -766,6 +766,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   const sites = () => { const s = Store.db.settings && Store.db.settings.sites; return Array.isArray(s) && s.length ? s : SITES_DEFAULT; };
   const siteOf = e => e.site || SITES_DEFAULT[0].id;
   const siteName = id => (sites().find(x => x.id === id) || { name: id }).name;
+  App.SITES = { list: sites, of: siteOf, name: siteName };
   const PIN = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>';
   const POSITIONS = { kitchen: ['เชฟ', 'ผู้ช่วยเชฟ', 'พนักงานครัว'], banquet: ['หัวหน้าจัดเลี้ยง', 'พนักงานจัดเลี้ยง'], av: ['หัวหน้าช่าง', 'ช่างเทคนิค'], front: ['หัวหน้าส่วนหน้า', 'พนักงานต้อนรับ'], hk: ['หัวหน้าแม่บ้าน', 'แม่บ้าน'], acc: ['หัวหน้าบัญชี', 'พนักงานบัญชี'] };
   // each department's positions: the list kept in settings.positions once someone edits it (else the defaults),
