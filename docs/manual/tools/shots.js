@@ -1,5 +1,6 @@
 // every screen for the user manual, in th / en / my
-const { chromium } = require('playwright'); const BASE = 'http://localhost:8765/'; const OUT = process.argv[2]; // folder for the PNGs, e.g. /tmp/manual-raw const ONLY = process.argv[3] ? process.argv[3].split(',') : null;
+const { chromium } = require('playwright'); const BASE = 'http://localhost:8765/'; const OUT = process.argv[2]; // folder for the PNGs, e.g. /tmp/manual-raw
+const ONLY = process.argv[3] ? process.argv[3].split(',') : null;
 const W = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const b = await chromium.launch(); const errs = [];
@@ -17,13 +18,13 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await click('[data-act=themeMenu]'); await shot('theme'); await close();
     await click('[data-act=notifs]'); await shot('notifs'); await close();
     await click('[data-act=userMenu]'); await shot('usermenu'); await close();
-    await go('#/meet'); await shot('meet'); await click('[data-act=meetSel]'); await shot('meet-sel');
+    await go('#/meet'); await shot('meet'); await click('[data-act=meetSel]'); await shot('meet-sel'); await click('[data-act=meetEdit]'); await shot('meet-edit'); await close();
     await go('#/rooms'); await shot('rooms');
     await go('#/roomrates'); await shot('roomrates');
     await go('#/food'); await shot('food'); await click('[data-act=foodEdit]'); await shot('food-edit'); await close();
     await go('#/quotes'); await shot('quotes');
     await go('#/quote/QT-2611-042'); await shot('quote-edit');
-    await go('#/doc/QT-2611-042'); await shot('quote-doc');
+    await go('#/doc/QT-2611-042'); await shot('quote-doc'); await click('[data-act=docVer][data-v="1"]'); await shot('quote-doc-full'); await click('[data-act=qdTab][data-v=edit]'); await shot('quote-doc-edit'); await click('[data-act=qdCancel]'); await click('[data-act=docVer][data-v="0"]');
     await p.evaluate(() => { App.state.wiz = null; }); await go('#/new');
     for (const [f, v] of [['title', 'สัมมนาประจำปี 2027'], ['client', 'บจก. ตัวอย่าง จำกัด']]) { try { await p.fill(`[data-f=${f}]`, v); await p.dispatchEvent(`[data-f=${f}]`, 'input'); await p.dispatchEvent(`[data-f=${f}]`, 'change'); } catch (e) { errs.push('fill ' + f); } }
     await shot('wiz1');
@@ -40,7 +41,8 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await click('#emSiteBtn'); await click('#emDeptBtn'); await click('#emPosBtn'); await shot('staff-plus', true); await close();
     await click('[data-act=empImport]'); await shot('staff-import'); await close();
     await click('[data-act=stTab][data-v=rules]'); await shot('staff-rules');
-    await go('#/tasks'); await shot('tasks'); await click('[data-act=tkNew]'); await shot('task-new'); await close();
+    await go('#/tasks'); await shot('tasks'); await click('[data-act=tkNew]'); await shot('task-new'); await click('[data-to=dept]'); await shot('task-site'); await close();
+    await click('[data-act=tpOpen]'); await click('[data-tp-mode=org]'); await click('[data-tp-zoom=fit]'); await shot('task-perms-org'); await click('[data-tp-mode=form]'); await shot('task-perms-form'); await close();
     await go('#/home'); await click('[data-act=tkView]'); await shot('task-view'); await close();
     await go('#/tasks/approve'); await shot('tasks-approve');
     // leave: sample requests
