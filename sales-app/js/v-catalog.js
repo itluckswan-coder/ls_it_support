@@ -173,8 +173,107 @@
     return `<svg viewBox="0 0 ${W} ${h}" role="img" aria-label="ผังที่นั่ง ${pax} ที่">${stage}${body}<text x="180" y="${h - 8}" text-anchor="middle" font-size="9" fill="#8D928F">ทางเข้า ↓</text></svg>`;
   }
 
+  /* edit a meeting room: photos, prices, capacity per layout, size, description, amenities (settings.meetRooms) */
+  function meetEditor(id) {
+    const room = D.MEETING_ROOMS.find(x => x.id === id); if (!room) return;
+    const draft = JSON.parse(JSON.stringify(room)); draft.amenText = (draft.amen || []).join(', ');
+    let busy = 0, err = '';
+    const bg = App.modal('<div id="meBody"></div>'), modal = bg.querySelector('.modal');
+    modal.style.maxWidth = '720px';
+    const num = v => { const n = parseFloat(String(v).replace(/,/g, '')); return n >= 0 ? n : NaN; };
+    function draw() {
+      const y = modal.scrollTop;
+      modal.querySelector('#meBody').innerHTML = `
+        <h2>แก้ไขห้องประชุม ${H(room.name)}</h2>
+        <h3 style="margin:4px 0 8px">รูปตัวอย่าง</h3>
+        <div class="ce-photos">${draft.imgs.map((p, i) => `<div class="ce-ph"><img src="${H(p)}" alt="">${i ? '' : '<span class="me-cover">รูปหน้าปก</span>'}<button type="button" class="ce-ph-btn" data-me="ph" data-i="${i}" aria-label="เปลี่ยนรูป"></button><button type="button" class="ce-x" data-me="phDel" data-i="${i}" aria-label="ลบรูป">${ICON.x}</button>${i ? `<button type="button" class="me-left" data-me="phLeft" data-i="${i}" aria-label="เลื่อนไปซ้าย">‹</button>` : ''}</div>`).join('')}<button type="button" class="ce-add-ph" data-me="phAdd">+ อัปโหลดรูป<small>เลือกได้หลายรูป</small></button></div>
+        <div class="xs muted" style="margin-top:6px">รูปแรกเป็นรูปหน้าปก · กด ‹ เพื่อเลื่อนลำดับ · กดที่รูปเพื่อเปลี่ยนรูป</div>
+        <div class="grid g2" style="margin-top:16px">
+          <div><label class="f">ราคาเต็มวัน (บาท) *</label><input class="input" data-f="full" inputmode="decimal" value="${H(draft.full)}"></div>
+          <div><label class="f">ราคาครึ่งวัน (บาท) *</label><input class="input" data-f="half" inputmode="decimal" value="${H(draft.half)}"></div>
+          <div><label class="f">พื้นที่ (ตร.ม.)</label><input class="input" data-f="area" inputmode="decimal" value="${H(draft.area)}"></div>
+          <div><label class="f">งานเลี้ยงการันตีขั้นต่ำ (ท่าน)</label><input class="input" data-f="minBanquet" inputmode="numeric" value="${H(draft.minBanquet || '')}" placeholder="ไม่บังคับ"></div>
+          <div style="grid-column:1/-1"><label class="f">คำอธิบาย</label><input class="input" data-f="desc" value="${H(draft.desc)}"></div>
+          <div style="grid-column:1/-1"><label class="f">สิ่งที่มีในห้อง (คั่นด้วย ,)</label><input class="input" data-f="amenText" value="${H(draft.amenText)}"></div>
+        </div>
+        <h3 style="margin:18px 0 8px">จำนวนคนที่รองรับ (ต่ำสุด–สูงสุด)</h3>
+        <div class="me-cap">${D.LAYOUTS.map(l => `<label class="f">${H(l.name)}</label><span class="row" style="gap:6px"><input class="input sm" data-cap="${l.id}" data-k="0" inputmode="numeric" value="${H(draft.cap[l.id][0])}" aria-label="${H(l.name)} ต่ำสุด"><span class="muted">–</span><input class="input sm" data-cap="${l.id}" data-k="1" inputmode="numeric" value="${H(draft.cap[l.id][1])}" aria-label="${H(l.name)} สูงสุด"><span class="small muted">คน</span></span>`).join('')}</div>
+        <div class="xs muted" style="margin-top:6px">ใส่ 0–0 ถ้าห้องไม่รองรับรูปแบบนั้น</div>
+        <div class="small red" style="min-height:20px;margin-top:8px" role="alert">${H(err)}</div>
+        ${busy ? `<div class="small teal">กำลังอัปโหลดรูป ${busy} รูป…</div>` : ''}
+        <div class="acts" style="flex-wrap:wrap"><button type="button" class="btn ghost" data-me="reset" style="margin-right:auto">คืนค่าเริ่มต้น</button><button type="button" class="btn ghost" data-act="closeModal">ยกเลิก</button><button type="button" class="btn red" data-me="save" ${busy ? 'disabled' : ''}>บันทึก</button></div>`;
+      modal.scrollTop = y;
+    }
+    async function upload(files, put) {
+      if (!files.length) return;
+      busy += files.length; err = ''; draw();
+      for (const f of files) { try { put(await g.CatalogImages.storeImage(f)); } catch (e) { err = e.message || 'อัปโหลดรูปไม่สำเร็จ'; } busy--; draw(); }
+    }
+    const save = over => {
+      const st = Store.db.settings || (Store.db.settings = {});
+      const all = Object.assign({}, st.meetRooms); if (over) all[id] = over; else delete all[id];
+      st.meetRooms = all; D.applyMeetRooms(all); Store.save(); App.closeModal(); App.render();
+    };
+    modal.addEventListener('input', e => {
+      const t = e.target;
+      if (t.dataset.f) draft[t.dataset.f] = t.value;
+      if (t.dataset.cap) draft.cap[t.dataset.cap][Number(t.dataset.k)] = t.value;
+    });
+    modal.addEventListener('click', async e => {
+      const b = e.target.closest('[data-me]'); if (!b) return;
+      const i = Number(b.dataset.i), act = b.dataset.me;
+      if (act === 'phAdd') upload(await g.CatalogImages.pickFiles(true), url => draft.imgs.push(url));
+      if (act === 'ph') upload(await g.CatalogImages.pickFiles(false), url => { draft.imgs[i] = url; });
+      if (act === 'phDel') { draft.imgs.splice(i, 1); draw(); }
+      if (act === 'phLeft') { [draft.imgs[i - 1], draft.imgs[i]] = [draft.imgs[i], draft.imgs[i - 1]]; draw(); }
+      if (act === 'reset') App.confirm(`คืนค่ารูป ราคา และจำนวนคนของ ${room.name} เป็นค่าเริ่มต้น?`, () => { save(null); App.toast('คืนค่าเริ่มต้น ' + room.name + ' แล้ว'); }, 'คืนค่าเริ่มต้น');
+      if (act === 'save') {
+        const full = num(draft.full), half = num(draft.half), area = num(draft.area);
+        if (isNaN(full) || isNaN(half)) { err = 'ราคาไม่ถูกต้อง'; draw(); return; }
+        if (isNaN(area)) { err = 'พื้นที่ไม่ถูกต้อง'; draw(); return; }
+        const cap = {};
+        for (const l of D.LAYOUTS) {
+          const [mn, mx] = draft.cap[l.id].map(v => String(v).trim() === '' ? 0 : num(v));
+          if (isNaN(mn) || isNaN(mx) || mn > mx) { err = `จำนวนคนแบบ ${l.name} ไม่ถูกต้อง (ต่ำสุดต้องไม่เกินสูงสุด)`; draw(); return; }
+          cap[l.id] = [Math.round(mn), Math.round(mx)];
+        }
+        const mb = String(draft.minBanquet || '').trim() === '' ? 0 : Math.round(num(draft.minBanquet)) || 0;
+        save({ imgs: draft.imgs.slice(), full, half, area, cap, desc: String(draft.desc || '').trim(), minBanquet: mb,
+          amen: String(draft.amenText || '').split(/[,،]/).map(x => x.trim()).filter(Boolean) });
+        App.toast('บันทึก ' + room.name + ' แล้ว — ราคาใหม่ใช้กับรายการที่เพิ่มใหม่');
+      }
+    });
+    draw();
+  }
+
+  /* swipeable photo gallery of a meeting room (scroll-snap; arrows and dots on a computer) */
+  const EMPTY_PH = 'repeating-linear-gradient(135deg,#dff3ef 0 10px,#cfeee8 10px 20px)';
+  function gallery(room, cls) {
+    const imgs = room.imgs || [];
+    if (!imgs.length) return `<div class="${cls} mg" style="background:${EMPTY_PH}"></div>`;
+    return `<div class="${cls} mg" data-room="${room.id}">
+      <div class="mg-track">${imgs.map((src, i) => `<div class="mg-sl" style="background-image:url('${H(src)}')" role="img" aria-label="${H(room.name)} ${i + 1}/${imgs.length}"></div>`).join('')}</div>
+      ${imgs.length > 1 ? `<button type="button" class="mg-nav prev" data-act="meetGal" data-d="-1" aria-label="รูปก่อนหน้า">‹</button><button type="button" class="mg-nav next" data-act="meetGal" data-d="1" aria-label="รูปถัดไป">›</button>
+      <div class="mg-dots">${imgs.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div><span class="mg-n">1/${imgs.length}</span>` : ''}
+    </div>`;
+  }
+  function galSync(mg) {
+    const tr = mg.querySelector('.mg-track'), n = tr.children.length, i = Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+    mg.querySelectorAll('.mg-dots i').forEach((d, j) => d.classList.toggle('on', j === i));
+    const lb = mg.querySelector('.mg-n'); if (lb) lb.textContent = (i + 1) + '/' + n;
+    const ui = App.state.ui.meet; if (ui) (ui.mg || (ui.mg = {}))[mg.dataset.room + (mg.closest('aside') ? ':side' : '')] = i;
+  }
+  document.addEventListener('scroll', e => { const t = e.target; if (t.classList && t.classList.contains('mg-track')) galSync(t.parentNode); }, true);
+
   App.V.meet = {
     title: 'ห้องประชุม',
+    after() {
+      const ui = App.state.ui.meet || {}, mg = ui.mg || {};
+      document.querySelectorAll('.mg[data-room]').forEach(el => {
+        const i = mg[el.dataset.room + (el.closest('aside') ? ':side' : '')];
+        if (i) { const tr = el.querySelector('.mg-track'); tr.scrollLeft = i * tr.clientWidth; galSync(el); }
+      });
+    },
     render() {
       const q = App.ctxQuote();
       const ui = App.state.ui.meet || (App.state.ui.meet = { layout: (q && (q.items.find(i => i.sec === 'meet' && i.layout) || {}).layout) || 'classroom', sel: null, av: true, half: false, holdDays: 10 });
@@ -204,16 +303,16 @@
     ${D.MEETING_ROOMS.map(room => {
       const [mn, mx] = room.cap[ui.layout]; const [fl, fc] = fit(room);
       return `<article class="card mroom ${room.id === ui.sel ? 'on' : ''}" data-act="meetSel" data-v="${room.id}">
-        <div class="ph" style="${room.img ? `background-image:url(${room.img})` : 'background:repeating-linear-gradient(135deg,#dff3ef 0 10px,#cfeee8 10px 20px)'}"></div>
+        ${gallery(room, 'ph')}
         <div><div class="row" style="align-items:baseline;flex-wrap:wrap"><h3 style="font-size:19px">${H(room.name)}</h3><span class="small muted">${room.area} ตร.ม. · ${H(room.desc)}</span></div>
           <div class="small muted" style="margin:8px 0 10px">${D.LAYOUTS.filter(l => l.id !== ui.layout && room.cap[l.id][1]).slice(0, 3).map(l => l.name + ' ' + room.cap[l.id][0] + '–' + room.cap[l.id][1]).join(' · ')}</div>${avail(room)}</div>
         <div class="cap"><span class="xs muted">${D.LAYOUTS.find(l => l.id === ui.layout).name}</span><b class="${fc === 'red' ? 'red' : ''}">${mx ? mn + '–' + mx : '—'}</b><span class="small ${fc === 'red' ? 'red' : 'muted'}">${fl}</span></div>
-        <div class="pr" style="text-align:right"><b style="font:600 22px var(--fh)">${U.n(ui.half ? room.half : room.full)} ฿</b><div class="xs muted">${ui.half ? 'ครึ่งวัน · เต็มวัน ' + U.n(room.full) : 'เต็มวัน 08:00–17:00'}</div>${room.minBanquet ? `<div class="xs muted">งานเลี้ยงการันตี ${room.minBanquet} ท่านขึ้นไป</div>` : ''}</div>
+        <div class="pr" style="text-align:right"><b style="font:600 22px var(--fh)">${U.n(ui.half ? room.half : room.full)} ฿</b><div class="xs muted">${ui.half ? 'ครึ่งวัน · เต็มวัน ' + U.n(room.full) : 'เต็มวัน 08:00–17:00'}</div>${room.minBanquet ? `<div class="xs muted">งานเลี้ยงการันตี ${room.minBanquet} ท่านขึ้นไป</div>` : ''}${App.can('edit_prices') ? `<button type="button" class="mroom-edit" data-act="meetEdit" data-v="${room.id}" title="แก้ไขรูป ราคา และจำนวนคน" aria-label="แก้ไขห้องประชุม ${H(room.name)}">${ICON.pen}</button>` : ''}</div>
       </article>`;
     }).join('')}
   </div>
   <aside class="card sticky" style="overflow:hidden">
-    <div style="height:190px;background:${r.img ? `url(${r.img}) center/cover` : 'repeating-linear-gradient(135deg,#dff3ef 0 10px,#cfeee8 10px 20px)'};position:relative">${chosen ? `<span class="badge" style="position:absolute;left:14px;bottom:14px;background:#fff;color:var(--teal-d)">${ICON.check} เลือกแล้ว</span>` : ''}</div>
+    <div style="position:relative">${gallery(r, 'side-ph')}${chosen ? `<span class="badge" style="position:absolute;left:14px;bottom:14px;background:#fff;color:var(--teal-d)">${ICON.check} เลือกแล้ว</span>` : ''}</div>
     <div style="padding:20px 22px 22px">
       <div class="small muted">${H(r.desc)}</div>
       <h2 style="font-size:22px;margin:4px 0">${H(r.name)} · ${D.LAYOUTS.find(l => l.id === ui.layout).name}</h2>
@@ -236,6 +335,8 @@
     meetLayout(el) { App.state.ui.meet.layout = el.dataset.v; App.render(); },
     meetSel(el) { App.state.ui.meet.sel = el.dataset.v; App.render(); if (window.innerWidth <= 1100) document.querySelector('aside.card')?.scrollIntoView({ behavior: 'smooth' }); },
     meetHalf(el) { App.state.ui.meet.half = el.dataset.v === '1'; App.render(); },
+    meetGal(el) { const tr = el.closest('.mg').querySelector('.mg-track'), n = tr.children.length, i = Math.round(tr.scrollLeft / tr.clientWidth) + Number(el.dataset.d); tr.scrollTo({ left: ((i + n) % n) * tr.clientWidth, behavior: 'smooth' }); },
+    meetEdit(el) { if (App.can('edit_prices')) meetEditor(el.dataset.v); },
     meetAdd() {
       const ui = App.state.ui.meet;
       const run = id => {

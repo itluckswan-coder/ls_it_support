@@ -31,6 +31,7 @@
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = !!multiple;
     inp.onchange = () => res(Array.from(inp.files || [])); inp.click();
   });
+  g.CatalogImages = { storeImage, pickFiles };
 
   /* ---------- save the whole menu list (synced to the shared database when online) ---------- */
   function saveCatalog() {
