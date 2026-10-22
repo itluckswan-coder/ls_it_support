@@ -29,6 +29,20 @@
       cap: { theatre: [0, 0], classroom: [0, 0], ushape: [0, 0], banquet: [100, 300], cocktail: [150, 350] }, full: 15000, half: 8000,
       amen: ['ไฟประดับ', 'เวทีกลางแจ้ง', 'เครื่องเสียงพื้นฐาน'] }
   ];
+  // every room's photos (the first is its cover); the admin edits photos, prices, capacity, size and description
+  // on the meeting-room page (settings.meetRooms), laid over these defaults — pages hold a reference to MEETING_ROOMS
+  MEETING_ROOMS.forEach(r => { r.imgs = r.img ? [r.img] : []; });
+  const MEETING_ROOMS_DEFAULT = JSON.parse(JSON.stringify(MEETING_ROOMS));
+  const MEET_EDITABLE = ['imgs', 'full', 'half', 'cap', 'area', 'desc', 'minBanquet', 'amen'];
+  function applyMeetRooms(over) {
+    MEETING_ROOMS.forEach((r, i) => {
+      const base = JSON.parse(JSON.stringify(MEETING_ROOMS_DEFAULT[i])), o = (over && over[r.id]) || {};
+      for (const k of MEET_EDITABLE) if (o[k] != null) base[k] = k === 'cap' ? Object.assign(base.cap, o.cap) : o[k];
+      base.img = (base.imgs || [])[0] || '';
+      for (const k of Object.keys(r)) delete r[k];
+      Object.assign(r, base);
+    });
+  }
 
   /* ---------- rooms: types from the hotel rate card, priced by season ----------
    * Every room type (a room family + bed) has a count and a full (rack) price; each season has a "with breakfast"
@@ -494,7 +508,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyDepts(this.db && this.db.settings && this.db.settings.depts); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyMeetRooms(this.db && this.db.settings && this.db.settings.meetRooms); applyDepts(this.db && this.db.settings && this.db.settings.depts); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },
@@ -519,7 +533,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { LAYOUTS, MEETING_ROOMS, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;
