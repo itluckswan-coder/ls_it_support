@@ -11,6 +11,7 @@
   const isAdmin = () => { const me = App.me(); return !!me && me.role === 'admin'; };
   const tasks = () => Store.db.tasks || (Store.db.tasks = []);
   const mine = (t, me) => !!me && !!t.to && (t.to.type === 'user' ? t.to.id === me.id : t.to.type === 'dept' && t.to.dept === deptOf(me));
+  const siteText = t => App.SITES ? App.SITES.name(t.to.site) : t.to.site;
   const toText = t => t.to.type === 'user' ? t.to.name || ((Store.db.users.find(u => u.id === t.to.id) || {}).name) || '—' : 'แผนก' + dept(t.to.dept).short;
   const when = iso => iso ? U.fmtD(iso.slice(0, 10), { year: false }) + ' ' + iso.slice(11, 16) : '—';
   const empName = id => (Store.db.employees.find(e => e.id === id) || {}).name;
@@ -87,6 +88,7 @@
       ${t.detail ? `<p style="white-space:pre-line;margin:12px 0 4px">${H(t.detail)}</p>` : '<p class="muted small" style="margin:12px 0 4px">ไม่มีรายละเอียดเพิ่มเติม</p>'}
       <div class="tk-kvs">
         ${kv('มอบหมายให้', H(toText(t)))}
+        ${t.to.type === 'dept' && t.to.site ? kv('สถานที่', H(siteText(t))) : ''}
         ${t.to.type === 'dept' && (t.to.emps || []).length ? kv('พนักงาน', H(t.to.emps.map(empName).filter(Boolean).join(', '))) : ''}
         ${kv('มอบหมายโดย', H(t.byName || '—'))}
         ${kv('มอบหมายเมื่อ', H(when(t.at)))}
@@ -121,7 +123,7 @@
   ${list.map(t => { const late = t.status !== 'done' && t.due && t.due < U.today(); return `<tr>
     <td><div style="font-weight:600">${t.priority === 'high' ? '<span class="badge st-tentative" style="margin-right:6px">ด่วน</span>' : ''}${H(t.title)}</div><div class="sub">${H(t.detail || '')}${t.quoteId ? ` · <a href="#/quote/${encodeURIComponent(t.quoteId)}">${H(t.quoteId)}</a>` : ''}</div>
       <div class="sub show-m">${H(toText(t))} · ${H(when(t.at))}</div></td>
-    <td class="hide-m"><div>${H(toText(t))}</div>${t.to.type === 'dept' && (t.to.emps || []).length ? `<div class="xs muted">${H(t.to.emps.map(empName).filter(Boolean).join(', '))}</div>` : ''}</td>
+    <td class="hide-m"><div>${H(toText(t))}</div>${t.to.type === 'dept' && t.to.site ? `<div class="xs muted">${H(siteText(t))}</div>` : ''}${t.to.type === 'dept' && (t.to.emps || []).length ? `<div class="xs muted">${H(t.to.emps.map(empName).filter(Boolean).join(', '))}</div>` : ''}</td>
     <td class="hide-m small">${H(when(t.at))}<div class="xs muted">โดย ${H(t.byName || '')}</div></td>
     <td class="hide-m small ${late ? 'red' : ''}">${t.due ? U.fmtD(t.due, { year: false }) + (late ? ' · เลยกำหนด' : '') : '—'}</td>
     <td>${t.status === 'done' ? `<span class="badge st-confirmed">ยืนยันแล้ว</span><div class="xs muted" style="margin-top:4px">${H(t.doneByName || '')} · ${H(when(t.doneAt))}</div>${t.doneNote ? `<div class="xs muted">“${H(t.doneNote)}”</div>` : ''}` : '<span class="badge st-sent">รอดำเนินการ</span>'}</td>
@@ -189,18 +191,29 @@
       <div class="seg white" role="radiogroup" style="margin:6px 0 10px"><button type="button" class="${t.to.type === 'user' ? 'on' : ''}" data-to="user" role="radio" aria-checked="${t.to.type === 'user'}">ผู้ใช้งาน</button><button type="button" class="${t.to.type === 'dept' ? 'on' : ''}" data-to="dept" role="radio" aria-checked="${t.to.type === 'dept'}">แผนก</button></div>
       <div id="tkToUser" ${t.to.type === 'user' ? '' : 'hidden'}><label class="f" for="tkUser">ผู้ใช้งาน</label><select class="input" id="tkUser">${users.map(u => `<option value="${H(u.id)}" ${u.id === t.to.id ? 'selected' : ''}>${H(u.name)} · ${H(App.roleName(u))} · ${H(u.dept || '')}</option>`).join('')}</select></div>
       <div id="tkToDept" ${t.to.type === 'dept' ? '' : 'hidden'}><label class="f" for="tkDept">แผนก</label><select class="input" id="tkDept">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === t.to.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select>
+        <div class="small muted" style="margin:12px 0 6px">สถานที่</div><div id="tkSites" class="row wrap" style="gap:6px" role="radiogroup" aria-label="สถานที่"></div>
         <div class="small muted" style="margin:10px 0 6px">พนักงานในแผนก (เลือกได้หลายคน หรือไม่เลือกก็ได้ = ทั้งแผนก)</div><div id="tkEmps" class="tk-emps"></div>
         <div class="xs muted" style="margin-top:6px">ผู้ใช้งานที่อยู่แผนกนี้ (เช่น หัวหน้าแผนก) จะเห็นงานและกดยืนยันได้</div></div>
       <div class="small red" id="tkErr" style="min-height:20px;margin-top:8px" role="alert"></div>
       <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="tkOk">${isNew ? 'มอบหมายงาน' : 'บันทึก'}</button></div>`, bg => {
       let type = t.to.type, picked = new Set(t.to.emps || []);
-      const sel = bg.querySelector('#tkDept'), box = bg.querySelector('#tkEmps');
+      const sel = bg.querySelector('#tkDept'), box = bg.querySelector('#tkEmps'), siteBox = bg.querySelector('#tkSites');
+      // workplace: all sites, or one site (the staff list shows only that site's people)
+      const S = App.SITES, siteOf = e => S ? S.of(e) : '';
+      const firstPicked = Store.db.employees.find(e => picked.has(e.id));
+      let site = t.to.site || (firstPicked ? siteOf(firstPicked) : '');
+      const fillSites = () => {
+        if (!S) return;
+        const inDept = Store.db.employees.filter(e => e.dept === sel.value), n = id => inDept.filter(e => !id || siteOf(e) === id).length;
+        siteBox.innerHTML = [{ id: '', name: 'ทุกสถานที่' }].concat(S.list()).map(x => `<button type="button" class="chip ${site === x.id ? 'on' : ''}" data-site="${H(x.id)}" role="radio" aria-checked="${site === x.id}">${H(x.name)} <span class="xs" style="opacity:.7">${n(x.id)}</span></button>`).join('');
+        siteBox.querySelectorAll('[data-site]').forEach(b => { b.onclick = () => { site = b.dataset.site; picked = new Set([...picked].filter(id => { const e = Store.db.employees.find(x => x.id === id); return e && (!site || siteOf(e) === site); })); fillSites(); fillEmps(); }; });
+      };
       const fillEmps = () => {
-        const emps = Store.db.employees.filter(e => e.dept === sel.value);
-        box.innerHTML = emps.map(e => `<label class="tk-emp"><input type="checkbox" value="${H(e.id)}" ${picked.has(e.id) ? 'checked' : ''}> ${H(e.name)} <span class="xs muted">${H(e.role || '')}</span></label>`).join('') || '<span class="small muted">ยังไม่มีพนักงานในแผนกนี้</span>';
+        const emps = Store.db.employees.filter(e => e.dept === sel.value && (!site || siteOf(e) === site));
+        box.innerHTML = emps.map(e => `<label class="tk-emp"><input type="checkbox" value="${H(e.id)}" ${picked.has(e.id) ? 'checked' : ''}> ${H(e.name)} <span class="xs muted">${H(e.role || '')}${!site && S ? ' · ' + H(S.name(siteOf(e))) : ''}</span></label>`).join('') || '<span class="small muted">ยังไม่มีพนักงานในแผนกนี้</span>';
         box.querySelectorAll('input').forEach(i => { i.onchange = () => { if (i.checked) picked.add(i.value); else picked.delete(i.value); }; });
       };
-      fillEmps(); sel.onchange = () => { picked = new Set(); fillEmps(); };
+      fillSites(); fillEmps(); sel.onchange = () => { picked = new Set(); fillSites(); fillEmps(); };
       bg.querySelectorAll('[data-to]').forEach(b => { b.onclick = () => {
         type = b.dataset.to;
         bg.querySelectorAll('[data-to]').forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', x === b); });
@@ -212,13 +225,13 @@
         if (!f.title) { err.textContent = 'กรุณาระบุงานที่ต้องทำ'; return; }
         let to;
         if (type === 'user') { const u = Store.db.users.find(x => x.id === bg.querySelector('#tkUser').value); if (!u) { err.textContent = 'เลือกผู้ใช้งาน'; return; } to = { type: 'user', id: u.id, name: u.name }; }
-        else to = { type: 'dept', dept: sel.value, name: dept(sel.value).name, emps: [...picked] };
+        else { to = { type: 'dept', dept: sel.value, name: dept(sel.value).name, emps: [...picked] }; if (site) to.site = site; }
         const me = App.me(), data = { title: f.title, detail: f.detail.trim(), due: f.due, priority: f.priority, quoteId: f.quoteId, to };
         if (isNew) tasks().push(Object.assign({ id: 'TK-' + Date.now().toString(36).toUpperCase(), by: me.id, byName: me.name, at: U.nowTH(), status: 'open' }, data));
         else {
           const cur = tasks().find(x => x.id === t.id); if (!cur) { App.closeModal(); return; }
           // a new assignee starts over
-          const moved = JSON.stringify([cur.to.type, cur.to.id, cur.to.dept]) !== JSON.stringify([to.type, to.id, to.dept]);
+          const moved = JSON.stringify([cur.to.type, cur.to.id, cur.to.dept, cur.to.site || '']) !== JSON.stringify([to.type, to.id, to.dept, to.site || '']);
           Object.assign(cur, data);
           if (moved) { cur.status = 'open'; delete cur.doneBy; delete cur.doneByName; delete cur.doneAt; delete cur.doneNote; cur.at = U.nowTH(); }
         }
