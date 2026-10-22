@@ -980,4 +980,5 @@
     '+ ใส่รายละเอียดห้องจากระบบ': ["+ Insert the room's details from the system", '+ စနစ်မှ အခန်းအသေးစိတ် ထည့်ရန်'], 'แก้ไขข้อมูลบนใบเสนอราคา': ['Edited the quotation sheet', 'ဈေးနှုန်းစာရွက်ကို ပြင်ခဲ့သည်']
   });
   I18N.add({ 'รูปแบบใบเสนอราคา': ['Quotation version', 'ဈေးနှုန်းစာရွက် ပုံစံ'], 'ใบเสนอราคาสำหรับลูกค้า': ['Customer copy', 'ဖောက်သည်အတွက်'], 'ใบเสนอราคาฉบับเต็ม': ['Full quotation', 'အပြည့်အစုံ'] });
+  I18N.add({ 'กลับไปใบฟังก์ชัน': ['Back to the function sheet', 'လုပ်ဆောင်ချက်စာရွက်သို့ ပြန်'], 'ออกแบบผังงานใช้ได้เฉพาะผู้ดูแลระบบ แผนก F&B และแผนกจัดเลี้ยง —': ['The floor-plan designer is for administrators, the F&B and the banquet departments only —', 'ကြမ်းခင်းပုံ ဒီဇိုင်းကို စနစ်စီမံသူ၊ F&B ဌာနနှင့် ညစာစားပွဲဌာနသာ သုံးနိုင်သည် —'] });
 })(window);
