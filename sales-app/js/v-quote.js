@@ -770,7 +770,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         '- หากมีการเปลี่ยนแปลงรายละเอียดการจัดงาน สามารถแจ้งที่เจ้าหน้าที่ฝ่ายขายล่วงหน้าอย่างน้อย 7 วัน',
         '- กรณียกเลิกกรุณาแจ้งล่วงหน้าอย่างน้อย 14 วัน ก่อนวันงาน หากแจ้งยกเลิกหลังจากนั้นต้องทำการชำระเงิน 100% ของยอดใบเสนอราคา',
         `- ยืนราคาถึงวันที่ ${U.fmtD(q.validUntil, { long: true })}${q.holdUntil ? ' · กันห้องประชุมไว้ชั่วคราวถึงวันที่ ' + U.fmtD(q.holdUntil, { long: true }) : ''}${q.items.some(i => i.sec === 'room') ? ' · วันปล่อยห้องพัก (cut-off) ' + U.fmtD(U.addDays(q.start, -14), { long: true }) : ''}`]
-        .concat(ui.online !== false ? ['- ลูกค้าสามารถยืนยันและลงนามออนไลน์ผ่านลิงก์ที่แนบในอีเมล'] : []).join('\n');
+        .concat(ui.online !== false ? ['- ลูกค้าสามารถยืนยันและลงนามออนไลน์ผ่านลิงก์ที่แนบในอีเมล'] : [])
+        .concat(['- เมื่อทำการชำระเงินผ่านบัตรเครดิตจะมีค่าบริการเพิ่ม 3% ของยอดใบเสนอราคา']).join('\n');
       const groups = [['room', 'ห้องพัก'], ['food', 'อาหารและเครื่องดื่ม'], ['meet', 'ห้องประชุม ณ โรงแรมลักษวรรณรีสอร์ท'], ['other', 'บริการอื่น ๆ']].filter(([k]) => q.items.some(i => i.sec === k));
       const mainRoom = D.MEETING_ROOMS.find(r => q.items.some(i => i.sec === 'meet' && i.ref === r.id));
       App.state.ui.doc.meetAuto = meetAuto(mainRoom);
