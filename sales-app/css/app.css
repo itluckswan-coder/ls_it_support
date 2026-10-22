@@ -965,3 +965,17 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .tp-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px;padding:12px 14px;border:1px solid var(--line);border-radius:12px}
 .tp-who{display:flex;flex-direction:column;gap:2px}
 @media (max-width:700px){.tp-row{grid-template-columns:1fr}}
+.oc-wrap{max-height:62vh;border:1px solid var(--line);border-radius:12px;padding:12px;background:var(--bg)}
+.oc-zoom{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.oc-zoom .icon-btn{width:34px;height:34px;font-size:18px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.oc-zoom .num{min-width:44px;text-align:center}
+.oc-tools{display:flex;justify-content:center;gap:2px;margin:-4px 0 2px}
+.oc-tool{width:26px;height:26px;border-radius:8px;font-size:13px;line-height:1;display:grid;place-items:center;color:var(--ink2)}
+.oc-tool:hover{background:var(--gray-soft)}
+.oc-card.root .oc-tool{color:#fff}.oc-card.root .oc-tool:hover{background:rgba(255,255,255,.15)}
+.oc-edit,.oc-add,.oc-ask{display:flex;flex-direction:column;gap:6px;margin-top:4px;text-align:center}
+.oc-add,.oc-ask{padding-top:8px;border-top:1px dashed var(--line);color:var(--ink)}
+.oc-card.root .oc-add,.oc-card.root .oc-ask{color:#fff}
+.oc-add .seg{align-self:center}.oc-add .seg button{height:26px;font-size:12px;padding:0 10px}
+.oc-card .btn.sm{height:28px;padding:0 10px;font-size:12px}
+.oc-card:has(.oc-add),.oc-card:has(.oc-edit),.oc-card:has(.oc-ask){max-width:200px}
