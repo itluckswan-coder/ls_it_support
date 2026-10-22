@@ -191,6 +191,8 @@
     const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b', xst(x, 'label'), xr(x, 'label'))}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด', '', xst(x, 'text'), xr(x, 'text'))}</div>`
       : `<div class="fnf-x">${x.label ? `<b${sa(xst(x, 'label'))}>${rtx(x.label, xr(x, 'label'))} :</b> ` : ''}${wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text')), 'span')}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
+    // the accounting / money part is for admins, sales managers and sales staff only; everyone else sees the front desk part alone
+    const showMoney = !!App.salesRole();
     // "+" inside each section while editing: adds a heading + detail row shaped like the rows above it
     const add = sec => ed ? `<button class="fnf-add" data-act="fnDXAdd" data-sec="${sec}" title="เพิ่มหัวข้อ/ช่องข้อมูลในส่วนนี้">＋ เพิ่มช่อง</button>` : '';
     const addRow = (sec, span) => ed ? `<tr class="fnf-addrow"><td colspan="${span}">${add(sec)}</td></tr>` : '';
@@ -222,14 +224,21 @@
     <tr><th class="sec" style="width:50%">แผนกแม่บ้าน</th><th class="sec">แผนกช่างเครื่องเสียง</th></tr>
     <tr>${tdc('hk', 'c', T('hk', '-', 'แผนกแม่บ้าน') + xIn('hk') + add('hk'))}${tdc('av', '', T('av', '-', 'แผนกช่างเครื่องเสียง') + xIn('av') + add('av'))}</tr>
   </table>
-  <table class="fnf-t">
+  ${showMoney ? `<table class="fnf-t">
     <tr><th colspan="2" class="sec" style="width:50%">แผนกบัญชี / การเงิน</th><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
     <tr><th>ยอดรวม :</th>${tdc('total', 'c fnf-total', ed ? T('total') : wrapS(sty.total, rtx(v.total, rich.total), 'span'))}<th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
     <tr><th>รายละเอียดค่าใช้จ่าย :</th>${cell('cost', 'c')}<th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
     <tr><th>ที่อยู่ออกบิล :</th>${cell('bill', 'c')}${tdc('front', 'c', T('front', '', 'หมายเหตุต้อนรับ'), 4)}</tr>
     ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + xtd(acc[i]) : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + xtd(front[i], 3) : '<td colspan="4"></td>'}</tr>`).join('')}
     ${ed ? `<tr class="fnf-addrow"><td colspan="2">${add('acc')}</td><td colspan="4">${add('front')}</td></tr>` : ''}
-  </table>
+  </table>` : `<table class="fnf-t">
+    <tr><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
+    <tr><th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
+    <tr><th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
+    <tr>${tdc('front', 'c', T('front', '', 'หมายเหตุต้อนรับ'), 4)}</tr>
+    ${front.map(x => `<tr>${xth(x)}${xtd(x, 3)}</tr>`).join('')}
+    ${ed ? `<tr class="fnf-addrow"><td colspan="4">${add('front')}</td></tr>` : ''}
+  </table>`}
   ${xs('other').length || ed ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}${xtd(x)}</tr>`).join('')}${addRow('other', 2)}</table>` : ''}
   <div class="fnf-sign">
     <div><span>ออกโดย :</span><div class="fnf-line"></div><div>${ed ? T('by', '', 'ชื่อผู้ออกเอกสาร') : wrapS(sty.by, `(${rtx(v.by, rich.by, '................................')})`, 'span')}</div><div>${ed ? T('byTitle', '', 'ตำแหน่ง') : wrapS(sty.byTitle, rtx(v.byTitle, rich.byTitle), 'span')}</div></div>
