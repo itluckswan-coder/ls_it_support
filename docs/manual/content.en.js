@@ -14,7 +14,7 @@ window.MANUAL.en = {
     title: 'Sales System User Manual',
     subtitle: 'Luck Swan Resort — quotations, meeting rooms, guest rooms, catering, function sheets, staff, leave requests and assigned tasks',
     url: 'https://luckswan-sales.it-luckswan.workers.dev',
-    version: '1.0', updated: 'Oct 21, 2026',
+    version: '1.1', updated: 'Oct 22, 2026',
     intro: 'The sales system is a web app that works on computers, iPads and phones. Everyone sees the same data in real time. The menus you see depend on the role and permissions the administrator gives you. This manual covers every chapter, from signing in to each department’s work, with real screenshots for every step.'
   },
   groups: [
@@ -87,10 +87,12 @@ window.MANUAL.en = {
         'Choose a room layout: Theatre · Classroom · U-shape · Banquet · Cocktail — the system works out the capacity for that layout.',
         'Check the room cards: size, capacity, full-day price and status, such as “Free all 2 days”, or a red bar showing dates that are already booked.',
         'Tap a room card to see its details on the right: room photos, seating plan, room conditions and equipment.',
-        'Tap “Choose this room” to add it to the quotation you are working on (the quotation number “For QT-…” shows under the heading; tap “Change” to switch quotations).'
+        'Tap “Choose this room” to add it to the quotation you are working on (the quotation number “For QT-…” shows under the heading; tap “Change” to switch quotations).',
+        'Room photos: swipe left/right or tap the ‹ › arrows to see the next photo, both on the room card and in the panel on the right (a counter such as 2/3 shows which photo you are viewing).',
+        'The pencil button ✏️ at the bottom right of a room card (people who can edit prices): edit the sample photos (upload several, delete, reorder — the first photo is the cover), the full-day/half-day prices, the capacity for each layout (min–max, such as 150–300 guests), the area, the banquet minimum guarantee, the description and what is in the room, then tap “Save” — there is also a “Reset to default” button.'
       ],
-      shots: [{ img: 'meet', cap: 'Meeting room list with capacity and availability' }, { img: 'meet-sel', cap: 'Room selected: seating plan, conditions and equipment' }],
-      tips: ['If a booking overlaps another event, the system warns you and an administrator must approve it first.', 'Rooms that are over capacity for the chosen layout show a warning.']
+      shots: [{ img: 'meet', cap: 'Meeting room list with capacity and availability' }, { img: 'meet-sel', cap: 'Room selected: seating plan, conditions and equipment' }, { img: 'meet-edit', cap: 'Editing a meeting room: photos, prices and capacity' }],
+      tips: ['If a booking overlaps another event, the system warns you and an administrator must approve it first.', 'Rooms that are over capacity for the chosen layout show a warning.', 'A new room price applies to items added to quotations from now on; existing quotations do not change.']
     },
     {
       id: 'rooms', group: 'sell', icon: 'bed', title: 'Guest Rooms and room rates', who: 'Sales · Administrator (rates)',
@@ -127,20 +129,20 @@ window.MANUAL.en = {
         'Search by customer name or quotation number, then tap a row to open it.',
         'On the quotation page, items are grouped into Meeting Rooms · Food & beverage · Guest Rooms. Edit quantities or prices right in the fields, and tap “+ Add item…” to add more.',
         'Switch between the “Table / Timeline” views at the top right to see the daily schedule.',
-        'Summary box on the right: subtotal before discount · discount · 10% service charge · 7% VAT · net total, plus the average per person.',
+        'Summary box on the right: prices on the quotation are Net prices (service charge and VAT included) — subtotal before discount · discount · price before service charge and VAT · 10% service charge · total before VAT · 7% VAT · net total, plus the average per person.',
         'Discounts over 10% need the sales manager’s approval.',
         'At the bottom, set Price valid until · Deposit (for example 30% within 7 days of confirmation) · tentative room hold until a date.',
         'Tap “Edit customer details and terms” to change the customer name, contact person, phone and email.',
         'Change the quotation status (Sent / Tentative / Confirmed / Cancelled) and see the edit history at the bottom of the page.'
       ],
       shots: [{ img: 'quotes', cap: 'Quotation list with status filters' }, { img: 'quote-edit', cap: 'Quotation edit page and summary box' }],
-      tips: ['The system saves automatically every time you make a change.', 'A confirmed quotation can be turned into a function sheet.']
+      tips: ['The system saves automatically every time you make a change.', 'A confirmed quotation can be turned into a function sheet.', 'How the total is broken down: price before SC/VAT = net total ÷ 1.177 → service charge is 10% of that price → total before VAT → 7% VAT. For example, 1,200 = 1,019.54 + 101.95 + 78.51.']
     },
     {
       id: 'newquote', group: 'sell', icon: 'plus', title: 'Creating a new quotation (5 steps)', who: 'Sales · Sales Manager',
       intro: 'Tap “+ New quotation” and the system walks you through it step by step. The net total (including service charge + VAT) is always shown on the right.',
       steps: [
-        'Step 1 Customer: fill in the event name* and customer/company*, contact person, phone, email, start–end dates and number of attendees, then tap “Next”.',
+        'Step 1 Customer: fill in the event name* and customer/company*, Tax ID (13 digits, optional), contact person, phone, email, start–end dates and number of attendees, then tap “Next”.',
         'Step 2 Meeting rooms: choose a room layout and tick the rooms (the system shows capacity and price). You can choose half day/full day and an AV package.',
         'Step 3 Food: turn each meal on or off (morning coffee break · lunch · afternoon coffee break · gala dinner · cocktail), then choose menus. You can add dietary requirements.',
         'Step 4 Guest rooms: set the number of nights and the number of rooms of each type.',
@@ -155,13 +157,16 @@ window.MANUAL.en = {
       intro: 'On the quotation page, tap “Send / Print”. You see a preview of the real document on the left and the sending panel on the right.',
       steps: [
         'Check the document on the left (company header, customer, items, prices, terms).',
+        'Choose the quotation format in the panel on the right: “Customer copy” (hides the separate service charge and VAT lines and shows the net total) or “Full quotation” (shows every line) — it is printed and sent in the format you choose.',
+        'Tap “Edit details” (sales): the text on the quotation turns into dashed boxes you can type in, such as the customer name, address, Tax ID, item names, details, quantities, terms and the signatory’s name — the ↺ button = Use the system value. Then tap “Save changes” (it applies to that quotation only).',
+        'Meeting room section on the quotation: shows the room photo and price. In edit mode you can type your own room details (tap “+ Insert the room’s details from the system” to bring in the existing text), and tap the photo to upload a new one, ✕ to remove the photo, or ↺ to use the room’s photo.',
         'Tap “Print / PDF” to print or save as PDF.',
         'Send by email: enter the recipient’s email, edit the message, and choose “Let the customer confirm and sign online” and “Show unit prices”.',
         'Set “Price valid until”, then tap “Send quotation”.',
         'The sending history is at the bottom of the panel.'
       ],
-      shots: [{ img: 'quote-doc', cap: 'Quotation preview and email panel' }],
-      tips: ['Documents sent to customers are always in Thai, even if you use the app in another language.']
+      shots: [{ img: 'quote-doc', cap: 'Customer copy and the email panel' }, { img: 'quote-doc-full', cap: 'Full quotation (shows separate service charge and VAT lines)' }, { img: 'quote-doc-edit', cap: 'Editing details on the quotation' }],
+      tips: ['Documents sent to customers are always in Thai, even if you use the app in another language.', 'Amounts and totals cannot be edited on the quotation — change the items on the quotation page.', 'The terms at the end include the line “Credit card payments carry an extra 3% fee on the quotation amount” · If you edited the terms field on a quotation yourself, tap ↺ to get the latest text.']
     },
     {
       id: 'beo', group: 'event', icon: 'list', title: 'Function Sheets (BEO)', who: 'Sales · Managers · Heads of Department · Accounting (view)',
@@ -173,13 +178,13 @@ window.MANUAL.en = {
         'Daily schedule: time, details, place and responsible department (switch between “Day 1 / Day 2”). You can import it from an Excel file.',
         'Each department card (Kitchen, Banquet, Engineering, Front Office, Housekeeping, Accounting) shows its tasks and an “Acknowledged / Awaiting acknowledgement” status. Tap “Edit” to add tasks for that department.',
         'Every change made after sending is counted as “Revision …” and goes to an administrator for approval before it is sent to departments.',
-        'Buttons at the top: Function details · Sales summary · Floor plan · Room setup · Print / PDF.'
+        'Buttons at the top: Function details · Sales summary · Floor plan (administrators, F&B and Banquet departments) · Room setup (administrators) · Print / PDF.'
       ],
       shots: [{ img: 'beo', cap: 'Function sheet: daily schedule and department cards' }, { img: 'beo-list', cap: 'Function sheet list with acknowledgement status' }],
       tips: ['Heads of department should tap “Acknowledge” every time there is a new sheet or a change.']
     },
     {
-      id: 'plan', group: 'event', icon: 'grid', title: 'Floor plans and room setup', who: 'Sales · Head of Banquet',
+      id: 'plan', group: 'event', icon: 'grid', title: 'Floor plans and room setup', who: 'Administrator · F&B department · Banquet department (heads and staff)',
       intro: 'Draw the room layout from a function sheet and print it for the setup team.',
       steps: [
         'On the function sheet, tap “Floor plan” and choose the day (Day 1 / Day 2).',
@@ -189,13 +194,14 @@ window.MANUAL.en = {
         '“Room setup”: set the room size (meters) and fixed items that cannot be moved, such as the stage, doors, pillars and power outlets — this applies to every event in that room.'
       ],
       shots: [{ img: 'plan', cap: 'Floor plan: templates, adding items and the room plan' }, { img: 'plansetup', cap: 'Room setup: room size and fixed items' }],
-      tips: ['Plans can be printed as PDF and attached to the function sheet.']
+      tips: ['Plans can be printed as PDF and attached to the function sheet.', 'The system checks the “Department” field in the user account: Kitchen / F&B / Food & beverage / Banquet — other people can see the plan thumbnail on the function sheet but cannot open the designer.', '“Room setup” is for administrators only.']
     },
     {
-      id: 'fnforms', group: 'event', icon: 'print', title: 'Function details and sales summary', who: 'Sales · Accounting',
+      id: 'fnforms', group: 'event', icon: 'print', title: 'Function details and sales summary', who: 'Administrator · Sales Manager · Sales Staff (edit) · Accounting · Heads of Department (view)',
       intro: 'Printable forms that match the hotel’s original paper forms. Data comes from the quotation and function sheet.',
       steps: [
-        'Tap “Function details” — switch between “Print preview / Edit details” and enter the Function No. (numbered automatically, or type your own).',
+        'Tap “Function details” — switch between “Print preview / Edit details” and enter the Function No. (numbered automatically, or type your own) — the Edit details tab, the “＋ Add details” button and numbering are only for administrators, sales managers and sales staff.',
+        'The “Accounting / Finance” section (total, cost details, billing address) is only visible to administrators, sales managers, sales staff and accounting — other roles see only the Front Office section, at full width.',
         'Tap “Sales summary” — a summary of function revenue, food, snacks, guest rooms and tax invoice details.',
         'Check it, then tap “Print / PDF”.'
       ],
@@ -255,17 +261,20 @@ window.MANUAL.en = {
       tips: []
     },
     {
-      id: 'tasks', group: 'people', icon: 'check', title: 'Assignment & Approve (assigned tasks and approvals)', who: 'Everyone (receive tasks) · Administrator (Approve)',
+      id: 'tasks', group: 'people', icon: 'check', title: 'Assignment & Approve (assigned tasks and approvals)', who: 'Everyone (receive tasks) · Administrators and roles given permission (assign tasks) · Administrator (Approve · ⚙ permissions)',
       intro: 'Assign tasks to users or whole departments, track their status, and approve edited function sheets.',
       steps: [
         'Assignment tab: see all tasks and filter by Pending / Confirmed — urgent tasks have an “Urgent” label and overdue tasks are red.',
         'Tap “+ Assign task”, enter the task name, details, assignee (a user or a department), due date and urgency. You can link it to a quotation.',
+        'Assigning to a department: tap a location button (All locations · Resort · Boutique · มณีอินทร์ · ช.ดรักส์ · ช.เฮ้าส์ · ภูมณีพันธุ์) — the number on the button is how many staff that department has at that location — then tick the staff (none ticked = the whole department). The location is shown in the task list.',
+        'The ⚙ button next to the heading (administrator): Assignment permissions, 2 ways — “Org chart” (a role higher up can assign work to every role and department below it; change “Reports to” to move one; − + Fit 100% buttons to zoom; and ✏️ rename, ＋ add a role/department, 🗑 delete on each box) or “Selection form” (choose, for each role, which roles and departments it can assign work to) — tap Save and the chosen way is used.',
+        'Roles given permission see the “+ Assign task” button (only the people and departments they are allowed to pick) and a “Tasks I assigned” list, where they can edit/delete only their own tasks, and they are notified when the assignee confirms.',
         'The assignee taps the task on the Home page or in the bell to see the details, then taps “Confirm” with a note, such as “All set up”.',
         'Approve tab (administrator): function sheets awaiting approval. Tap “View” to compare the changes, then “Approve” or send it back.',
         'Approved sheets can be sent to departments and move to the “Approved” section.'
       ],
-      shots: [{ img: 'tasks', cap: 'Assigned task list' }, { img: 'task-new', cap: 'Assigning a new task' }, { img: 'task-view', cap: 'Details of a received task' }, { img: 'tasks-approve', cap: 'Approve: function sheets awaiting approval' }],
-      tips: ['Tasks assigned to a department can be seen and confirmed by everyone in that department.']
+      shots: [{ img: 'tasks', cap: 'Assigned task list and the ⚙ permissions button' }, { img: 'task-new', cap: 'Assigning a new task' }, { img: 'task-site', cap: 'Assigning to a department: choosing the location and staff' }, { img: 'task-perms-org', cap: 'Assignment permissions: Org chart' }, { img: 'task-perms-form', cap: 'Assignment permissions: Selection form' }, { img: 'task-view', cap: 'Details of a received task' }, { img: 'tasks-approve', cap: 'Approve: function sheets awaiting approval' }],
+      tips: ['Tasks assigned to a department can be seen and confirmed by everyone in that department.', 'Until permissions are set, only administrators can assign tasks · Administrators can always assign work to anyone.', 'In the chart, you can only delete roles or departments you added yourself that have nobody in them · Changes to the chart take effect when you tap Save.']
     },
     {
       id: 'leave', group: 'people', icon: 'leave', title: 'Leave Requests (QT · Change day off · Missed fingerprint scan)', who: 'Everyone (submit) · Administrator (sign/approve) · Human Resources (details)',
@@ -292,7 +301,7 @@ window.MANUAL.en = {
         'Tap “+ Add user”, enter the name, email (used to sign in), phone, role and department, then save. Tell the user their starting password and ask them to change it the first time they sign in.',
         'Tap a user’s name to open the panel on the right and turn each permission on or off, such as Create and send quotations · Discounts up to 10% · Approve discounts over 10% · View function sheets and the booking calendar · Manage customer data · Plan staff shifts · Manage users · Edit prices and packages · View leave request details (HR).',
         'Tap ✏️ to edit details, change the status (Active / Disabled), set up two-step verification or reset the password.',
-        'Roles: tap “+ Add role”, enter a name, choose the visible menus and permissions, then save — saving a role updates the permissions of everyone in that role.'
+        'Roles: tap “+ Add role”, enter a name, choose the visible menus and permissions, then save — saving a role updates the permissions of everyone in that role (you can also add/rename/delete roles from the org chart in Assignment ⚙).'
       ],
       shots: [{ img: 'users', cap: 'User list and permissions panel' }, { img: 'user-edit', cap: 'Editing user details' }, { img: 'role', cap: 'Individual permissions' }],
       tips: ['When you change someone’s role, their permissions change to match the new role (you can fine-tune them afterwards).', 'Quotations already sent do not change when permissions change.']
@@ -326,8 +335,8 @@ window.MANUAL.en = {
       id: 'q-sales', title: 'Sales (sales staff)', color: '#0E9F8E', menus: 'Home · Rooms & Venues · Catering · Quotations · Function Sheets · Calendar · Leave Requests · Assignment',
       can: ['Create and send quotations', 'Discounts up to 10%', 'View function sheets and the booking calendar', 'Manage customer data'],
       steps: [
-        'Tap “+ New quotation” › complete the 5 steps: Customer › Meeting rooms › Food › Guest rooms › Summary.',
-        'Open the quotation › adjust items, discount and terms › tap Send / Print › email it or print a PDF.',
+        'Tap “+ New quotation” › complete the 5 steps: Customer (you can enter the Tax ID) › Meeting rooms › Food › Guest rooms › Summary.',
+        'Open the quotation › adjust items, discount and terms › tap Send / Print › choose Customer copy / Full quotation › you can edit details on the quotation › email it or print a PDF.',
         'When the customer confirms › change the status to “Confirmed” › Function Sheets › “+ Create from quote”.',
         'Fill in the daily schedule and each department’s tasks › follow up on acknowledgements.',
         'Check the calendar before taking a new booking to make sure rooms are free.'
@@ -340,7 +349,7 @@ window.MANUAL.en = {
       steps: [
         'Review quotations with discounts over 10% and approve them.',
         'Check the Home page: monthly target and latest quotations.',
-        'Assign work to the team: Assignment › “+ Assign task”.',
+        'Assign work to the team: Assignment › “+ Assign task” (once an administrator gives permission in ⚙).',
         'Approve shift extension (QT) requests on the Shifts page.',
         'Add/edit users in the sales team and set their permissions.'
       ],
@@ -351,7 +360,7 @@ window.MANUAL.en = {
       can: ['View function sheets and the booking calendar', 'Plan staff shifts / approve shift extensions'],
       steps: [
         'Check the bell every morning: new or edited function sheets › open the sheet › tap “Acknowledge” on your department’s card.',
-        'Read the daily schedule and floor plan to prepare equipment and staff.',
+        'Read the daily schedule and floor plan to prepare equipment and staff (F&B and Banquet: you can design floor plans).',
         'Staff › Shifts › choose the event › assign staff to shifts › request shift extensions when needed.',
         'Keep your department’s staff list up to date (add/edit/import).',
         'Tasks assigned to your department › open them › tap “Confirm” when everything is ready.'
@@ -364,6 +373,7 @@ window.MANUAL.en = {
       steps: [
         'Review confirmed quotations: net total, deposit terms and customer details.',
         'Function Sheets › “Sales summary”: check revenue, food, guest rooms and tax invoice details › Print / PDF.',
+        'Function details › “Accounting / Finance” section: see the total and cost details.',
         'Acknowledge the “Accounting” card on the function sheet.',
         'Calendar › Pipeline view to see amounts awaiting confirmation.'
       ],
@@ -385,13 +395,13 @@ window.MANUAL.en = {
       id: 'q-admin', title: 'Administrator', color: '#17211F', menus: 'All menus',
       can: ['All permissions', 'Sign and approve leave requests', 'Approve edited function sheets and overlapping room bookings', 'Edit guest room rates and menus', 'Manage users, roles and permissions'],
       steps: [
-        'Assignment & Approve › Approve tab: approve edited function sheets.',
+        'Assignment & Approve › Approve tab: approve edited function sheets · ⚙ Assignment permissions (org chart / form).',
         'Leave Requests › Awaiting approval tab › open the request › Sign / Reject.',
         'Users: create accounts, set roles and permissions, enable/disable users.',
-        'Set guest room rates and update catering menus when prices change.',
+        'Set guest room rates, edit meeting rooms (✏️ photos, prices, capacity) and update catering menus when prices change.',
         'Dashboard: track sales · back up data regularly.'
       ],
-      shots: ['tasks-approve', 'leave-view', 'dash'], links: ['tasks', 'leave', 'users', 'rooms', 'food', 'dash', 'backup']
+      shots: ['tasks-approve', 'task-perms-org', 'leave-view', 'dash'], links: ['tasks', 'leave', 'users', 'meet', 'rooms', 'food', 'dash', 'backup']
     },
     {
       id: 'q-all', title: 'All staff', color: '#6B716E', menus: 'Home · Leave Requests · Assigned tasks',
@@ -406,6 +416,7 @@ window.MANUAL.en = {
     }
   ],
   changelog: [
+    { v: '1.1', date: 'Oct 22, 2026', text: 'Meeting rooms: ✏️ button to edit photos, prices and capacity, and swipe through sample photos · Quotations: Net prices with the service charge/VAT worked back out, Tax ID field, Customer copy / Full quotation, editing details on the quotation, changing the meeting room photo, and the 3% credit card term · Function sheets: permissions for editing function details, the Accounting/Finance section and floor plans (F&B · Banquet) · Assignment: choose a location when assigning to a department, and ⚙ Assignment permissions (an org chart with zoom and rename/add/delete, or a form).' },
     { v: '1.0', date: 'Oct 21, 2026', text: 'First edition, covering every chapter: quotations, meeting rooms, guest rooms, catering, function sheets, floor plans, calendar, staff (locations, departments, positions, import), shifts, assigned tasks, leave requests, users, Dashboard, 3 languages and color themes.' }
   ]
 };
