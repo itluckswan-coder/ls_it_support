@@ -6,7 +6,8 @@
   const { U, App, Store } = g, D = g.DATA, H = U.esc;
 
   const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]);
-  const canEdit = () => App.can('create_quote') || App.can('staff');
+  // editing the function sheet (its "แก้ไขข้อมูล" tab, extra details, Function No.) is for admins, sales managers and sales staff
+  const canEdit = () => !!App.salesRole();
   const nl = t => H(t || '').replace(/\n/g, '<br>');
   const money = v => U.n(Math.round(Number(v) || 0));
 
