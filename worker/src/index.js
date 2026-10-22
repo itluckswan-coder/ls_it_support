@@ -129,6 +129,41 @@ const beoContent = b => {
 const DEPT_WORDS = { kitchen: ['ครัว', 'f&b'], banquet: ['จัดเลี้ยง', 'banquet'], av: ['ช่าง', 'av'], front: ['ส่วนหน้า', 'front'], hk: ['แม่บ้าน', 'housekeeping'], acc: ['บัญชี', 'account'] };
 const deptOf = u => { const d = String((u && u.dept) || '').toLowerCase(); return Object.keys(DEPT_WORDS).find(k => DEPT_WORDS[k].some(w => d.includes(w))) || null; };
 const isAssignee = (t, u) => !!t && !!t.to && (t.to.type === 'user' ? t.to.id === u.id : t.to.type === 'dept' && t.to.dept === deptOf(u));
+// who may assign work to whom (settings.taskPerms, set by the admin; mirrors js/task-perms.js): 'org' = a role assigns to
+// every role and department below it in the chart; 'form' = the roles and departments ticked for that role
+const TP_BASE_PARENT = { manager: 'admin', sales: 'manager', head: 'admin', acc: 'admin' };
+const tpCustom = st => ((st.roles || {}).custom || []).filter(c => c && c.id);
+const tpRoleKey = (u, st) => u.roleId && tpCustom(st).some(c => c.id === u.roleId && c.base === u.role) ? u.roleId : u.role;
+function tpParent(st, n) {
+  if (n === 'role:admin') return null;
+  const p = ((st.taskPerms || {}).parent || {})[n];
+  if (p && String(p).startsWith('role:') && p !== n) return p;
+  if (n.startsWith('dept:')) return 'role:admin';
+  const id = n.slice(5), c = tpCustom(st).find(x => x.id === id);
+  return 'role:' + (TP_BASE_PARENT[c ? c.base : id] || 'admin');
+}
+function tpBelow(st, node, top) {
+  const seen = new Set([node]);
+  for (let p = tpParent(st, node); p; p = tpParent(st, p)) { if (p === top) return true; if (seen.has(p)) return false; seen.add(p); }
+  return false;
+}
+async function canAssignTo(env, user, to) {
+  if (user.role === 'admin') return true;
+  const row = await env.DB.prepare("SELECT data FROM docs WHERE kind = 'settings' AND id = 'main' AND deleted = 0").first();
+  const st = row ? JSON.parse(row.data) : {}, tp = st.taskPerms || {}, key = tpRoleKey(user, st);
+  let target;
+  if (to.type === 'dept') target = 'dept:' + String(to.dept || '');
+  else {
+    if (!to.id || to.id === user.id) return false;
+    const r = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(to.id).first();
+    if (!r) return false;
+    target = 'role:' + tpRoleKey(publicUser(r), st);
+  }
+  if (target === 'role:admin') return false;
+  if (tp.mode === 'org') return tpBelow(st, target, 'role:' + key);
+  const rule = (tp.rules || {})[key] || {};
+  return to.type === 'dept' ? (rule.depts || []).includes(to.dept) : (rule.roles || []).includes(target.slice(5));
+}
 const lineTotal = it => (Number(it.price) || 0) * (Number(it.q1) || 0) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1);
 
 async function applyRules(env, user, kind, id, data, prev) {
@@ -171,13 +206,24 @@ async function applyRules(env, user, kind, id, data, prev) {
   }
   if (kind === 'task') {
     if (user.role !== 'admin') {
-      // assignees may only confirm their own task; everything else stays as the admin wrote it
-      if (!prev || !isAssignee(prev, user)) fail(403, 'เฉพาะผู้ดูแลระบบที่มอบหมายงานได้');
       const keep = ({ status, doneBy, doneByName, doneAt, doneNote, ...rest }) => rest;
-      if (JSON.stringify(keep(prev)) !== JSON.stringify(keep(data))) fail(403, 'แก้ไขได้เฉพาะการยืนยันงานที่ได้รับมอบหมาย');
-      if (prev.status === 'done') fail(409, 'งานนี้ยืนยันแล้ว');
-      if (data.status !== 'done') fail(400, 'สถานะไม่ถูกต้อง');
-      Object.assign(data, { doneBy: user.id, doneByName: user.name, doneAt: now(), doneNote: String(data.doneNote || '').slice(0, 500) });
+      if (prev && isAssignee(prev, user) && JSON.stringify(keep(prev)) === JSON.stringify(keep(data)) && prev.by !== user.id) {
+        // assignees may only confirm their own task; everything else stays as the assigner wrote it
+        if (prev.status === 'done') fail(409, 'งานนี้ยืนยันแล้ว');
+        if (data.status !== 'done') fail(400, 'สถานะไม่ถูกต้อง');
+        Object.assign(data, { doneBy: user.id, doneByName: user.name, doneAt: now(), doneNote: String(data.doneNote || '').slice(0, 500) });
+      } else {
+        // an assigner the admin allowed (settings.taskPerms) creates and changes only their own tasks, to whom they may assign
+        if (prev && prev.by !== user.id) fail(403, isAssignee(prev, user) ? 'แก้ไขได้เฉพาะการยืนยันงานที่ได้รับมอบหมาย' : 'แก้ไขได้เฉพาะงานที่คุณมอบหมาย');
+        if (!data.to || !['user', 'dept'].includes(data.to.type)) fail(400, 'ระบุผู้รับมอบหมาย');
+        if (!(await canAssignTo(env, user, data.to))) fail(403, 'คุณไม่มีสิทธิ์มอบหมายงานให้ผู้รับนี้');
+        Object.assign(data, prev ? { by: prev.by, byName: prev.byName } : { by: user.id, byName: user.name });
+        // the confirmation is the assignee's to give
+        const sameDone = prev && prev.status === 'done' && data.status === 'done' && prev.doneBy === data.doneBy && prev.doneAt === data.doneAt;
+        if (data.status === 'done' && !sameDone && !isAssignee(data, user)) fail(403, 'ผู้รับงานเป็นผู้ยืนยันงาน');
+        if (data.status === 'done' && !sameDone) Object.assign(data, { doneBy: user.id, doneByName: user.name, doneAt: now() });
+        if (data.status !== 'done') { data.status = 'open'; for (const k of ['doneBy', 'doneByName', 'doneAt', 'doneNote']) delete data[k]; }
+      }
     }
     if (!data.to || !['user', 'dept'].includes(data.to.type)) fail(400, 'ระบุผู้รับมอบหมาย');
     if (JSON.stringify(data).length > 20000) fail(413, 'รายละเอียดงานยาวเกินไป');
@@ -217,6 +263,8 @@ async function applyRules(env, user, kind, id, data, prev) {
     if (!can(user, 'edit_prices') && !can(user, 'staff')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้');
     // role names and added roles (settings.roles) are the admin's to change
     if (kind === 'settings' && user.role !== 'admin') { if (prev && prev.roles) data.roles = prev.roles; else delete data.roles; }
+    // so is who may assign work to whom (settings.taskPerms)
+    if (kind === 'settings' && user.role !== 'admin') { if (prev && prev.taskPerms) data.taskPerms = prev.taskPerms; else delete data.taskPerms; }
   }
   return data;
 }
@@ -246,9 +294,13 @@ async function deleteDoc(env, user, kind, id) {
     const row = await env.DB.prepare('SELECT data FROM docs WHERE kind = ? AND id = ? AND deleted = 0').bind(kind, id).first();
     const l = row && JSON.parse(row.data);
     if (!l || l.by !== user.id || !leaveUnsigned(l) || !['pending', 'cancelled'].includes(l.status)) fail(403, 'ลบได้เฉพาะใบของตัวเองที่ยังไม่มีผู้ลงนาม');
+  } else if (kind === 'task' && user.role !== 'admin') {
+    // an assigner may delete the tasks they assigned
+    const row = await env.DB.prepare('SELECT data FROM docs WHERE kind = ? AND id = ? AND deleted = 0').bind(kind, id).first();
+    const t = row && JSON.parse(row.data);
+    if (!t || t.by !== user.id) fail(403, 'ลบได้เฉพาะงานที่คุณมอบหมาย');
   } else {
     if (user.role !== 'admin' && !(RANK[user.role] >= RANK.manager)) fail(403, 'เฉพาะผู้จัดการขึ้นไปที่ลบข้อมูลได้');
-    if (kind === 'task' && user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบข้อมูลนี้ได้');
   }
   await env.DB.prepare('UPDATE docs SET deleted = 1, version = version + 1, updated_at = ?, updated_by = ? WHERE kind = ? AND id = ?').bind(now(), user.id, kind, id).run();
   await audit(env, user, kind, id, 'delete');

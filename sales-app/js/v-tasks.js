@@ -9,6 +9,9 @@
   const deptOf = u => { const d = String((u && u.dept) || '').toLowerCase(); return Object.keys(DEPT_WORDS).find(k => DEPT_WORDS[k].some(w => d.includes(w))) || null; };
   const dept = id => D.DEPTS.find(d => d.id === id) || { name: id, short: id, color: '#999', bg: '#eee', fg: '#333' };
   const isAdmin = () => { const me = App.me(); return !!me && me.role === 'admin'; };
+  // assigning work: the admin, and the roles the admin allowed (⚙ settings, js/task-perms.js); each assigner manages their own tasks
+  const canAssign = () => isAdmin() || (!!App.taskScope && App.taskScope().any);
+  const ownTask = t => isAdmin() || (!!t && t.by === (App.me() || {}).id);
   const tasks = () => Store.db.tasks || (Store.db.tasks = []);
   const mine = (t, me) => !!me && !!t.to && (t.to.type === 'user' ? t.to.id === me.id : t.to.type === 'dept' && t.to.dept === deptOf(me));
   const siteText = t => App.SITES ? App.SITES.name(t.to.site) : t.to.site;
@@ -27,7 +30,7 @@
     const out = [], admin = me.role === 'admin';
     for (const t of tasks()) {
       if (t.status !== 'done' && mine(t, me)) out.push({ at: t.at, title: 'งานใหม่ที่ได้รับมอบหมาย', sub: t.title + (t.due ? ' · กำหนด ' + U.fmtD(t.due, { year: false }) : ''), href: '#/tasks', tone: t.priority === 'high' ? 'red' : 'teal' });
-      if (admin && t.status === 'done') out.push({ at: t.doneAt, title: (t.doneByName || 'ผู้รับงาน') + ' ยืนยันงานแล้ว', sub: t.title, href: '#/tasks', tone: 'teal' });
+      if ((admin || t.by === me.id) && t.status === 'done' && t.doneBy !== me.id) out.push({ at: t.doneAt, title: (t.doneByName || 'ผู้รับงาน') + ' ยืนยันงานแล้ว', sub: t.title, href: '#/tasks', tone: 'teal' });
     }
     if (admin) for (const b of toApprove()) { const q = Store.quote(b.quoteId); out.push({ at: q.updatedAt || '', title: 'ใบฟังก์ชันรออนุมัติ', sub: b.id + ' · ' + q.client, href: '#/tasks/approve', tone: 'yellow' }); }
     // leave requests (การแจ้งใบลา): waiting on this user's signature, and the requester hears the outcome
@@ -105,15 +108,17 @@
     render(p) {
       const admin = isAdmin(), me = App.me();
       const tab = admin && p[0] === 'approve' ? 'approve' : 'assign';
-      const head = `<div class="page-hd"><div><h1>Assignment &amp; Approve</h1><div class="small muted">${admin ? 'มอบหมายงานให้ผู้ใช้งานหรือแผนก และอนุมัติใบฟังก์ชันที่ยืนยันแล้ว' : 'งานที่ได้รับมอบหมายให้คุณ' + (deptOf(me) ? ' และแผนก' + H(dept(deptOf(me)).short) : '')}</div></div>
-        ${admin && tab === 'assign' ? '<button class="btn red" data-act="tkNew">+ มอบหมายงาน</button>' : ''}</div>
+      const assigner = canAssign();
+      const head = `<div class="page-hd"><div><h1 class="row" style="gap:10px">Assignment &amp; Approve${App.taskPermsButton ? App.taskPermsButton() : ''}</h1><div class="small muted">${admin ? 'มอบหมายงานให้ผู้ใช้งานหรือแผนก และอนุมัติใบฟังก์ชันที่ยืนยันแล้ว' : 'งานที่ได้รับมอบหมายให้คุณ' + (deptOf(me) ? ' และแผนก' + H(dept(deptOf(me)).short) : '')}</div></div>
+        ${assigner && tab === 'assign' ? '<button class="btn red" data-act="tkNew">+ มอบหมายงาน</button>' : ''}</div>
         ${admin ? `<div class="seg white" style="margin-bottom:16px" role="tablist"><a role="tab" href="#/tasks" class="${tab === 'assign' ? 'on' : ''}">Assignment</a><a role="tab" href="#/tasks/approve" class="${tab === 'approve' ? 'on' : ''}">Approve${toApprove().length ? ` <span class="seg-n">${toApprove().length}</span>` : ''}</a></div>` : ''}`;
-      return head + (tab === 'approve' ? this.approve() : admin ? this.assignAdmin() : this.assignMine(me));
+      // an assigner who isn't the admin: the work they assigned, then the work assigned to them
+      return head + (tab === 'approve' ? this.approve() : admin ? this.assignAdmin() : assigner ? `<h2 style="margin:0 0 10px">งานที่ฉันมอบหมาย</h2>${this.assignAdmin(me)}<div style="height:22px"></div>${this.assignMine(me)}` : this.assignMine(me));
     },
 
-    assignAdmin() {
+    assignAdmin(by) {
       const ui = App.state.ui.tasks || (App.state.ui.tasks = { st: 'all' });
-      const all = tasks().slice().sort((a, b) => (b.at || '').localeCompare(a.at || ''));
+      const all = tasks().filter(t => !by || t.by === by.id).slice().sort((a, b) => (b.at || '').localeCompare(a.at || ''));
       const list = all.filter(t => ui.st === 'all' || (ui.st === 'done' ? t.status === 'done' : t.status !== 'done'));
       const cnt = s => all.filter(t => s === 'all' || (s === 'done' ? t.status === 'done' : t.status !== 'done')).length;
       return `
@@ -177,7 +182,10 @@
 
   /* ---------------- assign form ---------------- */
   function taskForm(t) {
-    const isNew = !t.id, users = Store.db.users.filter(u => u.status !== 'disabled');
+    const sc = App.taskScope(), me0 = App.me();
+    const isNew = !t.id, users = Store.db.users.filter(u => u.status !== 'disabled' && (sc.all || (u.id !== me0.id && sc.roles.has(App.roleOf(u).id))));
+    const depts = D.DEPTS.filter(d => sc.all || sc.depts.has(d.id));
+    if (!users.length) t.to.type = 'dept'; else if (!depts.length) t.to.type = 'user';
     const quotes = Store.db.quotes.filter(q => q.status !== 'cancelled').sort((a, b) => a.start.localeCompare(b.start));
     App.modal(`<h2>${isNew ? 'มอบหมายงาน' : 'แก้ไขงานที่มอบหมาย'}</h2>
       <div class="field"><label class="f" for="tkTitle">งานที่ต้องทำ</label><input class="input" id="tkTitle" name="title" value="${H(t.title || '')}" placeholder="เช่น โทรยืนยันจำนวนผู้เข้าร่วม"></div>
@@ -188,9 +196,9 @@
       </div>
       <div class="field" style="margin-top:14px"><label class="f" for="tkQ">เกี่ยวกับงาน (ไม่บังคับ)</label><select class="input" id="tkQ" name="quoteId"><option value="">— ไม่ระบุ —</option>${quotes.map(q => `<option value="${H(q.id)}" ${q.id === t.quoteId ? 'selected' : ''}>${H(q.id)} · ${H(q.client)} · ${U.fmtD(q.start, { year: false })}</option>`).join('')}</select></div>
       <div class="f" style="margin-top:14px">มอบหมายให้</div>
-      <div class="seg white" role="radiogroup" style="margin:6px 0 10px"><button type="button" class="${t.to.type === 'user' ? 'on' : ''}" data-to="user" role="radio" aria-checked="${t.to.type === 'user'}">ผู้ใช้งาน</button><button type="button" class="${t.to.type === 'dept' ? 'on' : ''}" data-to="dept" role="radio" aria-checked="${t.to.type === 'dept'}">แผนก</button></div>
+      <div class="seg white" role="radiogroup" style="margin:6px 0 10px${users.length && depts.length ? '' : ';display:none'}"><button type="button" class="${t.to.type === 'user' ? 'on' : ''}" data-to="user" role="radio" aria-checked="${t.to.type === 'user'}">ผู้ใช้งาน</button><button type="button" class="${t.to.type === 'dept' ? 'on' : ''}" data-to="dept" role="radio" aria-checked="${t.to.type === 'dept'}">แผนก</button></div>
       <div id="tkToUser" ${t.to.type === 'user' ? '' : 'hidden'}><label class="f" for="tkUser">ผู้ใช้งาน</label><select class="input" id="tkUser">${users.map(u => `<option value="${H(u.id)}" ${u.id === t.to.id ? 'selected' : ''}>${H(u.name)} · ${H(App.roleName(u))} · ${H(u.dept || '')}</option>`).join('')}</select></div>
-      <div id="tkToDept" ${t.to.type === 'dept' ? '' : 'hidden'}><label class="f" for="tkDept">แผนก</label><select class="input" id="tkDept">${D.DEPTS.map(d => `<option value="${d.id}" ${d.id === t.to.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select>
+      <div id="tkToDept" ${t.to.type === 'dept' ? '' : 'hidden'}><label class="f" for="tkDept">แผนก</label><select class="input" id="tkDept">${depts.map(d => `<option value="${d.id}" ${d.id === t.to.dept ? 'selected' : ''}>${H(d.name)}</option>`).join('')}</select>
         <div class="small muted" style="margin:12px 0 6px">สถานที่</div><div id="tkSites" class="row wrap" style="gap:6px" role="radiogroup" aria-label="สถานที่"></div>
         <div class="small muted" style="margin:10px 0 6px">พนักงานในแผนก (เลือกได้หลายคน หรือไม่เลือกก็ได้ = ทั้งแผนก)</div><div id="tkEmps" class="tk-emps"></div>
         <div class="xs muted" style="margin-top:6px">ผู้ใช้งานที่อยู่แผนกนี้ (เช่น หัวหน้าแผนก) จะเห็นงานและกดยืนยันได้</div></div>
@@ -242,13 +250,13 @@
 
   Object.assign(App.ACT, {
     tkSt(el) { App.state.ui.tasks.st = el.dataset.v; App.render(); },
-    tkNew() { if (isAdmin()) taskForm({ to: { type: 'user' }, priority: 'normal' }); },
-    tkEdit(el) { const t = tasks().find(x => x.id === el.dataset.id); if (t && isAdmin()) taskForm(JSON.parse(JSON.stringify(t))); },
+    tkNew() { if (!canAssign()) return; const sc = App.taskScope(); taskForm({ to: { type: sc.all || sc.roles.size ? 'user' : 'dept' }, priority: 'normal' }); },
+    tkEdit(el) { const t = tasks().find(x => x.id === el.dataset.id); if (t && canAssign() && ownTask(t)) taskForm(JSON.parse(JSON.stringify(t))); },
     tkDel(el) {
-      const t = tasks().find(x => x.id === el.dataset.id); if (!t || !isAdmin()) return;
+      const t = tasks().find(x => x.id === el.dataset.id); if (!t || !ownTask(t)) return;
       App.confirm('ลบงาน “' + t.title + '”?', () => { Store.db.tasks = tasks().filter(x => x !== t); Store.save(); App.render(); App.toast('ลบแล้ว'); }, 'ลบงาน');
     },
-    tkView(el) { const t = tasks().find(x => x.id === el.dataset.id), me = App.me(); if (t && (isAdmin() || mine(t, me))) taskView(t); },
+    tkView(el) { const t = tasks().find(x => x.id === el.dataset.id), me = App.me(); if (t && (ownTask(t) || mine(t, me))) taskView(t); },
     tkDone(el) {
       const t = tasks().find(x => x.id === el.dataset.id), me = App.me(); if (!t || !mine(t, me)) return;
       App.modal(`<h2>ยืนยันงานนี้?</h2><p class="muted" style="margin-top:-8px">${H(t.title)}</p>
