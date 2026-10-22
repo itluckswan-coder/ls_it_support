@@ -41,8 +41,8 @@
       return Array.isArray(l) ? l.filter(x => x !== 'home') : [];
     },
     // the built-in admin, sales manager and sales roles (not roles added on those levels)
-    // the floor-plan designer is for admins and the F&B department (its head and staff — the user's department is F&B / kitchen)
-    canPlan(me) { me = me === undefined ? App.me() : me; if (!me) return false; if (me.role === 'admin') return true; const k = (D.DEPTS || []).find(d => d.id === 'kitchen') || {}; const dept = String(me.dept || '').trim().toLowerCase(); return !!dept && (/f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen/.test(dept) || [k.name, k.short].filter(Boolean).some(n => n.toLowerCase() === dept)); },
+    // the floor-plan designer is for admins and the F&B and banquet departments (heads and staff — by the user's department)
+    canPlan(me) { me = me === undefined ? App.me() : me; if (!me) return false; if (me.role === 'admin') return true; const ks = (D.DEPTS || []).filter(d => d.id === 'kitchen' || d.id === 'banquet'); const dept = String(me.dept || '').trim().toLowerCase(); return !!dept && (/f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen|จัดเลี้ยง|banquet/.test(dept) || ks.some(k => [k.name, k.short].filter(Boolean).some(n => n.toLowerCase() === dept))); },
     salesRole(me) { me = me === undefined ? App.me() : me; return !!me && ['admin', 'manager', 'sales'].includes(me.role) && !(App.roleOf && App.roleOf(me).custom); },
     can(p) { const m = App.me(); return !!(m && m.perms && m.perms[p]); },
     firstName(u) { return (u && u.name || '').split(' ')[0]; },
