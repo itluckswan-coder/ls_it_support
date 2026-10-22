@@ -540,6 +540,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
           <div class="field"><label class="f">ชื่องาน *</label><input class="input" data-change="wizF" data-f="title" value="${H(q.title)}" placeholder="เช่น สัมมนาประจำปี 2027"></div>
           <div class="grid g2" style="margin-top:14px">
             <div><label class="f">ลูกค้า / บริษัท *</label><input class="input" data-change="wizF" data-f="client" value="${H(q.client)}" placeholder="บจก. ตัวอย่าง"></div>
+            <div><label class="f">เลขผู้เสียภาษี</label><input class="input" inputmode="numeric" maxlength="20" data-change="wizF" data-f="taxId" value="${H(q.taxId || '')}" placeholder="เลข 13 หลัก"></div>
             <div><label class="f">ผู้ติดต่อ</label><input class="input" data-change="wizF" data-f="contact" value="${H(q.contact)}" placeholder="คุณ…"></div>
             <div><label class="f">โทรศัพท์</label><input class="input" type="tel" data-change="wizF" data-f="phone" value="${H(q.phone)}"></div>
             <div><label class="f">อีเมล</label><input class="input" type="email" data-change="wizF" data-f="email" value="${H(q.email)}"></div>
