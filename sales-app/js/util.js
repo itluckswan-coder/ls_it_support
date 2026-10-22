@@ -110,11 +110,13 @@
       const gross = by.meet + by.food + by.room + by.other, sub = gross - credit;
       const pct = q.discount && q.discount.type === 'amt' ? (sub ? q.discount.value / sub : 0) : ((q.discount && q.discount.value) || 0) / 100;
       const disc = q.discount && q.discount.type === 'amt' ? Math.min(sub, Number(q.discount.value) || 0) : Math.round(sub * pct * 100) / 100;
-      const after = sub - disc;
-      const svc = Math.round(after * S.service * 100) / 100;
-      const vat = Math.round((after + svc) * S.vat * 100) / 100;
-      const net = Math.round((after + svc + vat) * 100) / 100;
-      return { by, gross, credit, roomFee, roomFree: !!roomFee && credit >= roomFee, sub, disc, pct: pct * 100, svc, vat, net, perPax: q.pax ? net / q.pax : 0 };
+      // prices are net (service charge and VAT included): the total is what the lines add up to, and the
+      // breakdown is worked backwards — base = net ÷ (1 + service)(1 + VAT), service on the base, VAT the rest
+      const r2 = x => Math.round(x * 100) / 100;
+      const net = r2(sub - disc);
+      const base = r2(net / ((1 + S.service) * (1 + S.vat)));
+      const svc = r2(base * S.service), pre = r2(base + svc), vat = r2(net - pre);
+      return { by, gross, credit, roomFee, roomFree: !!roomFee && credit >= roomFee, sub, disc, pct: pct * 100, base, svc, pre, vat, net, perPax: q.pax ? net / q.pax : 0 };
     },
     debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
     download(name, text, type = 'application/json') {
