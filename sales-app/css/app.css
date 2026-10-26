@@ -979,3 +979,4 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .oc-add .seg{align-self:center}.oc-add .seg button{height:26px;font-size:12px;padding:0 10px}
 .oc-card .btn.sm{height:28px;padding:0 10px;font-size:12px}
 .oc-card:has(.oc-add),.oc-card:has(.oc-edit),.oc-card:has(.oc-ask){max-width:200px}
+.bq-meal+.bq-meal{border-top:1px dashed var(--line);padding-top:14px}

@@ -70,6 +70,20 @@
     types: Object.fromEntries(ROOM_DEF.map(r => [r[0], { total: r[4], rack: r[5], rates: { s1: r[7], s2: r[8] } }]))
   };
   const ROOM_TYPES = []; // filled by applyRoomRates (pages hold a reference)
+  /* the boutique (ลักษวรรณ บูติก): rooms per room per night, each including congee, coffee and crackers for 2; breakfast and
+   * a dinner party bought on top, per person, at three price levels. Admins change them on the room-rates page (roomRates.boutique). */
+  const BOUTIQUE_DEFAULT = {
+    rooms: [{ id: 'bq_std', name: 'Standard', price: 400 }, { id: 'bq_sup', name: 'Superior', price: 500 }, { id: 'bq_dlx', name: 'Deluxe', price: 600 }],
+    incl: 'ข้าวต้ม กาแฟ แครกเกอร์ สำหรับ 2 ท่าน', breakfast: [50, 100, 150], dinner: [350, 399, 450]
+  };
+  const BOUTIQUE = JSON.parse(JSON.stringify(BOUTIQUE_DEFAULT));
+  function applyBoutique(b) {
+    b = b && typeof b === 'object' ? b : {};
+    const num = (v, d) => (Number(v) >= 0 && v !== '' && v != null ? Math.round(Number(v)) : d);
+    BOUTIQUE.rooms = BOUTIQUE_DEFAULT.rooms.map(r => Object.assign({}, r, { price: num(((b.rooms || []).find(x => x && x.id === r.id) || {}).price, r.price) }));
+    BOUTIQUE.incl = String(b.incl || BOUTIQUE_DEFAULT.incl).slice(0, 120);
+    for (const k of ['breakfast', 'dinner']) BOUTIQUE[k] = BOUTIQUE_DEFAULT[k].map((d, i) => num((b[k] || [])[i], d));
+  }
   let SEASONS = SEASONS_DEFAULT;
   const md = s => /^\d{2}-\d{2}$/.test(s || '') ? s : null;
   function applyRoomRates(rr) {
@@ -77,6 +91,7 @@
     const ss = (Array.isArray(rr.seasons) && rr.seasons.length ? rr.seasons : SEASONS_DEFAULT).filter(x => x && md(x.from) && md(x.to)).slice(0, 6);
     SEASONS = ss.length ? ss.map(x => ({ id: String(x.id), name: String(x.name || (x.from + ' – ' + x.to)).slice(0, 40), from: x.from, to: x.to })) : SEASONS_DEFAULT;
     const types = rr.types || {};
+    applyBoutique(rr.boutique);
     ROOM_TYPES.length = 0;
     for (const [id, fam, bed, zone, total, rack, pax, s1, s2, img] of ROOM_DEF) {
       const o = types[id] || {}, num = (v, d) => (Number(v) >= 0 && v !== '' && v != null ? Number(v) : d);
@@ -533,7 +548,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;
