@@ -50,8 +50,8 @@
   };
   const btList = k => { const s = (Store.db.settings || {}).beoTags; return s && Array.isArray(s[k]) ? s[k] : BT[k].def.map((name, i) => ({ id: k[0] + i, name })); };
   const btSave = (k, list) => { const st = Store.db.settings || (Store.db.settings = {}); st.beoTags = Object.assign({}, st.beoTags, { [k]: list }); Store.save(); };
-  // the lists are shared settings: changed by those the server lets write settings (price editors, staff managers, admins)
-  const btCanList = () => App.can('edit_prices') || App.can('staff');
+  // the lists are shared settings, changed by the sales roles only (admins, sales managers, sales staff; the worker checks too)
+  const btCanList = () => App.salesRole();
   function beoTagsCard(b, ui) {
     const pick = App.salesRole(), open = ui.btOpen || {}, tags = b.tags || {};
     const branch = k => {
