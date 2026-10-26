@@ -107,7 +107,7 @@ window.MANUAL.en = {
         'Administrators: tap “Room rates” to edit the rate periods (seasons), number of rooms and the With ABF / Room only price for each type, then save.'
       ],
       shots: [{ img: 'rooms', cap: 'Room block: choose room types, quantities and bed types' }, { img: 'roomrates', cap: 'Setting room rates by season (administrator)' }],
-      tips: ['Room rates are per room per night for 2 guests (Triple: 3 guests), before service charge and VAT.']
+      tips: ['Room rates are per room per night for 2 guests (Triple: 3 guests), net prices with service charge and VAT included (worked out the same way as the quotation).']
     },
     {
       id: 'food', group: 'sell', icon: 'food', title: 'Catering and menus', who: 'Sales · Administrator (menu editing)',
