@@ -372,7 +372,8 @@
      GROUP ROOMS (1h)
      ===================================================================== */
   function roomState(q) {
-    const st = { counts: {}, ci: q ? q.start : U.today(), nights: q ? Math.max(1, U.daysOf(q.start, q.end).length - 1) : 1, late: false, abf: true };
+    const st = { counts: {}, ci: q ? q.start : U.today(), nights: q ? Math.max(1, U.daysOf(q.start, q.end).length - 1) : 1, late: false, abf: true,
+      site: 'resort', bq: {}, bf: { tier: 0, pax: 0 }, dn: { tier: 0, pax: 0 } };
     if (q) {
       const rooms = q.items.filter(i => i.sec === 'room' && !i.free && i.ref !== 'late');
       // a stay across a change of season is several lines of one room type: count the rooms once, add up the nights
@@ -386,6 +387,9 @@
       }
       const sp = Object.values(span)[0]; if (sp) { st.ci = sp.a; st.nights = Math.max(1, U.diffDays(sp.a, sp.b)); }
       st.late = q.items.some(i => i.ref === 'late');
+      // rooms at the boutique, and the breakfast / dinner bought with them
+      for (const it of rooms) if (/^bq_/.test(it.ref || '')) { st.site = 'boutique'; st.bq[it.ref] = Math.max(st.bq[it.ref] || 0, Number(it.q1) || 0); }
+      for (const [k, ref] of [['bf', 'bq:bf'], ['dn', 'bq:dn']]) { const it = q.items.find(i => i.ref === ref); if (it) { st.site = 'boutique'; st[k] = { tier: Number(it.tier) || 0, pax: Number(it.q1) || 0 }; } }
       st.abf = !rooms.some(i => /Room only/i.test(i.name));
     }
     return st;
@@ -398,6 +402,10 @@
       let ui = App.state.ui.rooms;
       if (!ui || ui.q !== (q && q.id)) ui = App.state.ui.rooms = Object.assign(roomState(q), { q: q && q.id });
       const co = U.addDays(ui.ci, ui.nights);
+      ui.site = ui.site || 'resort'; ui.bq = ui.bq || {}; ui.bf = ui.bf || { tier: 0, pax: 0 }; ui.dn = ui.dn || { tier: 0, pax: 0 };
+      const sitePick = `<div class="row wrap rm-site" style="gap:10px;margin-bottom:14px"><span class="small muted">สถานที่</span><div class="seg white" role="radiogroup" aria-label="สถานที่">${[['resort', 'รีสอร์ท'], ['boutique', 'บูติก']].map(([k, l]) => `<button class="${ui.site === k ? 'on' : ''}" data-act="rmSite" data-v="${k}" role="radio" aria-checked="${ui.site === k}">${l}</button>`).join('')}</div></div>`;
+      const dateBox = `<div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div>`;
+      if (ui.site === 'boutique') return this.boutique(q, ui, sitePick, dateBox);
       const sel = D.ROOM_TYPES.filter(t => ui.counts[t.id] > 0);
       const tot = sel.reduce((a, t) => a + ui.counts[t.id], 0), guests = sel.reduce((a, t) => a + ui.counts[t.id] * t.pax, 0);
       const amount = sel.reduce((a, t) => a + ui.counts[t.id] * stayTotal(t, ui), 0);
@@ -440,7 +448,8 @@
       return `
 <div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคาก่อน Service และ VAT · ช่วงราคา ${H(season.name)}${segs.length > 1 ? ' และ ' + segs.slice(1).map(x => H(x.season.name)).join(', ') + ' (คิดแยกตามคืน)' : ''}</div><div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
   <div class="row wrap" style="gap:10px">${App.can('edit_prices') ? '<a class="btn ghost sm" href="#/roomrates">ตั้งราคาห้องพัก</a>' : ''}
-  <div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div></div></div>
+  ${dateBox}</div></div>
+${sitePick}
 <div class="seg white" style="margin-bottom:14px" role="group" aria-label="อาหารเช้า"><button class="${ui.abf ? 'on' : ''}" data-act="rmAbf" data-v="1">With ABF · รวมอาหารเช้า</button><button class="${ui.abf ? '' : 'on'}" data-act="rmAbf" data-v="0">Room only · ไม่รวมอาหารเช้า</button></div>
 <div class="split">
   <div>${zones.map(z => `<h2 class="rm-zone">Zone : ${z}</h2><div class="rcards" style="margin-bottom:18px">${fams(z).map(card).join('')}</div>`).join('')}</div>
@@ -458,6 +467,42 @@
 </div>`;
     }
   };
+  /* the boutique: three room types with congee, coffee and crackers for 2; breakfast and a dinner party per person on top */
+  App.V.rooms.boutique = function (q, ui, sitePick, dateBox) {
+    const B = D.BOUTIQUE, n = ui.nights, cnt = r => ui.bq[r.id] || 0;
+    const sel = B.rooms.filter(r => cnt(r) > 0), tot = sel.reduce((a, r) => a + cnt(r), 0);
+    const roomsAmt = sel.reduce((a, r) => a + cnt(r) * r.price * n, 0);
+    const meal = (k, label, list, unit) => { const m = ui[k], pr = list[m.tier] || list[0]; return { k, label, pr, pax: m.pax, amt: m.pax * pr * n, unit }; };
+    const bf = meal('bf', 'อาหารเช้า (ซื้อเพิ่ม)', B.breakfast, 'มื้อ'), dn = meal('dn', 'อาหารเย็นงานเลี้ยง', B.dinner, 'มื้อ');
+    const total = roomsAmt + bf.amt + dn.amt;
+    const step = (act, k, v, label) => `<span class="stepper"><button class="minus" data-act="${act}" data-k="${k}" data-v="-1" aria-label="ลด ${H(label)}">−</button><input inputmode="numeric" value="${v}" data-change="${act}Set" data-k="${k}" aria-label="${H(label)}"><button class="plus" data-act="${act}" data-k="${k}" data-v="1" aria-label="เพิ่ม ${H(label)}">+</button></span>`;
+    const card = r => `<article class="card rcard ${cnt(r) ? 'on' : ''}"><div class="ph"><span class="zone">บูติก</span></div>
+      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(r.name)}</h3><span class="badge">2 ท่าน</span></div>
+        <div class="small muted" style="margin:4px 0 6px">รวม${H(B.incl)}</div>
+        <div class="between" style="margin-top:6px"><div><span class="pr num">${U.n(r.price)} ฿</span><span class="small muted"> / ห้อง / คืน</span></div>${step('bqStep', r.id, cnt(r), 'จำนวนห้อง ' + r.name)}</div></div></article>`;
+    const mealBox = (m, list) => `<div class="bq-meal"><div class="between" style="flex-wrap:wrap;gap:8px"><b>${H(m.label)}</b><span class="xs muted">บาท / ท่าน / ${m.unit}</span></div>
+      <div class="row wrap" style="gap:6px;margin:8px 0">${list.map((p, i) => `<button class="chip ${ui[m.k].tier === i ? 'on' : ''}" data-act="bqTier" data-k="${m.k}" data-v="${i}">${U.n(p)} ฿</button>`).join('')}</div>
+      <div class="between"><span class="small muted">จำนวนท่าน${q ? ' (ผู้เข้าร่วม ' + U.n(q.pax) + ')' : ''} × ${n} ${m.unit}</span>${step('bqPax', m.k, m.pax, 'จำนวนท่าน ' + m.label)}</div></div>`;
+    return `
+<div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">บูติก · ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน รวม${H(B.incl)} · อาหารเช้าและอาหารเย็นงานเลี้ยงซื้อเพิ่มต่อท่าน</div>
+  <div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
+  <div class="row wrap" style="gap:10px">${App.can('edit_prices') ? '<a class="btn ghost sm" href="#/roomrates">ตั้งราคาห้องพัก</a>' : ''}
+  ${dateBox}</div></div>
+${sitePick}
+<div class="split">
+  <div><h2 class="rm-zone">ห้องพัก · บูติก</h2><div class="rcards" style="margin-bottom:18px">${B.rooms.map(card).join('')}</div>
+    <h2 class="rm-zone">อาหาร (ซื้อเพิ่ม)</h2><div class="card pad" style="display:flex;flex-direction:column;gap:16px">${mealBox(bf, B.breakfast)}${mealBox(dn, B.dinner)}</div></div>
+  <aside class="card pad sticky">
+    <h2 style="margin-bottom:12px">Room block · บูติก</h2>
+    ${sel.length ? sel.map(r => `<div class="sum-row"><span>${H(r.name)} × ${cnt(r)}</span><span class="num">${U.n(cnt(r) * r.price * n)}</span></div>`).join('') : '<div class="small muted">ยังไม่ได้เลือกห้อง</div>'}
+    ${[bf, dn].filter(m => m.pax).map(m => `<div class="sum-row"><span>${H(m.label)} ${U.n(m.pr)} ฿ × ${m.pax} ท่าน × ${n}</span><span class="num">${U.n(m.amt)}</span></div>`).join('')}
+    <div class="sum-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><b>รวม ${tot} ห้อง × ${n} คืน</b><b class="num">${U.n(total)}</b></div>
+    <div class="small muted">รองรับ ${tot * 2} ท่าน${q ? ' · ผู้เข้าร่วม ' + q.pax + ' ท่าน' : ''}</div>
+    <div class="note" style="margin:16px 0">วันปล่อยห้อง (cut-off) ${U.fmtD(U.addDays(ui.ci, -14), { long: true })} — ห้องที่ยังไม่มีรายชื่อจะคืนเข้าระบบอัตโนมัติ</div>
+    <button class="btn red block" data-act="bqApply" ${tot || bf.pax || dn.pax ? '' : 'disabled'}>อัปเดตใบเสนอ</button>
+  </aside>
+</div>`;
+  };
   // quote lines for a room type: one line per season the stay touches
   App.roomLines = (t, count, ci, nights, abf, desc) => D.roomStay(t, ci, nights, abf).map((x, k, all) =>
     D.roomItem(t.full + (abf ? ' รวมอาหารเช้า' : ' Room only (ไม่รวมอาหารเช้า)'), count, x.nights, x.price,
@@ -472,6 +517,33 @@
       ui.open[fam] = !isOpen; App.render();
     },
     rmAbf(el) { App.state.ui.rooms.abf = el.dataset.v === '1'; App.render(); },
+    rmSite(el) { App.state.ui.rooms.site = el.dataset.v; App.render(); },
+    bqStep(el) { const ui = App.state.ui.rooms, k = el.dataset.k; ui.bq[k] = U.clamp((ui.bq[k] || 0) + Number(el.dataset.v), 0, 999); App.render(); },
+    bqTier(el) { App.state.ui.rooms[el.dataset.k].tier = Number(el.dataset.v); App.render(); },
+    bqPax(el) {
+      const ui = App.state.ui.rooms, m = ui[el.dataset.k], q = App.ctxQuote();
+      // the first + fills in the number of guests on the quote
+      m.pax = m.pax === 0 && Number(el.dataset.v) > 0 && q && q.pax ? Number(q.pax) : U.clamp(m.pax + Number(el.dataset.v), 0, 9999); App.render();
+    },
+    bqApply() {
+      const ui = App.state.ui.rooms, B = D.BOUTIQUE;
+      const run = id => {
+        const q = Store.quote(id); App.setCtx(id);
+        // the boutique stay replaces the rooms on the quote (as a resort room block does), and the boutique meals bought before
+        q.items = q.items.filter(i => i.sec !== 'room' && i.ref !== 'late' && i.ref !== 'bq:bf' && i.ref !== 'bq:dn');
+        const n = ui.nights, sel = B.rooms.filter(r => (ui.bq[r.id] || 0) > 0), tot = sel.reduce((a, r) => a + ui.bq[r.id], 0);
+        const desc = `ลักษวรรณ บูติก · เช็กอิน ${U.fmtD(ui.ci, { year: false })} 14:00 → เช็กเอาต์ ${U.fmtD(U.addDays(ui.ci, n), { year: false })} 12:00`;
+        for (const r of sel) q.items.push(D.roomItem('บูติก · ' + r.name + ' รวม' + B.incl, ui.bq[r.id], n, r.price, desc, r.id, { ci: ui.ci }));
+        const meal = (k, ref, name, list) => { const m = ui[k]; if (!m.pax) return; const pr = list[m.tier] || list[0];
+          q.items.push({ id: U.uid('i'), sec: 'food', ref, name: name + ' ' + U.n(pr) + ' บาท/ท่าน', desc: 'ลักษวรรณ บูติก', price: pr, q1: m.pax, u1: 'ท่าน', q2: n, u2: 'มื้อ', tier: m.tier, sched: [] }); };
+        meal('bf', 'bq:bf', 'อาหารเช้า บูติก (ซื้อเพิ่ม)', B.breakfast);
+        meal('dn', 'bq:dn', 'อาหารเย็นงานเลี้ยง บูติก', B.dinner);
+        if (ui.ci !== q.start) App.toast('หมายเหตุ: วันเช็กอินต่างจากวันงาน');
+        App.touch(q, `อัปเดตห้องพักบูติก ${tot} ห้อง × ${n} คืน`); App.state.ui.rooms = null;
+        App.go('#/quote/' + encodeURIComponent(q.id));
+      };
+      const q = App.ctxQuote(); if (!q) App.pickQuoteModal('อัปเดตใบเสนอราคาใด?', run); else run(q.id);
+    },
     rmApply() {
       const ui = App.state.ui.rooms;
       const run = id => {
@@ -497,6 +569,7 @@
       for (const t of D.ROOM_TYPES) ui.rr.types[t.id] = { total: t.total, rack: t.rack, rates: JSON.parse(JSON.stringify(t.rates)) };
       ui.rrDirty = false;
     }
+    if (!ui.rr.boutique) ui.rr.boutique = JSON.parse(JSON.stringify(D.BOUTIQUE));
     return ui.rr;
   };
   const MON = U.MS;
@@ -519,7 +592,14 @@
         <tr><th rowspan="2">ประเภทห้อง</th><th rowspan="2">เตียง</th><th rowspan="2">จำนวน (ห้อง)</th><th rowspan="2">ราคาเต็ม</th>${ss.map(se => `<th colspan="2" class="rr-s c">${H(se.name)}</th>`).join('')}</tr>
         <tr>${ss.map(() => '<th class="rr-s r">With ABF</th><th class="r">Room only</th>').join('')}</tr></thead><tbody>
         ${['Resident', 'Resort'].map(z => `<tr class="rr-z"><td colspan="${4 + ss.length * 2}">Zone : ${z}</td></tr>` + D.ROOM_TYPES.filter(t => t.zoneId === z).map(row).join('')).join('')}
-      </tbody></table></section>`;
+      </tbody></table></section>
+      ${(() => { const b = d.boutique, bn = (path, v) => `<input class="input sm num" style="width:86px;text-align:right" inputmode="numeric" value="${v}" data-change="rrBq" data-p="${path}">`;
+        return `<section class="card pad" style="margin-top:16px"><h3 style="margin-bottom:4px">บูติก</h3><div class="small muted" style="margin-bottom:12px">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน รวม${H(b.incl)} · อาหารซื้อเพิ่ม บาทต่อท่านต่อมื้อ (3 ระดับราคา)</div>
+          <div class="grid g3" style="gap:14px">
+            <div><div class="f">ห้องพัก</div>${b.rooms.map((r, i) => `<div class="between" style="margin-top:6px"><span>${H(r.name)}</span>${bn('rooms.' + i, r.price)}</div>`).join('')}</div>
+            <div><div class="f">อาหารเช้า (ซื้อเพิ่ม)</div>${b.breakfast.map((v, i) => `<div class="between" style="margin-top:6px"><span>ระดับ ${i + 1}</span>${bn('breakfast.' + i, v)}</div>`).join('')}</div>
+            <div><div class="f">อาหารเย็นงานเลี้ยง</div>${b.dinner.map((v, i) => `<div class="between" style="margin-top:6px"><span>ระดับ ${i + 1}</span>${bn('dinner.' + i, v)}</div>`).join('')}</div>
+          </div></section>`; })()}`;
     }
   };
   Object.assign(App.ACT, {
@@ -530,7 +610,7 @@
     },
     rrReset() {
       App.confirm('คืนค่าราคา จำนวนห้อง และช่วงราคาตามตารางราคาเดิม?', () => {
-        const def = D.ROOM_RATES_DEFAULT; App.state.ui.rr = JSON.parse(JSON.stringify(def)); App.state.ui.rrDirty = true; App.render();
+        const def = D.ROOM_RATES_DEFAULT; App.state.ui.rr = Object.assign(JSON.parse(JSON.stringify(def)), { boutique: JSON.parse(JSON.stringify(D.BOUTIQUE_DEFAULT)) }); App.state.ui.rrDirty = true; App.render();
       }, 'คืนค่า');
     }
   });
@@ -539,6 +619,11 @@
       const d = rrDraft(), x = d.types[el.dataset.t], v = Math.max(0, Math.round(Number(String(el.value).replace(/[, ]/g, '')) || 0));
       const [a, b] = el.dataset.p.split('.');
       if (b == null) x[a] = v; else { x.rates[a] = x.rates[a] || [0, 0]; x.rates[a][Number(b)] = v; }
+      App.state.ui.rrDirty = true; App.render();
+    },
+    rrBq(el) {
+      const b = rrDraft().boutique, [k, i] = el.dataset.p.split('.'), v = Math.max(0, Math.round(Number(String(el.value).replace(/[, ]/g, '')) || 0));
+      if (k === 'rooms') b.rooms[Number(i)].price = v; else b[k][Number(i)] = v;
       App.state.ui.rrDirty = true; App.render();
     },
     rrSeason(el) {
@@ -552,6 +637,8 @@
     rmSet(el) { const ui = App.state.ui.rooms; ui.counts[el.dataset.k] = U.clamp(parseInt(el.value, 10) || 0, 0, 999); App.render(); },
     rmCi(el) { const ui = App.state.ui.rooms; if (el.value) ui.ci = el.value; App.render(); },
     rmCo(el) { const ui = App.state.ui.rooms; if (el.value) ui.nights = Math.max(1, U.diffDays(ui.ci, el.value)); App.render(); },
-    rmLate(el) { App.state.ui.rooms.late = el.checked; App.render(); }
+    rmLate(el) { App.state.ui.rooms.late = el.checked; App.render(); },
+    bqStepSet(el) { const ui = App.state.ui.rooms; ui.bq[el.dataset.k] = U.clamp(parseInt(el.value, 10) || 0, 0, 999); App.render(); },
+    bqPaxSet(el) { const ui = App.state.ui.rooms; ui[el.dataset.k].pax = U.clamp(parseInt(el.value, 10) || 0, 0, 9999); App.render(); }
   });
 })(window);
