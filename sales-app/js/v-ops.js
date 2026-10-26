@@ -43,6 +43,31 @@
     Store.db.beos.unshift(b); Store.save(); App.toast('สร้างใบฟังก์ชัน ' + b.id); return b;
   };
 
+  /* ---------- ประเภทผู้เข้าร่วมงาน และ ลักษณะงาน: two branches of choices on the function sheet ---------- */
+  const BT = {
+    guests: { name: 'ประเภทผู้เข้าร่วมงาน', def: ['เด็กนักเรียนอนุบาล', 'เด็กนักเรียนมัธยม', 'เด็กนักเรียนมหาวิทยาลัย', 'อาจารย์', 'เจ้าหน้าที่หน่วยงาน', 'ผู้สูงอายุ', 'นักกีฬา', 'นักวิชาการ', 'ผู้อำนวยการหน่วยงาน'] },
+    kinds: { name: 'ลักษณะงาน', def: ['ค่ายนักเรียนมีกิจกรรม', 'เข้าร่วมแข่งขันกิจกรรม', 'เปิดตัวสินค้า', 'งานเลี้ยงกินข้าว', 'งานเลี้ยงมีพิธีการ', 'Team building', 'คลาสสอน', 'แข่งขันวิชาการ', 'แข่งขันกีฬา', 'จัดบูธแสดงสินค้า'] }
+  };
+  const btList = k => { const s = (Store.db.settings || {}).beoTags; return s && Array.isArray(s[k]) ? s[k] : BT[k].def.map((name, i) => ({ id: k[0] + i, name })); };
+  const btSave = (k, list) => { const st = Store.db.settings || (Store.db.settings = {}); st.beoTags = Object.assign({}, st.beoTags, { [k]: list }); Store.save(); };
+  // the lists are shared settings: changed by those the server lets write settings (price editors, staff managers, admins)
+  const btCanList = () => App.can('edit_prices') || App.can('staff');
+  function beoTagsCard(b, ui) {
+    const pick = App.salesRole(), open = ui.btOpen || {}, tags = b.tags || {};
+    const branch = k => {
+      const list = btList(k), on = (tags[k] || []).filter(id => list.some(x => x.id === id)), names = on.map(id => list.find(x => x.id === id).name), isOpen = !!open[k], editing = ui.btEdit === k;
+      const chips = list.map(x => pick
+        ? `<button type="button" class="chip ${on.includes(x.id) ? 'on' : ''}" data-act="btPick" data-k="${k}" data-v="${H(x.id)}" aria-pressed="${on.includes(x.id)}">${on.includes(x.id) ? '<span aria-hidden="true">✓</span>' : ''}<span>${H(x.name)}</span></button>`
+        : on.includes(x.id) ? `<span class="chip on">${H(x.name)}</span>` : '').join('');
+      const edit = list.map(x => `<div class="pos-row"><input class="input sm" value="${H(x.name)}" data-change="btRen" data-k="${k}" data-v="${H(x.id)}" aria-label="แก้ชื่อ"><button type="button" class="icon-btn" data-act="btDel" data-k="${k}" data-v="${H(x.id)}" aria-label="ลบ ${H(x.name)}" style="color:var(--red)">${ICON.trash}</button></div>`).join('') + '</div>'
+        + `<div class="pos-row" style="margin-top:8px"><input class="input sm" id="btNew-${k}" placeholder="เพิ่มตัวเลือกใหม่" aria-label="เพิ่มตัวเลือกใหม่"><button type="button" class="btn red sm" data-act="btAdd" data-k="${k}">+ เพิ่ม</button></div>`;
+      const msg = ui.btMsg && editing ? `<div class="xs ${/^!/.test(ui.btMsg) ? 'red' : 'teal'}" style="margin-top:6px" role="status">${H(ui.btMsg.replace(/^!/, ''))}</div>` : '';
+      return `<div class="bt-branch"><button class="rm-fold ${isOpen ? 'open' : ''}" data-act="btFold" data-k="${k}" aria-expanded="${isOpen}"><span><b>${H(BT[k].name)}</b>${names.length ? `<span class="small" style="display:block;color:var(--teal-d)">${names.map(H).join(' · ')}</span>` : `<span class="xs muted" style="display:block">${pick ? 'กดเพื่อเลือก' : 'ยังไม่ได้เลือก'}</span>`}</span><i class="rm-chev">▾</i></button>
+        ${isOpen ? `<div class="bt-body">${editing ? `<div class="pos-list">${edit}` : `<div class="row wrap" style="gap:6px">${chips || '<span class="small muted">ยังไม่ได้เลือก</span>'}</div>`}
+          ${pick && btCanList() ? `<div style="margin-top:10px"><button type="button" class="link xs" data-act="btEdit" data-k="${k}">${editing ? '✓ เสร็จแล้ว' : '✏️ แก้ไข / เพิ่ม / ลบตัวเลือก'}</button></div>` : ''}${msg}</div>` : ''}</div>`;
+    };
+    return `<section class="card pad" style="margin-bottom:16px"><h2 style="margin-bottom:10px">ประเภทผู้เข้าร่วมงาน และ ลักษณะงาน</h2><div class="bt-grid">${branch('guests')}${branch('kinds')}</div></section>`;
+  }
   App.V.beo = {
     title: 'ใบฟังก์ชัน',
     render(p) {
@@ -84,6 +109,7 @@
       <div><div class="k">ฝ่ายขาย</div><div class="v">${H(owner ? App.firstName(owner) : '-')}${owner && owner.phone ? ' · ' + H(owner.phone) : ''}</div></div>
       <div><div class="k">การชำระเงิน</div><div class="v" data-act="beoEditF" data-f="payment" style="cursor:pointer">${H(b.payment)}</div></div>
     </section>
+    ${beoTagsCard(b, ui)}
     <section class="card" style="margin-bottom:16px;overflow:hidden">
       <div class="card-hd"><h2>กำหนดการ · วันที่ ${ui.day} ${U.DS[U.d(days[ui.day - 1]).getDay()]} ${U.fmtD(days[ui.day - 1], { year: false })}</h2>
         <div class="row">${days.length > 1 ? `<div class="seg">${days.map((d, i) => `<button class="${ui.day === i + 1 ? 'on' : ''}" data-act="beoDay" data-v="${i + 1}">วันที่ ${i + 1}</button>`).join('')}</div>` : ''}${schedEdit ? '<button class="btn ghost sm no-print" data-act="beoImport">นำเข้าจากไฟล์</button><button class="btn ghost sm no-print" data-act="beoRow" data-i="-1">+ เพิ่ม</button>' : ''}</div></div>
@@ -371,6 +397,29 @@
       const b = curB();
       App.modal(`<h2>หมายเหตุพิเศษ</h2><textarea class="input" name="note" rows="5">${H(b.note || '')}</textarea><div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">บันทึก</button></div>`,
         bg => bg.querySelector('#ok').onclick = () => { b.note = App.formData(bg).note; Store.save(); App.closeModal(); App.render(); });
+    },
+    // who comes and what kind of event: pick on the function sheet; the lists themselves are shared (settings.beoTags)
+    btFold(el) { const ui = App.state.ui.beo, o = ui.btOpen || (ui.btOpen = {}), k = el.dataset.k; o[k] = !o[k]; if (!o[k] && ui.btEdit === k) ui.btEdit = null; App.render(); },
+    btPick(el) {
+      const b = curB(); if (!b || !App.salesRole()) return;
+      const t = b.tags || (b.tags = {}), l = t[el.dataset.k] || (t[el.dataset.k] = []), i = l.indexOf(el.dataset.v);
+      if (i >= 0) l.splice(i, 1); else l.push(el.dataset.v);
+      Store.save(); App.render();
+    },
+    btEdit(el) { const ui = App.state.ui.beo; ui.btEdit = ui.btEdit === el.dataset.k ? null : el.dataset.k; ui.btMsg = ''; App.render(); },
+    btAdd(el) {
+      const k = el.dataset.k, inp = document.getElementById('btNew-' + k), v = String(inp ? inp.value : '').trim().replace(/\s+/g, ' ').slice(0, 60), ui = App.state.ui.beo;
+      if (!v) { ui.btMsg = '!กรุณากรอกชื่อ'; App.render(); return; }
+      const list = btList(k); if (list.some(x => x.name === v)) { ui.btMsg = '!มีชื่อนี้อยู่แล้ว'; App.render(); return; }
+      let id; do id = k[0] + Math.random().toString(36).slice(2, 8); while (list.some(x => x.id === id));
+      btSave(k, list.concat({ id, name: v })); ui.btMsg = 'เพิ่ม ' + v + ' แล้ว'; App.render();
+      const n = document.getElementById('btNew-' + k); if (n) n.focus();
+    },
+    btDel(el) {
+      const k = el.dataset.k, list = btList(k), x = list.find(o => o.id === el.dataset.v); if (!x) return;
+      const used = Store.db.beos.filter(b => ((b.tags || {})[k] || []).includes(x.id)).length;
+      App.state.ui.beo.btMsg = 'ลบ ' + x.name + ' แล้ว' + (used ? ` (ใช้อยู่ใน ${used} ใบ — ใบเหล่านั้นจะไม่แสดงตัวเลือกนี้)` : '');
+      btSave(k, list.filter(o => o !== x)); App.render();
     },
     beoEditF(el) {
       const b = curB(), f = el.dataset.f;
@@ -1447,6 +1496,14 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     roleOpen(el) { const r = App.roles().find(x => x.id === el.dataset.v); if (r) roleForm(r); }
   });
   function addUser(f) { const u = makeUser(f); Store.db.users.push(u); return u; }
+  Object.assign(App.CHG, {
+    btRen(el) {
+      const k = el.dataset.k, v = String(el.value).trim().replace(/\s+/g, ' ').slice(0, 60), list = btList(k), x = list.find(o => o.id === el.dataset.v), ui = App.state.ui.beo;
+      if (!x || v === x.name) return;
+      if (!v || list.some(o => o !== x && o.name === v)) { ui.btMsg = v ? '!มีชื่อนี้อยู่แล้ว' : '!กรุณากรอกชื่อ'; App.render(); return; }
+      btSave(k, list.map(o => o === x ? { id: o.id, name: v } : o)); ui.btMsg = 'แก้ชื่อเป็น ' + v + ' แล้ว'; App.render();
+    }
+  });
   Object.assign(App.CHG, {
     usQ(el) { UU().q = el.value; UU().page = 1; App.render(); },
     usDept(el) { UU().draft.dept = el.value; },
