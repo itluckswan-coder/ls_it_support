@@ -261,7 +261,17 @@ async function applyRules(env, user, kind, id, data, prev) {
     if (JSON.stringify(data).length > 800000) fail(413, 'ข้อมูลเมนูใหญ่เกินไป');
   }
   if (kind === 'employees' || kind === 'settings') {
-    if (!can(user, 'edit_prices') && !can(user, 'staff')) fail(403, 'คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้');
+    // the function sheet's attendee / event-type choices (settings.beoTags) belong to the sales roles: they save them
+    // even without settings rights, and nobody else changes them
+    const salesSide = ['admin', 'manager', 'sales'].includes(user.role);
+    if (!can(user, 'edit_prices') && !can(user, 'staff')) {
+      if (kind !== 'settings' || !salesSide) fail(403, 'คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้');
+      // a sales user without settings rights: only their beoTags is taken, the rest stays as saved
+      const tags = data.beoTags;
+      for (const k of Object.keys(data)) delete data[k];
+      Object.assign(data, prev || {}); if (tags) data.beoTags = tags; else delete data.beoTags;
+    }
+    if (kind === 'settings' && !salesSide) { if (prev && prev.beoTags) data.beoTags = prev.beoTags; else delete data.beoTags; }
     // role names and added roles (settings.roles) are the admin's to change
     if (kind === 'settings' && user.role !== 'admin') { if (prev && prev.roles) data.roles = prev.roles; else delete data.roles; }
     // so is who may assign work to whom (settings.taskPerms)
