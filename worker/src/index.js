@@ -120,8 +120,9 @@ async function state(env, since, user) {
 }
 
 /* ---------------- business rules ---------------- */
+// what a function sheet's approval looks at: not its workflow fields, and not its tags (who comes, kind of event — labels for the departments)
 const beoContent = b => {
-  const { approval, status, rev, revNote, signoff, ss, ...c } = b || {};
+  const { approval, status, rev, revNote, signoff, ss, tags, ...c } = b || {};
   c.depts = Object.fromEntries(Object.entries((b && b.depts) || {}).map(([k, v]) => [k, { items: v.items || [], owner: v.owner || '' }]));
   return c;
 };
