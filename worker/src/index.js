@@ -174,8 +174,8 @@ async function applyRules(env, user, kind, id, data, prev) {
     const d = data.discount || {};
     const pct = d.type === 'amt' ? (sub ? (Number(d.value) || 0) / sub * 100 : 0) : Number(d.value) || 0;
     if (pct > 10.0001 && !can(user, 'discount_over') && !(prev && prev.approval === 'approved' && JSON.stringify(prev.discount) === JSON.stringify(data.discount))) data.approval = 'pending';
-    // approval to book a meeting room over another booking's times: only admins give or withdraw it
-    if (user.role !== 'admin') { if (prev && prev.overlapOk) data.overlapOk = prev.overlapOk; else delete data.overlapOk; }
+    // approval to book a meeting room over another booking's times, and the booking approval (อนุมัติการจอง): only admins give or withdraw them
+    if (user.role !== 'admin') for (const k of ['overlapOk', 'bookOk']) { if (prev && prev[k]) data[k] = prev[k]; else delete data[k]; }
   }
   if (kind === 'beo') {
     if (!can(user, 'create_quote') && !can(user, 'staff')) fail(403, 'คุณมีสิทธิ์ดูใบฟังก์ชันอย่างเดียว');

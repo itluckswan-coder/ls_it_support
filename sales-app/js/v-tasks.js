@@ -39,6 +39,7 @@
     // meeting rooms booked over another booking's times: the admin is asked; the seller hears back once approved
     for (const q of Store.db.quotes) {
       if (admin && q.overlapReq && !q.overlapOk && q.status !== 'cancelled') out.push({ at: q.overlapReq.at, title: 'ขออนุมัติจองห้องประชุมทับเวลา', sub: q.id + ' · ' + q.client + ' · โดย ' + q.overlapReq.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'yellow' });
+      if (q.bookOk && q.owner === me.id && q.bookOk.by !== me.id) out.push({ at: q.bookOk.at, title: 'ใบเสนอราคาได้รับอนุมัติการจอง', sub: q.id + ' · ' + q.client + ' · โดย ' + q.bookOk.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'teal' });
       if (q.overlapOk && q.owner === me.id && q.overlapOk.by !== me.id) out.push({ at: q.overlapOk.at, title: 'อนุมัติจองห้องประชุมทับเวลาแล้ว', sub: q.id + ' · โดย ' + q.overlapOk.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'teal' });
     }
     for (const b of Store.db.beos) {
