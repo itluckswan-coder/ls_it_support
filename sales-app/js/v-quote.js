@@ -134,6 +134,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         ${App.holding(q) ? `<button class="btn ghost sm" data-act="qToBeo">ใบฟังก์ชัน</button><a class="btn ghost sm" href="#/staff/${qid(q.id)}">จัดรอบพนักงาน</a>` : ''}
         ${q.status !== 'cancelled' ? `<button class="btn ghost sm" data-act="qStatus" data-v="cancelled" style="color:var(--red)">ยกเลิก</button>` : `<button class="btn ghost sm" data-act="qStatus" data-v="draft">กู้คืนเป็นร่าง</button>`}
       </div>
+      ${bookOkBox(q)}
       ${canDelQ() ? `<button class="btn ghost red sm" style="width:100%;margin-top:12px" data-act="qDelete" data-id="${H(q.id)}">ลบใบเสนอราคา</button>` : ''}
       ${q.history && q.history.length ? `<div class="hr"></div><div class="small muted" style="margin-bottom:6px">ประวัติ</div>${q.history.slice(0, 5).map((h, i) => `<div class="row small" style="padding:4px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('')}` : ''}
     </section>
@@ -335,7 +336,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     },
     qDup() {
       const q = cur(), n = JSON.parse(JSON.stringify(q));
-      n.id = Store.nextId('QT'); n.status = 'draft'; n.history = []; n.views = 0; n.approval = null; n.holdUntil = '';
+      n.id = Store.nextId('QT'); n.status = 'draft'; n.history = []; n.views = 0; n.approval = null; n.holdUntil = ''; delete n.bookOk;
       n.createdAt = n.updatedAt = U.nowTH();
       n.items.forEach(i => i.id = U.uid('i'));
       n.history.unshift({ at: n.createdAt, t: 'สร้างจากสำเนา ' + q.id });
@@ -952,6 +953,30 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       </article>`;
     }
   };
+  /* ---------- the admin approves the booking (อนุมัติการจอง) ---------- */
+  function bookOkBox(q) {
+    const ok = q.bookOk, admin = App.me().role === 'admin', net = Math.round(App.calc(q).net * 100) / 100;
+    if (!ok) return admin && q.status !== 'cancelled' ? `<button class="btn teal sm" style="width:100%;margin-top:12px" data-act="qBookOk">อนุมัติการจอง</button>` : '';
+    const moved = Math.abs((Number(ok.net) || 0) - net) > 0.005;
+    return `<div class="note" style="margin-top:12px;background:${moved ? 'var(--yellow-soft)' : 'var(--teal-soft)'};color:${moved ? 'var(--ink)' : 'var(--teal-d)'}">
+      <b><span>✓</span> <span>อนุมัติการจองแล้ว</span></b><div class="xs" style="margin-top:2px">โดย ${H(ok.byName)} · ${H((ok.at || '').slice(0, 16).replace('T', ' '))} · ฿${U.n2(ok.net)}</div>
+      ${moved ? `<div class="xs red" style="margin-top:4px">ยอดเปลี่ยนหลังอนุมัติ · ตอนนี้ ฿${U.n2(net)}</div>` : ''}
+      ${admin ? `<div class="row" style="gap:12px;margin-top:6px">${moved ? '<button class="link small" data-act="qBookOk" style="font-weight:700">อนุมัติอีกครั้ง</button>' : ''}<button class="link red small" data-act="qBookUndo">ยกเลิกการอนุมัติ</button></div>` : ''}
+    </div>`;
+  }
+  Object.assign(App.ACT, {
+    qBookOk() {
+      const q = cur(), me = App.me(); if (me.role !== 'admin') return;
+      App.confirm('อนุมัติการจอง ' + q.id + ' · ' + q.client + '?', () => {
+        q.bookOk = { by: me.id, byName: me.name, at: U.nowTH(), net: Math.round(App.calc(q).net * 100) / 100 };
+        App.touch(q, 'อนุมัติการจอง'); App.render(); App.toast('อนุมัติการจองแล้ว');
+      }, 'อนุมัติการจอง');
+    },
+    qBookUndo() {
+      const q = cur(); if (App.me().role !== 'admin') return;
+      App.confirm('ยกเลิกการอนุมัติการจอง ' + q.id + '?', () => { delete q.bookOk; App.touch(q, 'ยกเลิกการอนุมัติการจอง'); App.render(); }, 'ยกเลิกการอนุมัติ');
+    }
+  });
   /* ---------- meeting rooms booked over each other ---------- */
   function overlapCard(q) {
     const list = App.meetConflicts(q); if (!list.length) return '';
