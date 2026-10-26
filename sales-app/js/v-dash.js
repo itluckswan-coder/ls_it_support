@@ -6,7 +6,7 @@
   // validated categorical set (CVD-safe, direct-labelled because the amber is low contrast)
   const C = { teal: '#0E9F8E', red: '#B8333A', blue: '#4A62B8', amber: '#D99A00', gray: '#8D928F', ink: '#17211F', grid: '#EFEDE6', axis: '#D9D6CC', muted: '#6B716E' };
   const SEC = [['meet', 'ห้องประชุม', C.teal], ['food', 'อาหารและเครื่องดื่ม', C.red], ['room', 'ห้องพัก', C.blue], ['other', 'บริการอื่น ๆ', C.amber]];
-  const ST = [['draft', 'ร่าง', C.gray], ['sent', 'ส่งแล้ว', C.amber], ['tentative', 'จองชั่วคราว', C.red], ['confirmed', 'ยืนยันแล้ว', C.teal]];
+  const ST = [['draft', 'ร่าง', C.gray], ['sent', 'ส่งแล้ว', C.blue], ['tentative', 'จองชั่วคราว', C.amber], ['confirmed', 'ยืนยันแล้ว', C.teal]];
   const PENDING = ['sent', 'tentative'];
 
   const short = v => { const x = Math.abs(v); return x >= 1e6 ? (v / 1e6).toFixed(x >= 1e7 ? 0 : 1) + 'M' : x >= 1e3 ? Math.round(v / 1e3) + 'K' : String(Math.round(v)); };

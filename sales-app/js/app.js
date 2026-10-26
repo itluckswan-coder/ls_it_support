@@ -194,7 +194,8 @@
       root.querySelectorAll('[name]').forEach(el => { o[el.name] = el.type === 'checkbox' ? el.checked : el.value; });
       return o;
     },
-    statusBadge(s) { return `<span class="badge st-${s}">${H(D.STATUS[s] || s)}</span>`; },
+    // tentative is yellow (st-hold); st-tentative stays the red badge used for urgent / rejected
+    statusBadge(s) { return `<span class="badge st-${s === 'tentative' ? 'hold' : s}">${H(D.STATUS[s] || s)}</span>`; },
     save() { Store.save(); },
     sw(name, on, attrs = '') { return `<label class="switch"><input type="checkbox" ${on ? 'checked' : ''} ${attrs} aria-label="${H(name)}"><span></span></label>`; },
 
