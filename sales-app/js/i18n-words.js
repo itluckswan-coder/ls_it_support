@@ -1019,4 +1019,5 @@
   I18N.pattern(/^จำนวนท่าน × (\d+) มื้อ$/, (m, L) => L === 'en' ? `Guests × ${m[1]} meal(s)` : `ဧည့်သည် × ${m[1]} နပ်`);
   I18N.pattern(/^จำนวนท่าน (.+)$/, (m, L, t) => (L === 'en' ? 'Number of guests, ' : 'ဧည့်သည်ဦးရေ · ') + t(m[1]));
   I18N.pattern(/^(อาหารเช้า \(ซื้อเพิ่ม\)|อาหารเย็นงานเลี้ยง) ([\d,]+) ฿ × ([\d,]+) ท่าน × (\d+)$/, (m, L, t) => `${t(m[1])} ${m[2]} ฿ × ${m[3]} ${L === 'en' ? 'guests' : 'ဦး'} × ${m[4]}`);
+  I18N.add({ 'ราคา Net รวม Service และ VAT แล้ว': ['Net price, service charge and VAT included', 'Net ဈေး · ဝန်ဆောင်ခနှင့် VAT ပါပြီး'] });
 })(window);

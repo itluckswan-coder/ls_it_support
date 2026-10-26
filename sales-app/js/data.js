@@ -46,7 +46,7 @@
 
   /* ---------- rooms: types from the hotel rate card, priced by season ----------
    * Every room type (a room family + bed) has a count and a full (rack) price; each season has a "with breakfast"
-   * (ABF) and a "room only" price for 2 guests (Triple: 3). Prices are before service charge and VAT.
+   * (ABF) and a "room only" price for 2 guests (Triple: 3). Prices are net (service charge and VAT included), as every quote line is (U.calc).
    * Admins change counts, prices and season dates on the room-rates page (settings.roomRates). */
   const ROOM_DEF = [
     // id, family, bed, zone, rooms, rack, pax, [season1 ABF, RO], [season2 ABF, RO], img

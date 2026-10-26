@@ -94,7 +94,7 @@
       const D = g.DATA, items = q.items || [];
       /* meeting-room rules: a meeting room's rent is paid down by the lunch and coffee-break spend of the same quote
          (rent − food; free once the food reaches the rent, the room still listed). Kinnaree's LED screen is 3,000
-         when the rest of the quote is 50,000 or more (before service and VAT), otherwise 5,000. */
+         when the rest of the quote adds up to 50,000 or more, otherwise 5,000. */
       const isRoom = it => it.sec === 'meet' && D && D.MEETING_ROOMS.some(r => r.id === it.ref);
       const isMeeting = it => isRoom(it) && !['banquet', 'cocktail'].includes(it.layout);
       // only menus marked "หักค่าห้องประชุมได้" (the lunch buffets and breaks, set on the catering page) count

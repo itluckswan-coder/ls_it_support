@@ -446,7 +446,7 @@
       const fams = z => [...new Set(D.ROOM_TYPES.filter(t => t.zoneId === z).map(t => t.fam))];
       const zones = ['Resident', 'Resort'];
       return `
-<div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคาก่อน Service และ VAT · ช่วงราคา ${H(season.name)}${segs.length > 1 ? ' และ ' + segs.slice(1).map(x => H(x.season.name)).join(', ') + ' (คิดแยกตามคืน)' : ''}</div><div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
+<div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคา Net รวม Service และ VAT แล้ว · ช่วงราคา ${H(season.name)}${segs.length > 1 ? ' และ ' + segs.slice(1).map(x => H(x.season.name)).join(', ') + ' (คิดแยกตามคืน)' : ''}</div><div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
   <div class="row wrap" style="gap:10px">${App.can('edit_prices') ? '<a class="btn ghost sm" href="#/roomrates">ตั้งราคาห้องพัก</a>' : ''}
   ${dateBox}</div></div>
 ${sitePick}
@@ -583,7 +583,7 @@ ${sitePick}
       const row = t => { const x = d.types[t.id]; return `<tr><td><b style="font-weight:500">${H(t.fam)}</b></td><td>${H(t.bed)}</td><td>${num(t.id, 'total', x.total, 64)}</td><td>${num(t.id, 'rack', x.rack)}</td>
         ${ss.map(se => { const r = x.rates[se.id] || [0, 0]; return `<td class="rr-s">${num(t.id, se.id + '.0', r[0])}</td><td>${num(t.id, se.id + '.1', r[1])}</td>`; }).join('')}</tr>`; };
       return `<div class="page-hd"><div><div class="small"><a class="link" href="#/rooms">← ห้องพัก</a></div><h1>ตั้งราคาห้องพัก</h1>
-        <div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคาก่อน Service และ VAT · ใช้กับทุกการจอง · ช่วงราคาวนซ้ำทุกปี</div></div>
+        <div class="small muted">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน (Triple 3 ท่าน) · ราคา Net รวม Service และ VAT แล้ว · ใช้กับทุกการจอง · ช่วงราคาวนซ้ำทุกปี</div></div>
         <div class="row wrap"><button class="btn ghost" data-act="rrReset">คืนค่าตามตารางราคา</button><button class="btn red" data-act="rrSave" ${ui.rrDirty ? '' : 'disabled'}>บันทึกราคา</button></div></div>
       <section class="card pad" style="margin-bottom:16px"><h3 style="margin-bottom:10px">ช่วงราคา</h3>
         ${ss.map((se, i) => `<div class="row wrap rr-season"><input class="input sm" style="max-width:200px" value="${H(se.name)}" data-change="rrSeason" data-s="${i}" data-k="name" aria-label="ชื่อช่วงราคา"><span class="small muted">ตั้งแต่</span>${mdPick(i, 'from', se.from)}<span class="small muted">ถึง</span>${mdPick(i, 'to', se.to)}</div>`).join('')}
