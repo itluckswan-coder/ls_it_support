@@ -14,7 +14,7 @@ window.MANUAL.en = {
     title: 'Sales System User Manual',
     subtitle: 'Luck Swan Resort — quotations, meeting rooms, guest rooms, catering, function sheets, staff, leave requests and assigned tasks',
     url: 'https://luckswan-sales.it-luckswan.workers.dev',
-    version: '1.1', updated: 'Oct 22, 2026',
+    version: '1.2', updated: 'Oct 26, 2026',
     intro: 'The sales system is a web app that works on computers, iPads and phones. Everyone sees the same data in real time. The menus you see depend on the role and permissions the administrator gives you. This manual covers every chapter, from signing in to each department’s work, with real screenshots for every step.'
   },
   groups: [
@@ -96,18 +96,22 @@ window.MANUAL.en = {
     },
     {
       id: 'rooms', group: 'sell', icon: 'bed', title: 'Guest Rooms and room rates', who: 'Sales · Administrator (rates)',
-      intro: 'Rooms & Venues › Guest Rooms is where you set up a group’s room block. Prices follow the season automatically.',
+      intro: 'Rooms & Venues › Guest Rooms is where you set up a group’s room block. You can choose between 2 places: Resort (prices follow the season automatically) and Boutique.',
       steps: [
-        'Choose the check-in date and number of nights at the top, then choose With ABF (breakfast included) or Room only.',
+        'Choose the “Place” at the top: Resort or Boutique.',
+        'Resort: choose the check-in date and number of nights at the top, then choose With ABF (breakfast included) or Room only.',
         'On each room type card, tap − / + to set the number of rooms and choose the bed type (Twin / Double / Triple for 3 guests).',
         'Check the room block summary on the right: number of rooms, guests and free rooms for the organiser (1 free for every 20 rooms).',
         'Turn Late check-out 14:00 on or off as agreed with the customer.',
         'Check the release date (cut-off) in the yellow box. Rooms without a guest list by then go back to the system automatically.',
         'Tap “Update quote” to save the guest rooms to the quotation.',
-        'Administrators: tap “Room rates” to edit the rate periods (seasons), number of rooms and the With ABF / Room only price for each type, then save.'
+        'Boutique: Standard 400 · Superior 500 · Deluxe 600 THB per room per night (including congee, coffee and crackers for 2). Tap − / + to set the number of rooms.',
+        'Boutique: extra meals per person — Breakfast (extra) 50 / 100 / 150 THB and Dinner party 350 / 399 / 450 THB. Choose a price, then enter the number of guests (the first time you tap +, the system fills in the quotation’s number of attendees). It is multiplied by the number of nights automatically.',
+        'Boutique: tap “Update quote” — the rooms on the quotation become boutique rooms (names start with “Boutique ·”) and the meals go into the Food & beverage section · When you open Guest Rooms again, it comes back to Boutique with the same quantities.',
+        'Users allowed to edit rates: tap “Room rates” to edit the rate periods (seasons), number of rooms and the With ABF / Room only price for each type — under “Boutique”, edit the 3 room prices and the 3 meal price levels, then save.'
       ],
-      shots: [{ img: 'rooms', cap: 'Room block: choose room types, quantities and bed types' }, { img: 'roomrates', cap: 'Setting room rates by season (administrator)' }],
-      tips: ['Room rates are per room per night for 2 guests (Triple: 3 guests), net prices with service charge and VAT included (worked out the same way as the quotation).']
+      shots: [{ img: 'rooms', cap: 'Resort room block: choose room types, quantities and bed types' }, { img: 'rooms-bq', cap: 'Boutique guest rooms and extra meals' }, { img: 'roomrates', cap: 'Setting room rates by season' }, { img: 'roomrates-bq', cap: 'Boutique rates: guest rooms and meals' }],
+      tips: ['Room rates are per room per night for 2 guests (Triple: 3 guests), net prices with service charge and VAT included (worked out the same way as the quotation).', 'A quotation holds guest rooms from one place at a time — tapping Update quote from Boutique replaces the resort rooms already on the quotation (and vice versa).', 'Boutique does not use the resort’s 1 free room for every 20 rooms or Late check-out.']
     },
     {
       id: 'food', group: 'sell', icon: 'food', title: 'Catering and menus', who: 'Sales · Administrator (menu editing)',
@@ -175,13 +179,14 @@ window.MANUAL.en = {
         'The list on the left is split into Upcoming · All · Draft. Labels show the status, such as “All departments” or “2 to acknowledge”.',
         'Tap “+ Create from quote” and choose a quotation. The system fills in the rooms, food and head count automatically.',
         'The header shows the event date, confirmed guests (+5% spare), rooms, contact person and salesperson.',
+        'The “Attendees and type of event” box: tap a branch heading to open it, then tap to choose as many as you need, e.g. Secondary school students · Teachers / lecturers / Team building · Training class. The branch heading shows what you chose · ✏️ Edit / add / delete choices inside the branch (Administrator, Sales Manager, Sales Staff); other roles can only view.',
         'Daily schedule: time, details, place and responsible department (switch between “Day 1 / Day 2”). You can import it from an Excel file.',
         'Each department card (Kitchen, Banquet, Engineering, Front Office, Housekeeping, Accounting) shows its tasks and an “Acknowledged / Awaiting acknowledgement” status. Tap “Edit” to add tasks for that department.',
         'Every change made after sending is counted as “Revision …” and goes to an administrator for approval before it is sent to departments.',
         'Buttons at the top: Function details · Sales summary · Floor plan (administrators, F&B and Banquet departments) · Room setup (administrators) · Print / PDF.'
       ],
-      shots: [{ img: 'beo', cap: 'Function sheet: daily schedule and department cards' }, { img: 'beo-list', cap: 'Function sheet list with acknowledgement status' }],
-      tips: ['Heads of department should tap “Acknowledge” every time there is a new sheet or a change.']
+      shots: [{ img: 'beo', cap: 'Function sheet: daily schedule and department cards' }, { img: 'beo-tags', cap: 'Attendees and type of event' }, { img: 'beo-list', cap: 'Function sheet list with acknowledgement status' }],
+      tips: ['Heads of department should tap “Acknowledge” every time there is a new sheet or a change.', 'Choosing attendees and the type of event does not send the sheet for a new revision approval · The list of choices is shared by all sheets.']
     },
     {
       id: 'plan', group: 'event', icon: 'grid', title: 'Floor plans and room setup', who: 'Administrator · F&B department · Banquet department (heads and staff)',
@@ -337,7 +342,7 @@ window.MANUAL.en = {
       steps: [
         'Tap “+ New quotation” › complete the 5 steps: Customer (you can enter the Tax ID) › Meeting rooms › Food › Guest rooms › Summary.',
         'Open the quotation › adjust items, discount and terms › tap Send / Print › choose Customer copy / Full quotation › you can edit details on the quotation › email it or print a PDF.',
-        'When the customer confirms › change the status to “Confirmed” › Function Sheets › “+ Create from quote”.',
+        'When the customer confirms › change the status to “Confirmed” › Function Sheets › “+ Create from quote” › choose the attendees and type of event.',
         'Fill in the daily schedule and each department’s tasks › follow up on acknowledgements.',
         'Check the calendar before taking a new booking to make sure rooms are free.'
       ],
@@ -360,7 +365,7 @@ window.MANUAL.en = {
       can: ['View function sheets and the booking calendar', 'Plan staff shifts / approve shift extensions'],
       steps: [
         'Check the bell every morning: new or edited function sheets › open the sheet › tap “Acknowledge” on your department’s card.',
-        'Read the daily schedule and floor plan to prepare equipment and staff (F&B and Banquet: you can design floor plans).',
+        'Read the daily schedule, attendees, type of event and floor plan to prepare equipment and staff (F&B and Banquet: you can design floor plans).',
         'Staff › Shifts › choose the event › assign staff to shifts › request shift extensions when needed.',
         'Keep your department’s staff list up to date (add/edit/import).',
         'Tasks assigned to your department › open them › tap “Confirm” when everything is ready.'
@@ -416,6 +421,7 @@ window.MANUAL.en = {
     }
   ],
   changelog: [
+    { v: '1.2', date: 'Oct 26, 2026', text: 'Guest rooms: choose the place, Resort / Boutique (Standard · Superior · Deluxe rooms with extra breakfast and dinner party), and Boutique rates · Room rate text states net prices · Function sheets: the Attendees and type of event box (choose by branch, edit/add/delete choices).' },
     { v: '1.1', date: 'Oct 22, 2026', text: 'Meeting rooms: ✏️ button to edit photos, prices and capacity, and swipe through sample photos · Quotations: Net prices with the service charge/VAT worked back out, Tax ID field, Customer copy / Full quotation, editing details on the quotation, changing the meeting room photo, and the 3% credit card term · Function sheets: permissions for editing function details, the Accounting/Finance section and floor plans (F&B · Banquet) · Assignment: choose a location when assigning to a department, and ⚙ Assignment permissions (an org chart with zoom and rename/add/delete, or a form).' },
     { v: '1.0', date: 'Oct 21, 2026', text: 'First edition, covering every chapter: quotations, meeting rooms, guest rooms, catering, function sheets, floor plans, calendar, staff (locations, departments, positions, import), shifts, assigned tasks, leave requests, users, Dashboard, 3 languages and color themes.' }
   ]
