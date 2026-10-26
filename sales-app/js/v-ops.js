@@ -432,7 +432,7 @@
      CALENDAR (1k)
      ===================================================================== */
   const ST_COLOR = {
-    draft: ['#E4E2DA', '#3D4542', '#8A8A82'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#F8E1E1', '#8E1F25', '#A8262D'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
+    draft: ['#E4E2DA', '#3D4542', '#8A8A82'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#FFE08A', '#6B4E00', '#E0A800'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
   };
   // an event on the calendar opens its function sheet; a quote without one (e.g. a draft) opens the quote
   const beoOf = q => App.can('view_beo') && !App.navHidden().includes('beo') ? Store.db.beos.find(b => b.quoteId === q.id) : null;

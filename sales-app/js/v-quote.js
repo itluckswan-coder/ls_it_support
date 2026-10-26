@@ -957,9 +957,11 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   function bookOkBox(q) {
     const ok = q.bookOk, admin = App.me().role === 'admin', net = Math.round(App.calc(q).net * 100) / 100;
     if (!ok) return admin && q.status !== 'cancelled' ? `<button class="btn teal sm" style="width:100%;margin-top:12px" data-act="qBookOk">อนุมัติใบเสนอราคา</button>` : '';
-    const moved = Math.abs((Number(ok.net) || 0) - net) > 0.005;
-    return `<div class="note" style="margin-top:12px;background:${moved ? 'var(--yellow-soft)' : 'var(--teal-soft)'};color:${moved ? 'var(--ink)' : 'var(--teal-d)'}">
+    // yellow while waiting for the customer; green once sales marks ลูกค้ายืนยันการจอง
+    const moved = Math.abs((Number(ok.net) || 0) - net) > 0.005, done = q.status === 'confirmed' && !moved;
+    return `<div class="note" style="margin-top:12px;background:${done ? 'var(--teal-soft)' : 'var(--yellow-soft)'};color:${done ? 'var(--teal-d)' : 'var(--yellow-d)'}">
       <b><span>✓</span> <span>อนุมัติใบเสนอราคาแล้ว</span></b><div class="xs" style="margin-top:2px">โดย ${H(ok.byName)} · ${H((ok.at || '').slice(0, 16).replace('T', ' '))} · ฿${U.n2(ok.net)}</div>
+      ${q.status === 'confirmed' ? '' : `<div class="xs" style="margin-top:2px;font-weight:600">รอลูกค้ายืนยันการจอง</div>`}
       ${moved ? `<div class="xs red" style="margin-top:4px">ยอดเปลี่ยนหลังอนุมัติ · ตอนนี้ ฿${U.n2(net)}</div>` : ''}
       ${admin ? `<div class="row" style="gap:12px;margin-top:6px">${moved ? '<button class="link small" data-act="qBookOk" style="font-weight:700">อนุมัติอีกครั้ง</button>' : ''}<button class="link red small" data-act="qBookUndo">ยกเลิกการอนุมัติ</button></div>` : ''}
     </div>`;
@@ -969,7 +971,14 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const q = cur(), me = App.me(); if (me.role !== 'admin') return;
       App.confirm('อนุมัติใบเสนอราคา ' + q.id + ' · ' + q.client + '?', () => {
         q.bookOk = { by: me.id, byName: me.name, at: U.nowTH(), net: Math.round(App.calc(q).net * 100) / 100 };
-        App.touch(q, 'อนุมัติใบเสนอราคา'); App.render(); App.toast('อนุมัติใบเสนอราคาแล้ว');
+        App.touch(q, 'อนุมัติใบเสนอราคา');
+        // approved before the customer confirms → hold it (จองชั่วคราว), unless its rooms overlap another booking without approval
+        let held = false;
+        if (q.status === 'draft' || q.status === 'sent') {
+          if (App.overlapOk(q)) { q.status = 'tentative'; if (!q.holdUntil) q.holdUntil = U.addDays(U.today(), 10); App.touch(q, 'เปลี่ยนสถานะเป็น ' + D.STATUS.tentative); held = true; }
+          else App.toast('ห้องประชุมทับเวลากับการจองอื่น — ยังไม่เปลี่ยนเป็นจองชั่วคราว');
+        }
+        App.render(); if (held || q.status !== 'draft' && q.status !== 'sent') App.toast(held ? 'อนุมัติแล้ว · เปลี่ยนสถานะเป็นจองชั่วคราว' : 'อนุมัติใบเสนอราคาแล้ว');
       }, 'อนุมัติใบเสนอราคา');
     },
     qBookUndo() {
