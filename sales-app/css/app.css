@@ -135,6 +135,7 @@ main{padding:28px 32px 48px;max-width:1440px;margin:0 auto}
 .st-draft{background:var(--gray-soft);color:var(--ink2)}
 .st-sent{background:var(--yellow-soft);color:#7a5c00}
 .st-tentative{background:var(--red-soft);color:var(--red-d)}
+.st-hold{background:#FFE08A;color:#6B4E00}
 .st-confirmed{background:var(--teal-soft);color:var(--teal-d)}
 .st-cancelled{background:#eee;color:#999;text-decoration:line-through}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
