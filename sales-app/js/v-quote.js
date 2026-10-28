@@ -766,6 +766,17 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
           ${note || ed ? `<div style="margin-top:6px;color:#444">${F('meetNote', '', 'พิมพ์รายละเอียดห้องประชุมที่ต้องการแสดง (ไม่บังคับ)')}</div>` : ''}
           ${ed && room && !note ? `<button type="button" class="link no-print" data-act="qdMeetAuto" style="margin-top:6px">+ ใส่รายละเอียดห้องจากระบบ</button>` : ''}</div></div></td></tr>`;
       };
+      // guest-room photos under the room line (one strip per room type): the type's photo unless changed on this quotation
+      // (q.docEdit.rimg[key] = list of photos, [] = none); boutique / custom rooms start without one
+      const rKey = it => it.ref && it.ref !== 'late' ? 'r.' + it.ref : ik(it);
+      const rSys = it => { const t = D.ROOM_TYPES.find(r => r.id === it.ref); return t && t.img ? [t.img] : []; };
+      const roomPics = (it, i, all) => {
+        if (it.ref === 'late' || it.free || all.findIndex(x => rKey(x) === rKey(it)) !== i) return '';
+        const k = rKey(it), own = (X.rimg || {})[k], list = own !== undefined ? own : rSys(it);
+        if (!ed) return list.length ? `<tr><td colspan="5" style="padding-top:0"><div class="qd-rimgs">${list.map(u => `<img src="${H(u)}" alt="">`).join('')}</div></td></tr>` : '';
+        return `<tr><td colspan="5" style="padding-top:0"><div class="qd-rimgs">${list.map((u, j) => `<div class="qd-img"><img src="${H(u)}" alt=""><button type="button" class="ce-x" data-act="qdRImgDel" data-k="${H(k)}" data-i="${j}" aria-label="ลบรูป">${ICON.x}</button></div>`).join('')}
+          <div class="qd-img"><span>📷<br>เพิ่มรูปห้อง</span><button type="button" class="qd-img-btn" data-act="qdRImgAdd" data-k="${H(k)}" aria-label="เพิ่มรูปห้อง"></button>${own !== undefined ? `<button type="button" class="qd-rv" data-act="qdRImgRv" data-k="${H(k)}" title="ใช้รูปของห้องจากระบบ">↺</button>` : ''}</div></div></td></tr>`;
+      };
       const condSys = [`- เพื่อเป็นการยืนยันการจัดงาน กรุณา เซ็นยืนยันใช้บริการในใบเสนอราคาและ/หรือ ชำระมัดจำ ${q.deposit || '30-50%'} จากยอดรวมตามใบเสนอราคาที่ ${S.bank}`,
         `- เมื่อทำการชำระเงินเรียบร้อยแล้ว นำส่งหลักฐานการชำระเงินมาที่ ${S.email} หรือ Line Official : ${S.line}`,
         '- หากมีการเปลี่ยนแปลงรายละเอียดการจัดงาน สามารถแจ้งที่เจ้าหน้าที่ฝ่ายขายล่วงหน้าอย่างน้อย 7 วัน',
@@ -776,6 +787,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const groups = [['room', 'ห้องพัก'], ['food', 'อาหารและเครื่องดื่ม'], ['meet', 'ห้องประชุม ณ โรงแรมลักษวรรณรีสอร์ท'], ['other', 'บริการอื่น ๆ']].filter(([k]) => q.items.some(i => i.sec === k));
       const mainRoom = D.MEETING_ROOMS.find(r => q.items.some(i => i.sec === 'meet' && i.ref === r.id));
       App.state.ui.doc.meetAuto = meetAuto(mainRoom);
+      App.state.ui.doc.rSys = Object.fromEntries(q.items.filter(i => i.sec === 'room').map(it => [rKey(it), rSys(it)]));
       return `<article class="doc${ed ? ' qd-editing' : ''}" id="qdPaper">
   <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
     <div><b>${H(S.company)}</b><br>${H(S.address)}<br>ติดต่อโรงแรม ${H(S.phone)} / ติดต่อสำนักงานใหญ่ ${H(S.hq)}<br>สาขา <span style="background:#cfe6fb;padding:1px 40px 1px 8px;color:#1a3fd8">${F('branch', App.prop(App.siteOfQ(q)).th)}</span></div>
@@ -790,7 +802,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   </div>
   <table><thead><tr><th>คำอธิบาย/รายละเอียด</th><th class="c">ระยะเวลาการใช้บริการ</th><th class="c">จำนวน หน่วย</th><th class="c">${unit ? 'ราคาต่อหน่วย' : ''}</th><th class="r">ราคารวม</th></tr></thead><tbody>
   ${groups.map(([k, name], gi) => `<tr class="grp"><td colspan="5">${gi + 1}. ${name}</td></tr>` +
-    (k === 'meet' && mainRoom ? meetBlock(k, mainRoom) : q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
+    (k === 'meet' && mainRoom ? meetBlock(k, mainRoom) : k === 'room' ? q.items.filter(i => i.sec === k).map((it, i, all) => row(it) + roomPics(it, i, all)).join('') : q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
   </tbody></table>
   <div style="display:flex;justify-content:flex-end;margin-top:12px"><table style="width:auto;min-width:260px">
     ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าบุฟเฟ่ต์กลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
@@ -830,7 +842,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     qdCancel() { const ui = DU(); ui.edit = false; ui.draft = null; ui.dirty = false; App.render(); },
     qdSave() {
       const ui = DU(), q = Store.quote(App.state.params[0]), d = ui.draft || {};
-      const out = {}; if (d.t && Object.keys(d.t).length) out.t = d.t; if (d.img !== undefined) out.img = d.img;
+      const out = {}; if (d.t && Object.keys(d.t).length) out.t = d.t; if (d.img !== undefined) out.img = d.img; if (d.rimg && Object.keys(d.rimg).length) out.rimg = d.rimg;
       if (Object.keys(out).length) q.docEdit = out; else delete q.docEdit;
       ui.edit = false; ui.draft = null; ui.dirty = false;
       App.touch(q, 'แก้ไขข้อมูลบนใบเสนอราคา'); App.render(); App.toast('บันทึกการแก้ไขบนใบเสนอราคาแล้ว');
@@ -843,6 +855,23 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       App.toast('กำลังอัปโหลดรูป…');
       try { d.img = await g.CatalogImages.storeImage(f); ui.dirty = true; App.render(); } catch (e) { App.toast(e.message || 'อัปโหลดรูปไม่สำเร็จ'); }
     },
+    // guest-room photos on the quotation (per room type)
+    async qdRImgAdd(el) {
+      const ui = DU(), d = ui.draft, k = el.dataset.k; if (!d || !g.CatalogImages) return;
+      const fs = await g.CatalogImages.pickFiles(true); if (!fs.length) return;
+      App.toast('กำลังอัปโหลดรูป…');
+      try {
+        const cur = (d.rimg || {})[k] !== undefined ? d.rimg[k].slice() : (App.state.ui.doc.rSys || {})[k] || [];
+        for (const f of fs) cur.push(await g.CatalogImages.storeImage(f));
+        (d.rimg || (d.rimg = {}))[k] = cur; ui.dirty = true; App.render();
+      } catch (e) { App.toast(e.message || 'อัปโหลดรูปไม่สำเร็จ'); }
+    },
+    qdRImgDel(el) {
+      const ui = DU(), d = ui.draft, k = el.dataset.k; if (!d) return;
+      const cur = (d.rimg || {})[k] !== undefined ? d.rimg[k].slice() : ((App.state.ui.doc.rSys || {})[k] || []).slice();
+      cur.splice(Number(el.dataset.i), 1); (d.rimg || (d.rimg = {}))[k] = cur; ui.dirty = true; App.render();
+    },
+    qdRImgRv(el) { const ui = DU(), d = ui.draft; if (d && d.rimg) { delete d.rimg[el.dataset.k]; ui.dirty = true; App.render(); } },
     qdImgDel() { const ui = DU(); if (ui.draft) { ui.draft.img = ''; ui.dirty = true; App.render(); } },
     qdImgRv() { const ui = DU(); if (ui.draft) { delete ui.draft.img; ui.dirty = true; App.render(); } },
     docSend() {
