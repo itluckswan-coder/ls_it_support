@@ -250,7 +250,7 @@
     render(params) {
       const b = curBeo(), q = b && Store.quote(b.quoteId);
       if (!b || !q) return '<div class="empty">ไม่พบใบฟังก์ชัน — <a href="#/beo">กลับไปหน้าใบฟังก์ชัน</a></div>';
-      if (!App.canPlan()) return `<div class="empty">ออกแบบผังงานใช้ได้เฉพาะผู้ดูแลระบบ แผนก F&B และแผนกจัดเลี้ยง — <a href="#/beo/${encodeURIComponent(b.id)}">กลับไปใบฟังก์ชัน</a></div>`;
+      if (!App.canPlan()) return `<div class="empty">ออกแบบผังงานใช้ได้เฉพาะผู้ดูแลระบบ ฝ่ายขาย แผนก F&B และแผนกจัดเลี้ยง — <a href="#/beo/${encodeURIComponent(b.id)}">กลับไปใบฟังก์ชัน</a></div>`;
       const days = U.daysOf(q.start, q.end), day = Math.min(dayOf(), days.length);
       const p = planOf(b, day), edit = canEdit();
       histSync();
