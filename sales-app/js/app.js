@@ -53,7 +53,7 @@
     },
     async login(ident, pw, remember) {
       if (g.API && g.API.online) {
-        try { const u = await g.API.login(ident, pw, remember); App.state.uid = u.id; localStorage.setItem('lsSales.cloudUid', u.id); return null; }
+        try { const u = await g.API.login(ident, pw, remember); App.clearSite(); App.state.uid = u.id; localStorage.setItem('lsSales.cloudUid', u.id); return null; }
         catch (e) { return e.message; }
       }
       ident = String(ident || '').trim().toLowerCase();
@@ -66,7 +66,7 @@
       u.lastLogin = U.nowTH();
       u.lastDevice = App.deviceName();
       Store.save();
-      App.state.uid = u.id;
+      App.clearSite(); App.state.uid = u.id;
       try {
         (remember ? localStorage : sessionStorage).setItem('lsSales.session', u.id);
         (remember ? sessionStorage : localStorage).removeItem('lsSales.session');
@@ -76,7 +76,7 @@
     logout() {
       if (g.API && g.API.online) g.API.logout();
       try { localStorage.removeItem('lsSales.session'); sessionStorage.removeItem('lsSales.session'); localStorage.removeItem('lsSales.cloudUid'); } catch (e) { /* ignore */ }
-      App.state.uid = null; App.go('#/login');
+      App.clearSite(); App.state.uid = null; App.go('#/login');
     },
     deviceName() {
       const ua = navigator.userAgent;
@@ -99,6 +99,8 @@
       if (route === 'setup' && !(cloud && g.API.setup)) { location.replace(App.state.uid ? '#/home' : '#/login'); return; }
       if (!App.state.uid && route !== 'login' && route !== 'setup') { location.replace('#/login'); return; }
       if (App.state.uid && route === 'login') { location.replace('#/home'); return; }
+      // after sign-in: pick a property (สถานที่) first; everything below shows that property's work
+      if (App.state.uid && route !== 'site' && route !== 'setup' && !App.site()) { location.replace('#/site'); return; }
       // a section the user's role can't see goes back to the home page
       const sec = (App.V[route] || App.V.home).nav || route;
       if (App.state.uid && sec !== 'home' && App.navHidden().includes(sec)) { location.replace('#/home'); return; }
@@ -151,7 +153,8 @@
       return `
 <header class="topbar">
   <button class="menu-btn" data-act="drawer" aria-label="เมนู">${ICON.menu}</button>
-  <a class="brand" href="#/home"><img src="img/logo-wide-sm.png" alt="Luck Swan Resort"><span class="sep"></span><span class="t">ลักษวรรณ รีสอร์ต<small>ฝ่ายขาย</small></span></a>
+  <a class="brand" href="#/home">${(p => p.id === 'resort' ? '<img src="img/logo-wide-sm.png" alt="Luck Swan Resort">' : App.propLogo(p, 'brand-word'))(App.prop(App.site()))}<span class="sep"></span><span class="t">${H(App.prop(App.site()).th)}<small>ฝ่ายขาย</small></span></a>
+  <button class="site-chip" data-act="siteSwitch" title="เปลี่ยนสถานที่" aria-label="เปลี่ยนสถานที่">${H(App.prop(App.site()).th)} <span aria-hidden="true">▾</span></button>
   <nav class="nav">${App.navTree().map(n => n.grp
     ? `<button type="button" class="nav-grp ${n.items.some(x => x[0] === active) ? 'on' : ''}" data-act="navGrp" data-g="${n.grp.id}" aria-haspopup="true" aria-expanded="false">${n.grp.name} <span class="caret" aria-hidden="true">▾</span></button>`
     : `<a href="${n[2]}" class="${n[0] === active ? 'on' : ''}">${n[1]}</a>`).join('')}</nav>
@@ -262,8 +265,8 @@
     ctxQuote() {
       const db = Store.db;
       let id = App.state.ctx || (function () { try { return sessionStorage.getItem('lsSales.ctx'); } catch (e) { return null; } })();
-      let q = id && db.quotes.find(x => x.id === id && x.status !== 'cancelled');
-      if (!q) q = db.quotes.filter(x => x.status === 'draft' || x.status === 'sent' || x.status === 'tentative').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
+      let q = id && db.quotes.find(x => x.id === id && x.status !== 'cancelled' && App.inSite(x));
+      if (!q) q = App.siteQuotes().filter(x => x.status === 'draft' || x.status === 'sent' || x.status === 'tentative').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
       return q || null;
     },
     setCtx(id) { App.state.ctx = id; try { sessionStorage.setItem('lsSales.ctx', id); } catch (e) { /* ignore */ } },
@@ -273,7 +276,7 @@
       Store.save();
     },
     pickQuoteModal(title, cb, filter) {
-      const qs = Store.db.quotes.filter(filter || (q => q.status !== 'cancelled')).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+      const qs = App.siteQuotes().filter(filter || (q => q.status !== 'cancelled')).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       App.modal(`<h2>${H(title)}</h2>
         <div>${qs.map(q => `<button class="pick" data-id="${H(q.id)}"><span><b>${H(q.client)}</b><br><span class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</span></span>${App.statusBadge(q.status)}</button>`).join('') || '<div class="empty">ไม่มีใบเสนอราคา</div>'}</div>
         <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button><a class="btn red" href="#/new" data-act="closeModal">+ ใบเสนอราคาใหม่</a></div>`,
@@ -415,8 +418,8 @@
   App.INP.search = U.debounce(el => {
     const v = el.value.trim().toLowerCase(), box = document.getElementById('searchRes');
     if (!v) { box.classList.add('hidden'); return; }
-    const qs = Store.db.quotes.filter(q => [q.id, q.client, q.title, q.contact, q.email].join(' ').toLowerCase().includes(v)).slice(0, 8);
-    const bs = Store.db.beos.filter(b => b.id.toLowerCase().includes(v)).slice(0, 3);
+    const qs = App.siteQuotes().filter(q => [q.id, q.client, q.title, q.contact, q.email].join(' ').toLowerCase().includes(v)).slice(0, 8);
+    const bs = App.siteBeos().filter(b => b.id.toLowerCase().includes(v)).slice(0, 3);
     box.innerHTML = qs.map(q => `<a href="#/quote/${encodeURIComponent(q.id)}"><b>${H(q.client)}</b> ${App.statusBadge(q.status)}<div class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</div></a>`).join('') +
       bs.map(b => `<a href="#/beo/${encodeURIComponent(b.id)}"><b>${H(b.id)}</b><div class="small muted">ใบฟังก์ชัน</div></a>`).join('') || '<div class="empty small">ไม่พบผลลัพธ์</div>';
     box.classList.remove('hidden');
@@ -507,9 +510,9 @@
       const db = Store.db, me = App.me(), now = new Date(), today = U.today();
       const hr = now.getHours();
       const greet = hr < 12 ? 'สวัสดีตอนเช้า' : hr < 17 ? 'สวัสดีตอนบ่าย' : 'สวัสดีตอนเย็น';
-      const quotes = db.quotes.slice().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+      const quotes = App.siteQuotes().sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       const ym = today.slice(0, 7);
-      const closed = db.quotes.filter(q => q.status === 'confirmed' && q.start.slice(0, 7) === ym).reduce((a, q) => a + App.calc(q).net, 0);
+      const closed = App.siteQuotes().filter(q => q.status === 'confirmed' && q.start.slice(0, 7) === ym).reduce((a, q) => a + App.calc(q).net, 0);
       const target = db.settings.target || 1;
       const pct = Math.round(closed / target * 100);
       const pkgFrom = Math.min(...D.FOOD.filter(f => f.cat === 'package').map(f => f.price));
@@ -560,14 +563,14 @@
     salesHome(me) { return App.salesRole(me); },
     followUps() {
       const out = [], today = U.today(), me = App.me();
-      for (const b of Store.db.beos) {
+      for (const b of App.siteBeos()) {
         const st = g.Approval ? g.Approval.state(b) : 'approved', q = Store.quote(b.quoteId), lnk = `<a class="link" href="#/beo/${encodeURIComponent(b.id)}">`;
         if (st === 'pending' && g.Approval.canDecide(b, me))
           out.push({ p: 0, color: 'var(--yellow)', title: `ใบฟังก์ชัน ${b.id} รออนุมัติ`, sub: `${q ? q.title + ' · ' : ''}แก้ไขโดย ${b.approval.requestedByName || '-'}`, action: lnk + 'ตรวจ</a>' });
         if (st === 'rejected' && b.approval.requestedBy === App.state.uid)
           out.push({ p: 0, color: 'var(--red)', title: `ใบฟังก์ชัน ${b.id} ถูกตีกลับ`, sub: b.approval.comment || '', action: lnk + 'แก้ไข</a>' });
       }
-      for (const q of App.V.home.salesHome(me) ? Store.db.quotes : []) {
+      for (const q of App.V.home.salesHome(me) ? App.siteQuotes() : []) {
         const open = `<a class="link" href="#/quote/${encodeURIComponent(q.id)}">`;
         if (q.status === 'sent' && q.views > 0)
           out.push({ p: 1, color: 'var(--red)', title: `${q.client} เปิดอ่านใบเสนอ ${q.views} ครั้ง`, sub: 'ยังไม่ตอบ' + (q.holdUntil ? ' · ห้องกันไว้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''), action: q.phone ? `<a class="link" href="${App.tel(q.phone)}">โทร</a>` : open + 'เปิด</a>' });

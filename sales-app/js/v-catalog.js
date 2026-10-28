@@ -402,7 +402,7 @@
       let ui = App.state.ui.rooms;
       if (!ui || ui.q !== (q && q.id)) ui = App.state.ui.rooms = Object.assign(roomState(q), { q: q && q.id });
       const co = U.addDays(ui.ci, ui.nights);
-      ui.site = ui.site || 'resort'; ui.bq = ui.bq || {}; ui.bf = ui.bf || { tier: 0, pax: 0 }; ui.dn = ui.dn || { tier: 0, pax: 0 };
+      ui.site = ui.site || (App.site() === 'boutique' ? 'boutique' : 'resort'); ui.bq = ui.bq || {}; ui.bf = ui.bf || { tier: 0, pax: 0 }; ui.dn = ui.dn || { tier: 0, pax: 0 };
       const sitePick = `<div class="row wrap rm-site" style="gap:10px;margin-bottom:14px"><span class="small muted">สถานที่</span><div class="seg white" role="radiogroup" aria-label="สถานที่">${[['resort', 'รีสอร์ท'], ['boutique', 'บูติก']].map(([k, l]) => `<button class="${ui.site === k ? 'on' : ''}" data-act="rmSite" data-v="${k}" role="radio" aria-checked="${ui.site === k}">${l}</button>`).join('')}</div></div>`;
       const dateBox = `<div class="datebox"><label>เช็กอิน<input type="date" value="${ui.ci}" data-change="rmCi"></label><label style="border-left:1px solid var(--line)">เช็กเอาต์<input type="date" value="${co}" data-change="rmCo"></label><span class="n">${ui.nights} คืน</span></div>`;
       if (ui.site === 'boutique') return this.boutique(q, ui, sitePick, dateBox);

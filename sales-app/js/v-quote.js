@@ -22,7 +22,7 @@
     nav: 'quote', title: 'ใบเสนอราคา',
     render() {
       const ui = App.state.ui.quotes || (App.state.ui.quotes = { st: 'all', q: '' });
-      const all = Store.db.quotes;
+      const all = App.siteQuotes();
       const qs = all.filter(q => (ui.st === 'all' || q.status === ui.st) && (!ui.q || [q.id, q.client, q.title, q.contact].join(' ').toLowerCase().includes(ui.q.toLowerCase())))
         .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       const cnt = s => all.filter(q => s === 'all' || q.status === s).length;
@@ -658,7 +658,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const w = W(), q = w.q;
       if (!q.title.trim() || !q.client.trim()) { w.step = 1; App.render(); App.toast('กรุณากรอกชื่องานและชื่อลูกค้า'); return; }
       wizBuild(w);
-      q.id = Store.nextId('QT'); q.owner = App.state.uid; q.room = w.sel.room;
+      q.id = Store.nextId('QT'); q.owner = App.state.uid; q.room = w.sel.room; q.site = App.site() || 'resort';
       q.createdAt = q.updatedAt = U.nowTH();
       q.history = [{ at: q.createdAt, t: 'สร้างใบเสนอราคา', by: App.me().name }];
       if (q.discount.value > 10) q.approval = App.can('discount_over') ? 'approved' : 'pending';
@@ -702,7 +702,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       if (!q) return '<div class="empty">ไม่พบใบเสนอราคา</div>';
       const ui = App.state.ui.doc && App.state.ui.doc.id === q.id ? App.state.ui.doc :
         (App.state.ui.doc = { id: q.id, ch: 'email', to: [q.email].concat(q.cc || []).filter(Boolean), unit: true, online: true, full: false, msg: null });
-      if (ui.msg == null) ui.msg = `เรียน ${q.contact || 'ลูกค้า'}\nขอบคุณที่ไว้วางใจ ลักษวรรณ รีสอร์ต ค่ะ แนบใบเสนอราคาสำหรับงาน${q.title} ${U.fmtRange(q.start, q.end)}${q.room ? ' ห้อง ' + ((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name || '') : ''}${q.holdUntil ? ' กันไว้ให้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''} ค่ะ`;
+      if (ui.msg == null) ui.msg = `เรียน ${q.contact || 'ลูกค้า'}\nขอบคุณที่ไว้วางใจ ${App.prop(App.siteOfQ(q)).th} ค่ะ แนบใบเสนอราคาสำหรับงาน${q.title} ${U.fmtRange(q.start, q.end)}${q.room ? ' ห้อง ' + ((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name || '') : ''}${q.holdUntil ? ' กันไว้ให้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''} ค่ะ`;
       const pending = q.approval === 'pending' && App.calc(q).pct > 10;
       const chLabel = { email: 'ส่งใบเสนอราคา', line: 'ส่งทาง LINE', link: 'คัดลอกลิงก์', pdf: 'พิมพ์ / บันทึก PDF' }[ui.ch];
       return `<div class="doc-wrap">
@@ -778,8 +778,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       App.state.ui.doc.meetAuto = meetAuto(mainRoom);
       return `<article class="doc${ed ? ' qd-editing' : ''}" id="qdPaper">
   <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
-    <div><b>${H(S.company)}</b><br>${H(S.address)}<br>ติดต่อโรงแรม ${H(S.phone)} / ติดต่อสำนักงานใหญ่ ${H(S.hq)}<br>สาขา <span style="background:#cfe6fb;padding:1px 40px 1px 8px;color:#1a3fd8">${F('branch', 'ลักษวรรณ รีสอร์ต')}</span></div>
-    <img src="img/logo-wide.png" alt="Luck Swan Resort" style="width:170px;flex:none">
+    <div><b>${H(S.company)}</b><br>${H(S.address)}<br>ติดต่อโรงแรม ${H(S.phone)} / ติดต่อสำนักงานใหญ่ ${H(S.hq)}<br>สาขา <span style="background:#cfe6fb;padding:1px 40px 1px 8px;color:#1a3fd8">${F('branch', App.prop(App.siteOfQ(q)).th)}</span></div>
+    ${(p => p.logo ? `<img src="${p.logo}" alt="${H(p.name)}" style="width:170px;flex:none">` : App.propLogo(p, 'doc-word'))(App.prop(App.siteOfQ(q)))}
   </div>
   <div class="blue b" style="margin:16px 0 10px;font-size:13px">Quotation<br>ใบเสนอราคา</div>
   <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:6px 14px;margin-bottom:14px">
@@ -847,7 +847,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     qdImgRv() { const ui = DU(); if (ui.draft) { delete ui.draft.img; ui.dirty = true; App.render(); } },
     docSend() {
       const q = Store.quote(App.state.params[0]), ui = DU(), c = App.calc(q);
-      const subject = `ใบเสนอราคา ${q.id} · ${q.title} · ลักษวรรณ รีสอร์ต`;
+      const subject = `ใบเสนอราคา ${q.id} · ${q.title} · ${App.prop(App.siteOfQ(q)).th}`;
       const summary = `${ui.msg}\n\nเลขที่: ${q.id}\nงาน: ${q.title}\nวันที่: ${U.fmtRange(q.start, q.end)} · ${q.pax} ท่าน\nยอดสุทธิ: ${U.n2(c.net)} บาท (รวม Service และ VAT)\nยืนราคาถึง: ${U.fmtD(q.validUntil)}`;
       let note = '';
       if (ui.ch === 'email') {
@@ -933,7 +933,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       return `<div class="page-hd no-print"><div><div class="small"><a class="link" href="#/quote/${encodeURIComponent(q.id)}">← ${H(q.id)}</a></div><h1>บิลค่าล่วงเวลา ${H(b.no)}</h1></div>
         <div class="row">${App.salesRole() ? `<button class="btn ghost red" data-act="otDel" data-id="${H(b.id)}">ลบบิล</button>` : ''}<button class="btn red" onclick="window.print()">พิมพ์ / PDF</button></div></div>
       <article class="doc">
-        <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start"><div><b>${H(S.company)}</b><br>${H(S.address)}<br>โทร ${H(S.phone || '')}</div><img src="img/logo-wide.png" alt="Luck Swan Resort" style="width:170px;flex:none"></div>
+        <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start"><div><b>${H(S.company)}</b><br>${H(S.address)}<br>โทร ${H(S.phone || '')}</div>${(p => p.logo ? `<img src="${p.logo}" alt="${H(p.name)}" style="width:170px;flex:none">` : App.propLogo(p, 'doc-word'))(App.prop(App.siteOfQ(q)))}</div>
         <div class="blue b" style="margin:16px 0 10px;font-size:13px">Overtime Invoice<br>ใบแจ้งค่าล่วงเวลาห้องประชุม</div>
         <div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px 14px;margin-bottom:14px">
           <b>ผู้รับบริการ</b><b>เลขที่บิล</b><b>วันที่ออกบิล</b>
