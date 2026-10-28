@@ -984,3 +984,28 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .bt-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start}
 .bt-body{padding:10px 4px 2px}
 @media (max-width:900px){.bt-grid{grid-template-columns:1fr}}
+
+/* properties (สถานที่): the picker after sign-in, the switch in the top bar */
+.site-page{max-width:1180px;margin:0 auto;padding:22px 24px 60px}
+.site-top{margin-bottom:28px}
+.site-page h1{font:600 30px var(--fh);margin:0 0 10px}
+.site-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px}
+.site-card{display:flex;flex-direction:column;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:0 4px 16px rgba(0,0,0,.08);padding:8px;cursor:pointer;color:inherit;font:inherit;transition:transform .15s,box-shadow .15s}
+.site-card:hover,.site-card:focus-visible{transform:translateY(-3px);box-shadow:0 10px 26px rgba(0,0,0,.14)}
+.site-card.on{outline:2px solid var(--teal)}
+.sc-hero{height:230px;display:flex;align-items:center;justify-content:center;background:#fff;border-radius:10px}
+.sc-logo{max-width:80%;max-height:150px}
+.sc-foot{display:flex;gap:14px;align-items:stretch;padding:8px 4px 4px}
+.sc-thumb{flex:none;width:96px;height:120px;border:1px solid var(--line);border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sc-mini{max-width:86px}
+.sc-txt{display:flex;flex-direction:column;gap:4px;min-width:0}
+.sc-txt b{font:600 17px var(--fh)}
+.site-word{display:inline-flex;flex-direction:column;align-items:center;font-family:Georgia,'Times New Roman',serif;color:#8E2A2E;line-height:1}
+.site-word b{font-size:30px;font-style:italic;font-weight:600;white-space:nowrap}
+.site-word small{color:#D9A400;letter-spacing:.5em;font-size:10px;margin-top:6px}
+.sc-mini.site-word b{font-size:12px;white-space:normal;text-align:center}.sc-mini.site-word small{font-size:6px;letter-spacing:.3em}
+.brand-word.site-word b{font-size:16px}.brand-word.site-word small{font-size:7px;letter-spacing:.35em;margin-top:3px}
+.doc-word.site-word{width:170px;flex:none}.doc-word.site-word b{font-size:24px}
+.site-chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:6px 12px;font:600 13px var(--fb, inherit);cursor:pointer;white-space:nowrap;margin-left:8px}
+.site-chip:hover{background:var(--bg)}
+@media (max-width:640px){.site-page{padding:16px}.sc-hero{height:170px}.site-chip{padding:5px 9px;font-size:12px}}

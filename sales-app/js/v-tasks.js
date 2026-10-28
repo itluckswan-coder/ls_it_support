@@ -19,7 +19,7 @@
   const when = iso => iso ? U.fmtD(iso.slice(0, 10), { year: false }) + ' ' + iso.slice(11, 16) : '—';
   const empName = id => (Store.db.employees.find(e => e.id === id) || {}).name;
   // function sheets waiting for the admin's sign-off: the quote is confirmed and no edit is waiting for approval
-  const toApprove = () => Store.db.beos.filter(b => { const q = Store.quote(b.quoteId); return q && q.status === 'confirmed' && !b.signoff && g.Approval && g.Approval.state(b) !== 'pending'; });
+  const toApprove = () => App.siteBeos().filter(b => { const q = Store.quote(b.quoteId); return q && q.status === 'confirmed' && !b.signoff && g.Approval && g.Approval.state(b) !== 'pending'; });
   const ICON_BELL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>';
 
   /* ---------------- notifications (bell) ---------------- */
@@ -37,12 +37,12 @@
     if (App.leaveWaiting) for (const l of App.leaveWaiting()) out.push({ at: l.at, title: 'ใบลารออนุมัติ', sub: l.no + ' · ' + (l.fullName || l.byName), href: '#/leave', tone: 'yellow' });
     for (const l of Store.db.leaves || []) if (l.by === me.id && (l.status === 'approved' || l.status === 'rejected')) { const x = (l.sign || {}).gm || (l.sign || {}).head || {}; out.push({ at: x.at, title: l.status === 'approved' ? 'ใบลาได้รับอนุมัติ' : 'ใบลาไม่ได้รับอนุมัติ', sub: l.no + (x.byName ? ' · โดย ' + x.byName : ''), href: '#/leave', tone: l.status === 'approved' ? 'teal' : 'red' }); }
     // meeting rooms booked over another booking's times: the admin is asked; the seller hears back once approved
-    for (const q of Store.db.quotes) {
+    for (const q of App.siteQuotes()) {
       if (admin && q.overlapReq && !q.overlapOk && q.status !== 'cancelled') out.push({ at: q.overlapReq.at, title: 'ขออนุมัติจองห้องประชุมทับเวลา', sub: q.id + ' · ' + q.client + ' · โดย ' + q.overlapReq.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'yellow' });
       if (q.bookOk && q.owner === me.id && q.bookOk.by !== me.id) out.push({ at: q.bookOk.at, title: 'ใบเสนอราคาได้รับอนุมัติ', sub: q.id + ' · ' + q.client + ' · โดย ' + q.bookOk.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'teal' });
       if (q.overlapOk && q.owner === me.id && q.overlapOk.by !== me.id) out.push({ at: q.overlapOk.at, title: 'อนุมัติจองห้องประชุมทับเวลาแล้ว', sub: q.id + ' · โดย ' + q.overlapOk.byName, href: '#/quote/' + encodeURIComponent(q.id), tone: 'teal' });
     }
-    for (const b of Store.db.beos) {
+    for (const b of App.siteBeos()) {
       const a = b.approval || {};
       if (g.Approval && g.Approval.canDecide(b, me)) out.push({ at: a.requestedAt, title: 'การแก้ไขใบฟังก์ชันรออนุมัติ', sub: b.id + ' · แก้ไขโดย ' + (a.requestedByName || ''), href: '#/beo/' + encodeURIComponent(b.id), tone: 'yellow' });
       if (a.state === 'rejected' && a.requestedBy === me.id) out.push({ at: a.at, title: 'ใบฟังก์ชันถูกตีกลับ', sub: b.id + (a.comment ? ' · ' + a.comment : ''), href: '#/beo/' + encodeURIComponent(b.id), tone: 'red' });
@@ -155,8 +155,8 @@
     },
 
     approve() {
-      const wait = toApprove(), done = Store.db.beos.filter(b => b.signoff).sort((a, b) => b.signoff.at.localeCompare(a.signoff.at));
-      const editing = Store.db.beos.filter(b => g.Approval && g.Approval.state(b) === 'pending');
+      const wait = toApprove(), done = App.siteBeos().filter(b => b.signoff).sort((a, b) => b.signoff.at.localeCompare(a.signoff.at));
+      const editing = App.siteBeos().filter(b => g.Approval && g.Approval.state(b) === 'pending');
       const row = (b, btn) => { const q = Store.quote(b.quoteId) || {}, ack = Object.values(b.depts || {}), ok = ack.filter(d => d.ack).length; return `<tr>
         <td><a href="#/beo/${encodeURIComponent(b.id)}" style="font-weight:600">${H(b.id)}</a><div class="sub">${H(q.client || '')} · ${H(q.title || '')}</div><div class="sub show-m">${q.start ? U.fmtRange(q.start, q.end) : ''} · ${U.n(q.pax || 0)} ท่าน</div></td>
         <td class="hide-m">${q.start ? U.fmtRange(q.start, q.end) : '—'}</td><td class="hide-m num">${U.n(q.pax || 0)}</td>
@@ -187,7 +187,7 @@
     const isNew = !t.id, users = Store.db.users.filter(u => u.status !== 'disabled' && (sc.all || (u.id !== me0.id && sc.roles.has(App.roleOf(u).id))));
     const depts = D.DEPTS.filter(d => sc.all || sc.depts.has(d.id));
     if (!users.length) t.to.type = 'dept'; else if (!depts.length) t.to.type = 'user';
-    const quotes = Store.db.quotes.filter(q => q.status !== 'cancelled').sort((a, b) => a.start.localeCompare(b.start));
+    const quotes = App.siteQuotes().filter(q => q.status !== 'cancelled').sort((a, b) => a.start.localeCompare(b.start));
     App.modal(`<h2>${isNew ? 'มอบหมายงาน' : 'แก้ไขงานที่มอบหมาย'}</h2>
       <div class="field"><label class="f" for="tkTitle">งานที่ต้องทำ</label><input class="input" id="tkTitle" name="title" value="${H(t.title || '')}" placeholder="เช่น โทรยืนยันจำนวนผู้เข้าร่วม"></div>
       <div class="field"><label class="f" for="tkDetail">รายละเอียด</label><textarea class="input" id="tkDetail" name="detail" rows="3" style="height:auto;padding-top:10px">${H(t.detail || '')}</textarea></div>

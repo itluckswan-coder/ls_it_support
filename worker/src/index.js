@@ -6,6 +6,19 @@ const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'c
 const PBKDF2_ITER = 10000; // kept modest so login fits the Workers free-plan CPU budget
 const SESSION_DAYS = { remember: 30, normal: 1 };
 const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task', 'leave'];
+// properties (สถานที่): a quotation's site (missing = resort); function sheets and staff plans follow their quotation.
+// user.sites limits which an account may open (missing or empty = all); admins open all
+const SITE_IDS = ['resort', 'boutique', 'maneein'];
+const userSites = u => u.role === 'admin' || !Array.isArray(u.sites) || !u.sites.length ? SITE_IDS : SITE_IDS.filter(x => u.sites.includes(x));
+const siteOk = (u, site) => userSites(u).includes(site || 'resort');
+const quoteSite = async (env, qid) => { const r = qid && await env.DB.prepare("SELECT json_extract(data, '$.site') AS site FROM docs WHERE kind = 'quote' AND id = ?").bind(String(qid)).first(); return r ? r.site || 'resort' : null; };
+// may this user see / change this doc? (only quote, beo and staff belong to a property)
+async function docSiteOk(env, user, kind, id, data) {
+  if (userSites(user).length === SITE_IDS.length) return true;
+  if (kind === 'quote') return siteOk(user, data ? data.site : await quoteSite(env, id));
+  if (kind === 'beo' || kind === 'staff') { const s = await quoteSite(env, kind === 'beo' ? data && data.quoteId : id); return s == null || siteOk(user, s); }
+  return true;
+}
 const MAX_IMAGE_BYTES = 1500000;
 
 /* ---------------- helpers ---------------- */
@@ -111,10 +124,17 @@ async function state(env, since, user) {
     : (await env.DB.prepare('SELECT * FROM users').all()).results;
   // every user id, so clients can drop accounts that were deleted since their last sync
   const userIds = since ? (await env.DB.prepare('SELECT id FROM users').all()).results.map(r => r.id) : users.map(r => r.id);
+  // only the properties this user may open
+  let siteDocs = docs;
+  if (user && userSites(user).length < SITE_IDS.length) {
+    const qs = new Map((await env.DB.prepare("SELECT id, json_extract(data, '$.site') AS site FROM docs WHERE kind = 'quote'").all()).results.map(r => [r.id, r.site || 'resort']));
+    const ok = qid => !qs.has(qid) || siteOk(user, qs.get(qid));
+    siteDocs = docs.filter(d => d.deleted || (d.kind === 'quote' ? ok(d.id) : d.kind === 'staff' ? ok(d.id) : d.kind === 'beo' ? ok(JSON.parse(d.data).quoteId) : true));
+  }
   return {
     serverTime: now(),
     userIds,
-    docs: docs.filter(d => d.kind !== 'leave' || !user || d.deleted || leaveSeen(JSON.parse(d.data), user)).map(d => ({ kind: d.kind, id: d.id, version: d.version, deleted: !!d.deleted, data: d.deleted ? null : JSON.parse(d.data) })),
+    docs: siteDocs.filter(d => d.kind !== 'leave' || !user || d.deleted || leaveSeen(JSON.parse(d.data), user)).map(d => ({ kind: d.kind, id: d.id, version: d.version, deleted: !!d.deleted, data: d.deleted ? null : JSON.parse(d.data) })),
     users: users.map(r => Object.assign(publicUser(r), { _v: r.version }))
   };
 }
@@ -291,6 +311,7 @@ async function putDoc(req, env, user, kind, id) {
     return json({ error: 'conflict', message: 'ข้อมูลนี้ถูกแก้ไขโดยผู้อื่น — โหลดเวอร์ชันล่าสุดแล้ว', doc: live ? { kind, id, version: row.version, data: JSON.parse(row.data) } : null }, 409);
   }
   const prev = live ? JSON.parse(row.data) : null;
+  if (!(await docSiteOk(env, user, kind, id, data)) || (prev && !(await docSiteOk(env, user, kind, id, prev)))) fail(403, 'คุณไม่มีสิทธิ์เข้าสถานที่นี้');
   const out = await applyRules(env, user, kind, id, data, prev);
   const v = (row ? row.version : 0) + 1, at = now();
   await env.DB.prepare('INSERT INTO docs (kind, id, data, version, updated_at, updated_by, deleted) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data, version = excluded.version, updated_at = excluded.updated_at, updated_by = excluded.updated_by, deleted = 0')
@@ -312,6 +333,8 @@ async function deleteDoc(env, user, kind, id) {
     if (!t || t.by !== user.id) fail(403, 'ลบได้เฉพาะงานที่คุณมอบหมาย');
   } else {
     if (user.role !== 'admin' && !(RANK[user.role] >= RANK.manager)) fail(403, 'เฉพาะผู้จัดการขึ้นไปที่ลบข้อมูลได้');
+    const row = await env.DB.prepare('SELECT data FROM docs WHERE kind = ? AND id = ? AND deleted = 0').bind(kind, id).first();
+    if (row && !(await docSiteOk(env, user, kind, id, JSON.parse(row.data)))) fail(403, 'คุณไม่มีสิทธิ์เข้าสถานที่นี้');
   }
   await env.DB.prepare('UPDATE docs SET deleted = 1, version = version + 1, updated_at = ?, updated_by = ? WHERE kind = ? AND id = ?').bind(now(), user.id, kind, id).run();
   await audit(env, user, kind, id, 'delete');
@@ -376,7 +399,9 @@ async function putUser(req, env, user, id) {
   if (id === user.id && !(data.perms && data.perms.users) && user.role !== 'admin') fail(400, 'ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้');
   const clean = { name: String(data.name || '').slice(0, 100), role: data.role, roleId: /^r_[a-z0-9]{4,20}$/.test(String(data.roleId || '')) ? data.roleId : '', dept: String(data.dept || '').slice(0, 100), phone: String(data.phone || '').slice(0, 40),
     status: ['active', 'invited', 'disabled'].includes(data.status) ? data.status : 'invited', twoFA: !!data.twoFA,
-    perms: Object.fromEntries(ALL_PERMS.map(p => [p, !!(data.perms && data.perms[p])])), lastLogin: row ? JSON.parse(row.data).lastLogin || null : null, lastDevice: row ? JSON.parse(row.data).lastDevice || '' : '' };
+    perms: Object.fromEntries(ALL_PERMS.map(p => [p, !!(data.perms && data.perms[p])])), lastLogin: row ? JSON.parse(row.data).lastLogin || null : null, lastDevice: row ? JSON.parse(row.data).lastDevice || '' : '',
+    // which properties the account may open: set by admins only
+    sites: user.role === 'admin' ? SITE_IDS.filter(x => Array.isArray(data.sites) && data.sites.includes(x)) : row ? JSON.parse(row.data).sites || [] : [] };
   if (row) {
     if (row.version !== Number(version)) fail(409, 'ข้อมูลผู้ใช้นี้ถูกแก้ไขโดยผู้อื่น กรุณาโหลดใหม่');
     await env.DB.prepare('UPDATE users SET email = ?, data = ?, version = version + 1, updated_at = ? WHERE id = ?').bind(data.email, JSON.stringify(clean), now(), id).run();

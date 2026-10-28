@@ -73,7 +73,7 @@
     render(p) {
       const ui = App.state.ui.beo || (App.state.ui.beo = { f: 'soon', day: 1 });
       const today = U.today();
-      const all = Store.db.beos.map(b => ({ b, q: Store.quote(b.quoteId) })).filter(x => x.q).sort((a, b) => a.q.start.localeCompare(b.q.start));
+      const all = App.siteBeos().map(b => ({ b, q: Store.quote(b.quoteId) })).filter(x => x.q).sort((a, b) => a.q.start.localeCompare(b.q.start));
       const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? b.status === 'draft' : q.end >= today && U.diffDays(today, q.start) <= 60));
       const sel = all.find(x => x.b.id === p[0]) || list[0] || all[0];
       if (sel && !p[0]) { history.replaceState(null, '', '#/beo/' + encodeURIComponent(sel.b.id)); }
@@ -130,7 +130,7 @@
   </div></div>`;
     }
   };
-  const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]) || Store.db.beos[0];
+  const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]) || App.siteBeos()[0];
 
   /* ---------- approval ---------- */
   const fmtAt = iso => iso ? U.fmtD(iso.slice(0, 10), { year: false }) + ' ' + iso.slice(11, 16) : '';
@@ -446,7 +446,7 @@
       const [y, m] = ui.ym.split('-').map(Number);
       const first = new Date(y, m - 1, 1), startD = U.addDays(U.iso(first), -first.getDay());
       // drafts, tentative and confirmed quotes with a date show (sent and cancelled ones don't); a missing end date counts as a one-day event
-      const qs = Store.db.quotes.filter(q => q.status !== 'cancelled' && q.status !== 'sent' && q.start && (ui.area === 'all' || q.room === ui.area || (q.items || []).some(i => i.ref === ui.area))).map(q => q.end && q.end >= q.start ? q : Object.assign({}, q, { end: q.start }));
+      const qs = App.siteQuotes().filter(q => q.status !== 'cancelled' && q.status !== 'sent' && q.start && (ui.area === 'all' || q.room === ui.area || (q.items || []).some(i => i.ref === ui.area))).map(q => q.end && q.end >= q.start ? q : Object.assign({}, q, { end: q.start }));
       const inMonth = qs.filter(q => q.start.slice(0, 7) === ui.ym || q.end.slice(0, 7) === ui.ym);
       const stat = s => { const l = inMonth.filter(q => q.status === s); return [l.length, l.reduce((a, q) => a + App.calc(q).net, 0)]; };
       const evOn = d => qs.filter(q => d >= q.start && d <= q.end);
@@ -597,7 +597,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     },
     renderShifts(p) {
       const db = Store.db;
-      const candidates = db.quotes.filter(q => q.status !== 'cancelled' && q.status !== 'draft').sort((a, b) => a.start.localeCompare(b.start));
+      const candidates = App.siteQuotes().filter(q => q.status !== 'cancelled' && q.status !== 'draft').sort((a, b) => a.start.localeCompare(b.start));
       const q = Store.quote(p[0]) || Store.quote(App.state.ui.staffQ) || candidates.find(x => db.staff[x.id]) || candidates[0];
       if (!q) return '<div class="empty">ยังไม่มีงานที่ต้องจัดรอบพนักงาน</div>';
       App.state.ui.staffQ = q.id;
@@ -1232,6 +1232,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       ${isAdmin ? '<button class="chip role-add" data-act="roleAdd" title="เพิ่มบทบาทใหม่" aria-label="เพิ่มบทบาทใหม่">＋</button><button class="chip role-edit" data-act="roleEdit" title="แก้ไขชื่อบทบาท">✎ แก้ไขบทบาท</button>' : ''}</div>
     <div class="small muted" style="margin:16px 0 8px">แผนก</div>
     <select class="input" data-change="usDept" ${canEdit ? '' : 'disabled'}>${depts.concat(depts.includes(dr.dept) ? [] : [dr.dept]).map(d => `<option ${d === dr.dept ? 'selected' : ''}>${H(d)}</option>`).join('')}</select>
+    <div class="small muted" style="margin:16px 0 8px">สถานที่ที่เข้าได้</div>
+    <div class="row wrap" style="gap:6px">${dr.role === 'admin' ? '<span class="small muted">ผู้ดูแลระบบเข้าได้ทุกสถานที่</span>' : App.PROPS.map(p => `<button class="chip ${App.sitesOf(dr).includes(p.id) ? 'on' : ''}" data-act="usSite" data-v="${p.id}" ${isAdmin ? '' : 'disabled'}>${H(p.th)}</button>`).join('')}</div>
     <div class="small muted" style="margin:16px 0 4px">สิทธิ์การใช้งาน</div>
     ${D.PERMS.map(p => `<div class="perm"><div><div>${H(p.name)}</div>${p.note ? `<div class="xs muted">${H(p.note)}</div>` : ''}</div>${App.sw(p.name, dr.perms[p.id], `data-change="usPerm" data-p="${p.id}" ${canEdit ? '' : 'disabled'}`)}</div>`).join('')}
     <div style="background:var(--bg);border-radius:12px;padding:12px 14px;margin:14px 0" class="small">
@@ -1253,10 +1255,18 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     usSel(el) { UU().sel = el.dataset.v; UU().draft = null; App.render(); if (window.innerWidth <= 1100) document.getElementById('usPanel')?.scrollIntoView({ behavior: 'smooth' }); },
     usDraftRole(el) { const d = UU().draft, r = App.roles().find(x => x.id === el.dataset.v); if (!r) return; setRole(d, r); d.perms = permsOf(r); App.render(); },
     us2fa() { const d = UU().draft; d.twoFA = !d.twoFA; App.render(); },
+    // properties an account may open (admins only set this; admins themselves open all)
+    usSite(el) {
+      if (App.me().role !== 'admin') return;
+      const d = UU().draft, id = el.dataset.v, cur = App.sitesOf(d);
+      const next = cur.includes(id) ? cur.filter(x => x !== id) : cur.concat(id);
+      if (!next.length) { App.toast('ต้องเลือกอย่างน้อย 1 สถานที่'); return; }
+      d.sites = App.PROPS.map(p => p.id).filter(x => next.includes(x)); App.render();
+    },
     usSave() {
       const d = UU().draft, u = Store.db.users.find(x => x.id === d.id);
       if (u.id === App.state.uid && !d.perms.users) { App.toast('ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้'); return; }
-      Object.assign(u, { role: d.role, dept: d.dept, perms: d.perms, twoFA: d.twoFA }); if (d.roleId) u.roleId = d.roleId; else delete u.roleId; Store.save(); UU().draft = null; App.render(); App.toast('บันทึกแล้ว');
+      Object.assign(u, { role: d.role, dept: d.dept, perms: d.perms, twoFA: d.twoFA }); if (App.me().role === 'admin' && d.sites) u.sites = d.sites; if (d.roleId) u.roleId = d.roleId; else delete u.roleId; Store.save(); UU().draft = null; App.render(); App.toast('บันทึกแล้ว');
     },
     usToggle() {
       const u = Store.db.users.find(x => x.id === UU().sel);

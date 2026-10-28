@@ -18,7 +18,7 @@
   const FIRST_YEAR = 2026;
   function yearSpan() {
     const now = U.d(U.today()).getFullYear();
-    const last = Store.db.quotes.filter(q => q.status === 'confirmed' && q.start).reduce((m, q) => Math.max(m, Number(q.start.slice(0, 4)) || 0), now);
+    const last = App.siteQuotes().filter(q => q.status === 'confirmed' && q.start).reduce((m, q) => Math.max(m, Number(q.start.slice(0, 4)) || 0), now);
     return { min: Math.min(FIRST_YEAR, now), max: Math.max(now, last) };
   }
   const UNIT = { day: 'วัน', week: 'สัปดาห์', month: 'เดือน' };
@@ -104,7 +104,7 @@
       const ys = yearSpan(); ui.year = Math.min(ys.max, Math.max(ys.min, ui.year));
       if (!modesFor(ui).includes(ui.mode)) ui.mode = ui.month == null ? 'month' : 'week';
       const db = Store.db, ps = periods(ui), rg = range(ui), pr = prevRange(ui), from = rg.a, to = rg.b;
-      const live = db.quotes.filter(q => q.status !== 'cancelled');
+      const live = App.siteQuotes().filter(q => q.status !== 'cancelled');
       const inRange = q => q.start >= from && q.start <= to;
       const idx = q => ps.findIndex(p => q.start >= p.a && q.start <= p.b);
       const conf = ps.map(() => 0), pend = ps.map(() => 0);
@@ -118,9 +118,9 @@
       // revenue by section (before discount, service charge and VAT)
       const bySec = SEC.map(([k, name, color]) => ({ name, color, v: cq.reduce((a, q) => a + (App.calc(q).by[k] || 0), 0) }));
       // quote status mix (count + value) for events in range
-      const stParts = ST.map(([k, name, color]) => { const qs = db.quotes.filter(q => q.status === k && inRange(q)); return { name, color, v: qs.length, tip: qs.length + ' ใบ · ' + baht(qs.reduce((a, q) => a + App.calc(q).net, 0)) }; });
-      const cancelled = db.quotes.filter(q => q.status === 'cancelled' && inRange(q)).length;
-      const sent = db.quotes.filter(q => q.status !== 'draft' && inRange(q)), won = sent.filter(q => q.status === 'confirmed');
+      const stParts = ST.map(([k, name, color]) => { const qs = App.siteQuotes().filter(q => q.status === k && inRange(q)); return { name, color, v: qs.length, tip: qs.length + ' ใบ · ' + baht(qs.reduce((a, q) => a + App.calc(q).net, 0)) }; });
+      const cancelled = App.siteQuotes().filter(q => q.status === 'cancelled' && inRange(q)).length;
+      const sent = App.siteQuotes().filter(q => q.status !== 'draft' && inRange(q)), won = sent.filter(q => q.status === 'confirmed');
       // by sales person
       const people = {};
       for (const q of cq) people[q.owner] = (people[q.owner] || 0) + App.calc(q).net;
@@ -201,7 +201,7 @@
     dashCsv() {
       const ui = App.state.ui.dash, ps = periods(ui), db = Store.db;
       const rows = ps.map(p => {
-        const qs = db.quotes.filter(q => q.start >= p.a && q.start <= p.b);
+        const qs = App.siteQuotes().filter(q => q.start >= p.a && q.start <= p.b);
         const sum = st => Math.round(qs.filter(q => st.includes(q.status)).reduce((a, q) => a + App.calc(q).net, 0));
         return [p.label, p.a, p.b, sum(['confirmed']), sum(PENDING), qs.filter(q => q.status === 'confirmed').length].join(',');
       });

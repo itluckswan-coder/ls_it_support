@@ -46,7 +46,7 @@
     task: (db.tasks || []).map(t => [t.id, t]),
     leave: (db.leaves || []).map(l => [l.id, l])
   });
-  const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, roleId: u.roleId || '', dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {} });
+  const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, roleId: u.roleId || '', dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {}, sites: u.sites || [] });
 
   const API = {
     online: false, setup: false, token: null, serverTime: null, offline: false,
