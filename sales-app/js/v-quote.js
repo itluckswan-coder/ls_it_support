@@ -134,6 +134,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         ${App.holding(q) ? `<button class="btn ghost sm" data-act="qToBeo">ใบฟังก์ชัน</button><a class="btn ghost sm" href="#/staff/${qid(q.id)}">จัดรอบพนักงาน</a>` : ''}
         ${q.status !== 'cancelled' ? `<button class="btn ghost sm" data-act="qStatus" data-v="cancelled" style="color:var(--red)">ยกเลิก</button>` : `<button class="btn ghost sm" data-act="qStatus" data-v="draft">กู้คืนเป็นร่าง</button>`}
       </div>
+      ${App.holding(q) && !q.bookOk && !Store.db.beos.some(b => b.quoteId === q.id) ? `<div class="xs muted" style="margin-top:10px">ออกใบฟังก์ชันได้หลังผู้ดูแลระบบกด “อนุมัติใบเสนอราคา”</div>` : ''}
       ${bookOkBox(q)}
       ${canDelQ() ? `<button class="btn ghost red sm" style="width:100%;margin-top:12px" data-act="qDelete" data-id="${H(q.id)}">ลบใบเสนอราคา</button>` : ''}
       ${q.history && q.history.length ? `<div class="hr"></div><div class="small muted" style="margin-bottom:6px">ประวัติ</div>${q.history.slice(0, 5).map((h, i) => `<div class="row small" style="padding:4px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('')}` : ''}
@@ -344,6 +345,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     },
     qToBeo() {
       const q = cur(); const b = Store.db.beos.find(x => x.quoteId === q.id);
+      // a function sheet is issued only from a quotation the admin approved (อนุมัติใบเสนอราคา)
+      if (!b && !q.bookOk) { App.toast('ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน จึงออกใบฟังก์ชันได้'); return; }
       if (b) App.go('#/beo/' + qid(b.id)); else { const nb = App.makeBEO(q); App.go('#/beo/' + qid(nb.id)); }
     },
     qDetails() { detailsModal(cur()); },

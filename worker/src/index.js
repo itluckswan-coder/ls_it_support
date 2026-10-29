@@ -199,6 +199,11 @@ async function applyRules(env, user, kind, id, data, prev) {
   }
   if (kind === 'beo') {
     if (!can(user, 'create_quote') && !can(user, 'staff')) fail(403, 'คุณมีสิทธิ์ดูใบฟังก์ชันอย่างเดียว');
+    // a new function sheet needs its quotation approved by an admin (อนุมัติใบเสนอราคา)
+    if (!prev) {
+      const qr = await env.DB.prepare("SELECT json_extract(data, '$.bookOk.by') AS ok FROM docs WHERE kind = 'quote' AND id = ? AND deleted = 0").bind(String(data.quoteId || '')).first();
+      if (!qr || !qr.ok) fail(403, 'ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน จึงออกใบฟังก์ชันได้');
+    }
     const rank = RANK[user.role] || 1;
     const changed = !prev || JSON.stringify(beoContent(prev)) !== JSON.stringify(beoContent(data));
     const prevAppr = prev ? (prev.approval || { state: 'approved' }) : null;

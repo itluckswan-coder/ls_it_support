@@ -360,7 +360,7 @@
       App.pickQuoteModal('สร้างใบฟังก์ชันจากใบเสนอราคา', id => {
         const ex = Store.db.beos.find(b => b.quoteId === id);
         const b = ex || App.makeBEO(Store.quote(id)); App.go('#/beo/' + encodeURIComponent(b.id));
-      }, q => q.status !== 'cancelled' && q.status !== 'draft');
+      }, q => q.status !== 'cancelled' && q.status !== 'draft' && (!!q.bookOk || Store.db.beos.some(b => b.quoteId === q.id))); // only quotations the admin approved
     },
     beoSend() {
       const b = curB(), q = Store.quote(b.quoteId);
