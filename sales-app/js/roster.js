@@ -2,7 +2,9 @@
  * a shift code or a mark (DAY OFF, EXTRA, CDO, WOP, VC) per day, the day's room forecast (OCC%) and function guests,
  * and each person's totals. Heads of department fill their department's rows, HR (leave_hr) and admins any row; it is
  * signed in turn by a head (หัวหน้า) → HR (ทรัพยากรบุคคล) → an admin (ผู้จัดการ), and prints on one A4 landscape page.
- * Stored as doc kind 'roster', id "<site>:<YYYY-MM>" (the month the period ends in); the worker applies the same rules. */
+ * One roster per department (same form for every department), each signed on its own.
+ * Stored as doc kind 'roster', id "<site>:<dept>:<YYYY-MM>" (the month the period ends in); the worker applies the same rules.
+ * (Rosters made before the split, "<site>:<YYYY-MM>", hold every department; a department's new roster copies its rows from one.) */
 (function (g) {
   'use strict';
   const { U, App, Store } = g, D = g.DATA, H = U.esc;
@@ -23,9 +25,11 @@
   const me = () => App.me();
   const isHr = u => !!u && (u.role === 'admin' || !!(u.perms && u.perms.leave_hr));
   const isHead = u => !!u && (u.role === 'head' || u.role === 'manager');
-  const canEdit = () => isHr(me()) || isHead(me());
-  const canRow = row => isHr(me()) || (isHead(me()) && !!App.userDept && row.dept === App.userDept(me()));
-  const mayStep = (k, u) => k === 'head' ? isHead(u) || u.role === 'admin' : k === 'hr' ? isHr(u) : u.role === 'admin';
+  const myDept = () => App.userDept ? App.userDept(me()) : null;
+  // heads work on their own department's roster; HR and admins on any
+  const canEdit = () => isHr(me()) || (isHead(me()) && myDept() === UI().dept);
+  const canRow = () => canEdit();
+  const mayStep = (k, u) => k === 'head' ? u.role === 'admin' || (isHead(u) && myDept() === UI().dept) : k === 'hr' ? isHr(u) : u.role === 'admin';
 
   /* ---- periods: 26th of one month to the 25th of the next, keyed by the month it ends in ---- */
   const pad = n => String(n).padStart(2, '0');
@@ -42,8 +46,16 @@
     return { work, off, ex, vc, total: days.length, left: (Number(row.vcStart) || 0) - vc };
   };
   const pax = (site, d) => App.siteQuotes().filter(q => (q.status === 'tentative' || q.status === 'confirmed') && q.start && q.start <= d && d <= (q.end || q.start)).reduce((a, q) => a + (Number(q.pax) || 0), 0);
-  const cur = () => { const ui = UI(); return rosters().find(r => r.id === (App.site() || 'resort') + ':' + ui.key); };
-  const UI = () => App.state.ui.roster || (App.state.ui.roster = { key: keyOf(U.today()), brush: null });
+  const site = () => App.site() || 'resort';
+  const rid = (dept, key) => site() + ':' + dept + ':' + key;
+  const legacy = key => rosters().find(r => r.id === site() + ':' + key); // a roster from before the split by department
+  const cur = () => { const ui = UI(); return rosters().find(r => r.id === rid(ui.dept, ui.key)); };
+  const UI = () => {
+    const ui = App.state.ui.roster || (App.state.ui.roster = { key: keyOf(U.today()), brush: null });
+    if (!ui.dept || !D.DEPTS.some(d => d.id === ui.dept)) { const m = myDept(); ui.dept = D.DEPTS.some(d => d.id === m) ? m : (D.DEPTS[0] || {}).id; }
+    return ui;
+  };
+  const deptEmps = dept => Store.db.employees.filter(e => (App.SITES ? App.SITES.of(e) : 'resort') === site() && e.dept === dept);
 
   // any change to the table after someone signed sends it back for signatures
   const touched = r => { if (r.sign && Object.keys(r.sign).length) { r.sign = {}; App.toast('แก้ไขตารางแล้ว — ต้องลงนามใหม่ตามลำดับ'); } r.updatedAt = U.nowTH(); Store.save(); App.render(); };
@@ -59,11 +71,12 @@
   App.V.staff.renderRoster = function () {
     const ui = UI(), site = App.site() || 'resort', r = cur(), days = daysOf(ui.key), u = me(), edit = canEdit();
     const prop = App.prop ? App.prop(site) : { th: site };
+    const dtabs = `<div class="row wrap no-print" style="gap:6px;margin-bottom:14px" role="tablist" aria-label="แผนก">${D.DEPTS.map(d => { const has = rosters().some(x => x.id === rid(d.id, ui.key)); return `<button class="chip ${ui.dept === d.id ? 'on' : ''}" role="tab" data-act="rsDept" data-v="${d.id}"><i class="dot" style="background:${d.color};border-radius:3px"></i> ${H(d.name)} <span class="n">${deptEmps(d.id).length}</span>${has ? ' ✓' : ''}</button>`; }).join('')}</div>`;
     const nav = `<div class="row" style="gap:8px"><button class="icon-btn" data-act="rsNav" data-v="-1" aria-label="รอบก่อนหน้า">‹</button><b style="min-width:220px;text-align:center">${label(ui.key)}</b><button class="icon-btn" data-act="rsNav" data-v="1" aria-label="รอบถัดไป">›</button></div>`;
-    const head = `<div class="page-hd no-print"><div><h1>ตารางการทำงาน</h1><div class="small muted">${H(prop.th)} · ตัดรอบวันที่ 26 – 25 ของทุกเดือน</div></div>
+    const head = `<div class="page-hd no-print"><div><h1>ตารางการทำงาน</h1><div class="small muted">${H(prop.th)} · ${H(deptName(ui.dept))} · ตัดรอบวันที่ 26 – 25 ของทุกเดือน</div></div>
       <div class="row wrap">${nav}${r ? '<button class="btn ghost" data-act="rsPrint">พิมพ์ / PDF</button>' : ''}${isHr(u) && u.role === 'admin' ? '<button class="btn ghost" data-act="rsCodes">รหัสกะ</button>' : ''}</div></div>`;
-    if (!r) return head + `<div class="card pad" style="text-align:center"><p class="muted">ยังไม่มีตารางการทำงานรอบ ${label(ui.key)}</p>
-      ${edit ? `<button class="btn red" data-act="rsNew">สร้างตารางรอบนี้</button><div class="xs muted" style="margin-top:8px">${rosters().some(x => x.id === site + ':' + shiftKey(ui.key, -1)) ? 'ใช้รายชื่อและยอดพักร้อนคงเหลือจากรอบก่อน' : 'ใช้รายชื่อจากพนักงานทั้งหมดของสถานที่นี้'}</div>` : '<p class="small muted">หัวหน้าแผนก ฝ่ายบุคคล หรือผู้ดูแลระบบเป็นผู้สร้างตาราง</p>'}</div>`;
+    if (!r) return head + dtabs + `<div class="card pad" style="text-align:center"><p class="muted">ยังไม่มีตารางการทำงานของ${H(deptName(ui.dept))} รอบ ${label(ui.key)}</p>
+      ${edit ? `<button class="btn red" data-act="rsNew">สร้างตารางรอบนี้</button><div class="xs muted" style="margin-top:8px">${legacy(ui.key) && legacy(ui.key).rows.some(x => x.dept === ui.dept) ? 'ใช้ข้อมูลของแผนกนี้จากตารางรวมรอบนี้' : rosters().some(x => x.id === rid(ui.dept, shiftKey(ui.key, -1))) || legacy(shiftKey(ui.key, -1)) ? 'ใช้รายชื่อและยอดพักร้อนคงเหลือจากรอบก่อน' : 'ใช้รายชื่อพนักงานของแผนกนี้'}</div>` : `<p class="small muted">หัวหน้า${H(deptName(ui.dept))} ฝ่ายบุคคล หรือผู้ดูแลระบบเป็นผู้สร้างตาราง</p>`}</div>`;
 
     const groups = []; for (const row of r.rows) { let gp = groups.find(x => x.dept === row.dept); if (!gp) groups.push(gp = { dept: row.dept, rows: [] }); gp.rows.push(row); }
     const today = U.today();
@@ -71,7 +84,7 @@
       ${shifts().map(s => `<button class="chip ${ui.brush === s.code ? 'on' : ''}" data-act="rsBrush" data-v="${H(s.code)}" title="${H(s.time || s.code)}">${H(s.code)}</button>`).join('')}
       ${Object.entries(MARKS).map(([k, m]) => `<button class="chip ${m.cls} ${ui.brush === k ? 'on' : ''}" data-act="rsBrush" data-v="${k}">${m.name}</button>`).join('')}
       <button class="chip ${ui.brush === '' ? 'on' : ''}" data-act="rsBrush" data-v="">ล้างช่อง</button>
-      <span style="flex:1"></span><button class="link" data-act="rsAddRow">+ เพิ่มแถว</button>${isHr(u) ? '<button class="link" data-act="rsSync">+ ดึงพนักงานที่ยังไม่มีในตาราง</button>' : ''}</div>` : '';
+      <span style="flex:1"></span><button class="link" data-act="rsAddRow">+ เพิ่มแถว</button>${edit ? '<button class="link" data-act="rsSync">+ ดึงพนักงานที่ยังไม่มีในตาราง</button>' : ''}</div>` : '';
     const dayHead = days.map(d => { const x = U.d(d), we = x.getDay() === 0 || x.getDay() === 6; return `<th class="rs-dh${we ? ' we' : ''}${d === today ? ' td' : ''}">${U.DS[x.getDay()]}</th>`; }).join('');
     const dateHead = days.map(d => `<th class="rs-dh${d === today ? ' td' : ''}">${U.d(d).getDate()}</th>`).join('');
     const occ = days.map(d => { const v = (r.occ || {})[d]; return `<td class="rs-fc">${isHr(u) ? `<input class="rs-in" inputmode="numeric" value="${v == null ? '' : H(v)}" data-change="rsOcc" data-d="${d}" aria-label="OCC% ${d}">` : H(v == null ? '' : v)}</td>`; }).join('');
@@ -89,8 +102,8 @@
     const signs = STEPS.map(([k, name]) => { const s = S[k]; return `<div class="rs-sig"><div class="rs-sig-line">${s ? `<b>${H(s.byName)}</b>` : '&nbsp;'}</div><div>${name}</div><div class="xs muted">${s ? U.fmtD(s.at.slice(0, 10)) + ' ' + s.at.slice(11, 16) : ''}</div>
       ${!s && next && next[0] === k && u && mayStep(k, u) ? `<button class="btn teal sm no-print" data-act="rsSign" data-k="${k}" style="margin-top:6px">ลงนาม (${name})</button>` : ''}</div>`; }).join('');
     const status = S.gm ? '<span class="badge st-confirmed">ลงนามครบแล้ว</span>' : `<span class="badge st-sent">รอ${next ? next[1] : ''}ลงนาม</span>`;
-    return head + tools + `<section class="card rs-card"><div class="rs-scroll"><div class="rs-paper">
-  <div class="rs-title"><b>ตารางการทำงาน ${label(ui.key)}</b><span class="rs-site">${H(prop.th)}</span></div>
+    return head + dtabs + tools + `<section class="card rs-card"><div class="rs-scroll"><div class="rs-paper">
+  <div class="rs-title"><b>ตารางการทำงาน ${label(ui.key)}</b><span class="rs-site">${H(prop.th)} · ${H(deptName(ui.dept))}</span></div>
   <table class="rs"><thead>
     <tr><th rowspan="2">ฝ่าย</th><th rowspan="2">รหัสพนักงาน</th><th rowspan="2">รายชื่อพนักงาน</th>${dayHead}<th rowspan="4" class="rs-vh">วันทำงาน</th><th rowspan="4" class="rs-vh">DAY OFF</th><th rowspan="4" class="rs-vh">EXTRA</th><th rowspan="4" class="rs-vh">รวม</th><th rowspan="4" class="rs-vh">พักร้อนคงเหลือ</th><th rowspan="4" class="rs-vh">พักร้อนใช้ไป</th></tr>
     <tr>${dateHead}</tr>
@@ -116,27 +129,32 @@
   Object.assign(App.ACT, {
     rsNav(el) { const ui = UI(); ui.key = shiftKey(ui.key, Number(el.dataset.v)); App.render(); },
     rsPrint() { window.print(); },
+    rsDept(el) { const ui = UI(); ui.dept = el.dataset.v; ui.brush = null; App.render(); },
     rsNew() {
       if (!canEdit()) return;
-      const ui = UI(), site = App.site() || 'resort', prev = rosters().find(x => x.id === site + ':' + shiftKey(ui.key, -1));
-      const rows = prev ? prev.rows.map(x => ({ id: x.id, emp: x.emp || null, name: x.name, code: x.code || '', dept: x.dept, vcStart: tally(x, daysOf(prev.period)).left, cells: {} }))
-        : Store.db.employees.filter(e => (App.SITES ? App.SITES.of(e) : 'resort') === site).sort((a, b) => String(a.dept).localeCompare(String(b.dept))).map(e => ({ id: 'r_' + e.id, emp: e.id, name: e.name, code: e.code || '', dept: e.dept, vcStart: 0, cells: {} }));
-      rosters().push({ id: site + ':' + ui.key, site, period: ui.key, rows, occ: {}, note: '', sign: {}, createdAt: U.nowTH(), by: me().id });
+      const ui = UI(), dept = ui.dept, pk = shiftKey(ui.key, -1), same = legacy(ui.key);
+      const mine = rs => rs.filter(x => x.dept === dept);
+      const lg = legacy(pk), prev = rosters().find(x => x.id === rid(dept, pk)) || (lg && mine(lg.rows).length ? lg : null);
+      // this period's combined roster (before the split) → its rows for this department, cells included;
+      // else last period's → names and leave left; else the department's staff
+      const rows = same && mine(same.rows).length ? mine(same.rows).map(x => JSON.parse(JSON.stringify(x)))
+        : prev ? mine(prev.rows).map(x => ({ id: x.id, emp: x.emp || null, name: x.name, code: x.code || '', dept, note: x.note || '', vcStart: tally(x, daysOf(prev.period)).left, cells: {} }))
+        : deptEmps(dept).map(e => ({ id: 'r_' + e.id, emp: e.id, name: e.name, code: e.code || '', dept, vcStart: 0, cells: {} }));
+      rosters().push({ id: rid(dept, ui.key), site: site(), dept, period: ui.key, rows, occ: same ? Object.assign({}, same.occ) : {}, note: '', sign: {}, createdAt: U.nowTH(), by: me().id });
       Store.save(); App.render(); App.toast('สร้างตารางการทำงานแล้ว');
     },
     rsSync() {
-      const r = cur(), site = r.site, have = new Set(r.rows.map(x => x.emp).filter(Boolean));
-      const add = Store.db.employees.filter(e => (App.SITES ? App.SITES.of(e) : 'resort') === site && !have.has(e.id));
+      const r = cur(), have = new Set(r.rows.map(x => x.emp).filter(Boolean));
+      const add = deptEmps(r.dept).filter(e => !have.has(e.id));
       if (!add.length) { App.toast('มีพนักงานครบทุกคนแล้ว'); return; }
-      for (const e of add) r.rows.push({ id: 'r_' + e.id, emp: e.id, name: e.name, code: e.code || '', dept: e.dept, vcStart: 0, cells: {} });
+      for (const e of add) r.rows.push({ id: 'r_' + e.id, emp: e.id, name: e.name, code: e.code || '', dept: r.dept, vcStart: 0, cells: {} });
       touched(r); App.toast('เพิ่ม ' + add.length + ' คน');
     },
     rsAddRow() {
-      const u = me(), mine = App.userDept && App.userDept(u), depts = D.DEPTS.filter(d => isHr(u) || d.id === mine);
-      if (!depts.length) { App.toast('ไม่พบแผนกของบัญชีนี้'); return; }
-      ask('เพิ่มแถว', [{ k: 'name', label: 'ชื่อ (เช่น ต้อนรับกะบ่าย, รีสอร์ท แทน)', v: '' }, { k: 'code', label: 'รหัสพนักงาน (ไม่บังคับ)', v: '' }, { k: 'dept', label: 'ฝ่าย', v: depts[0].id, opts: depts.map(d => [d.id, d.name]) }], f => {
+      if (!canEdit()) return;
+      ask('เพิ่มแถว · ' + deptName(UI().dept), [{ k: 'name', label: 'ชื่อ (เช่น ต้อนรับกะบ่าย, รีสอร์ท แทน)', v: '' }, { k: 'code', label: 'รหัสพนักงาน (ไม่บังคับ)', v: '' }], f => {
         if (!String(f.name || '').trim()) { App.toast('กรุณากรอกชื่อ'); return; }
-        const r = cur(); r.rows.push({ id: 'r_' + Math.random().toString(36).slice(2, 9), emp: null, name: f.name.trim(), code: (f.code || '').trim(), dept: f.dept, vcStart: 0, cells: {} }); touched(r);
+        const r = cur(); r.rows.push({ id: 'r_' + Math.random().toString(36).slice(2, 9), emp: null, name: f.name.trim(), code: (f.code || '').trim(), dept: r.dept, vcStart: 0, cells: {} }); touched(r);
       });
     },
     rsName(el) {

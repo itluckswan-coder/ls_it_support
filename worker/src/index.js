@@ -141,16 +141,18 @@ async function state(env, since, user) {
 }
 
 /* ---------------- business rules ---------------- */
-// the monthly work roster (ตารางการทำงาน, mirrors js/roster.js): heads of department fill their department's rows,
-// HR (leave_hr) and admins fill any; signed in turn by a head (หัวหน้า) → HR (ทรัพยากรบุคคล) → an admin (ผู้จัดการ);
-// a change to the table after anyone signed clears the signatures
+// the monthly work roster (ตารางการทำงาน, mirrors js/roster.js), one per department (data.dept): a head of department
+// fills their own department's roster, HR (leave_hr) and admins any; signed in turn by that department's head (or an
+// admin) → HR (ทรัพยากรบุคคล) → an admin (ผู้จัดการ); a change to the table after anyone signed clears the signatures.
+// Rosters from before the split (no data.dept) hold every department: there a head changes only their own rows.
 const isHr = u => u.role === 'admin' || !!(u.perms && u.perms.leave_hr);
 const isHeadRole = u => u.role === 'head' || u.role === 'manager';
 function applyRoster(user, data, prev) {
   if (!isHr(user) && !isHeadRole(user)) fail(403, 'แก้ไขตารางการทำงานได้เฉพาะหัวหน้าแผนก ฝ่ายบุคคล และผู้ดูแลระบบ');
   if (JSON.stringify(data).length > 400000) fail(413, 'ตารางการทำงานใหญ่เกินไป');
   const body = r => { const { sign, ...c } = r || {}; return JSON.stringify(c); };
-  if (!isHr(user) && prev) {
+  if (data.dept && !isHr(user) && (deptOf(user) !== data.dept || (prev && prev.dept !== data.dept) || (data.rows || []).some(r => r.dept !== data.dept))) fail(403, 'หัวหน้าแผนกแก้ไขได้เฉพาะตารางของแผนกตัวเอง');
+  if (!data.dept && !isHr(user) && prev) {
     // a head changes only the rows of their own department (a new table may start with every row)
     const mine = deptOf(user), pr = new Map(((prev && prev.rows) || []).map(r => [r.id, JSON.stringify(r)]));
     const nr = new Map((data.rows || []).map(r => [r.id, JSON.stringify(r)]));
@@ -159,7 +161,7 @@ function applyRoster(user, data, prev) {
   }
   const ps = (prev && prev.sign) || {}, ns = data.sign || {};
   if (prev && body(prev) !== body(data)) { data.sign = {}; return; }
-  const may = { head: isHeadRole(user) || user.role === 'admin', hr: isHr(user), gm: user.role === 'admin' };
+  const may = { head: user.role === 'admin' || (isHeadRole(user) && (!data.dept || deptOf(user) === data.dept)), hr: isHr(user), gm: user.role === 'admin' };
   const order = ['head', 'hr', 'gm'], out = {};
   for (const k of order) {
     if (JSON.stringify(ps[k] || null) === JSON.stringify(ns[k] || null)) { if (ps[k]) out[k] = ps[k]; continue; }
