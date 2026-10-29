@@ -1,10 +1,11 @@
 // every screen for the user manual, in th / en / my
 const { chromium } = require('playwright'); const BASE = 'http://localhost:8765/'; const OUT = process.argv[2]; // folder for the PNGs, e.g. /tmp/manual-raw
-const ONLY = process.argv[3] ? process.argv[3].split(',') : null;
+const ONLY = process.argv[3] && process.argv[3] !== 'all' ? process.argv[3].split(',') : null;
+const LANGS = process.argv[4] ? process.argv[4].split(',') : ['th', 'en', 'my']; // e.g. node shots.js /tmp/raw all th
 const W = ms => new Promise(r => setTimeout(r, ms));
 (async () => {
   const b = await chromium.launch(); const errs = [];
-  for (const L of ['th', 'en', 'my']) {
+  for (const L of LANGS) {
     const p = await (await b.newContext({ viewport: { width: 1280, height: 820 } })).newPage(); p.on('pageerror', e => errs.push(L + ':' + e.message));
     const shot = async (n, full) => { if (ONLY && !ONLY.includes(n)) return; await W(350); await p.screenshot({ path: `${OUT}/${n}-${L}.png`, fullPage: !!full }); };
     const go = async h => { await p.evaluate(h => { App.closeModal && App.closeModal(); App.closeNavPop && App.closeNavPop(); location.hash = h; }, h); await W(500); };
@@ -13,18 +14,26 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await p.goto(BASE); await p.evaluate(L => { localStorage.clear(); localStorage.setItem('lsSales.lang', L); }, L); await p.goto(BASE + '#/login'); await p.reload(); await p.waitForSelector('#lgU'); await W(500);
     await shot('login');
     await p.fill('#lgU', 'laksika@luckswangroup.com'); await p.fill('#lgP', 'luckswan'); await p.click('button[type=submit]'); await W(1200);
+    // after sign-in: choose a property
+    if (await p.$('.site-card')) { await shot('site'); await click('.site-card[data-v=resort]'); await W(600); }
     await shot('home');
     await click('[data-act=langMenu]'); await shot('lang'); await close();
     await click('[data-act=themeMenu]'); await shot('theme'); await close();
     await click('[data-act=notifs]'); await shot('notifs'); await close();
     await click('[data-act=userMenu]'); await shot('usermenu'); await close();
     await go('#/meet'); await shot('meet'); await click('[data-act=meetSel]'); await shot('meet-sel'); await click('[data-act=meetEdit]'); await shot('meet-edit'); await close();
+    await p.evaluate(() => { const r = DATA.MEETING_ROOMS.find(x => x.id === 'kinnaree') || DATA.MEETING_ROOMS[0]; if ((r.imgs || []).length < 2) r.imgs = [r.img, 'img/meet-ruenhong.jpg', 'img/meet-thikhampon.jpg']; App.render(); }); await click('.mg[data-room] .mg-zoom'); await shot('meet-zoom'); await p.evaluate(() => document.getElementById('lbox')?.remove());
     await go('#/rooms'); await shot('rooms'); await click('[data-act=rmSite][data-v=boutique]'); await click('[data-act=bqStep][data-k=bq_sup][data-v="1"]'); await click('[data-act=bqTier][data-k=bf][data-v="1"]'); await click('[data-act=bqPax][data-k=bf][data-v="1"]'); await p.evaluate(() => window.scrollTo(0, 0)); await shot('rooms-bq'); await p.evaluate(() => { App.state.ui.rooms = null; });
     await go('#/roomrates'); await shot('roomrates'); await p.evaluate(() => document.querySelector('[data-change=rrBq]').scrollIntoView({ block: 'center' })); await shot('roomrates-bq');
-    await go('#/food'); await shot('food'); await click('[data-act=foodEdit]'); await shot('food-edit'); await close();
+    await go('#/food'); await shot('food'); await click('[data-act=fcEdit]:not([data-v])'); await shot('food-cats'); await close(); await click('[data-act=foodEdit]'); await shot('food-edit'); await close();
     await go('#/quotes'); await shot('quotes');
     await go('#/quote/QT-2611-042'); await shot('quote-edit');
-    await go('#/doc/QT-2611-042'); await shot('quote-doc'); await click('[data-act=docVer][data-v="1"]'); await shot('quote-doc-full'); await click('[data-act=qdTab][data-v=edit]'); await shot('quote-doc-edit'); await click('[data-act=qdCancel]'); await click('[data-act=docVer][data-v="0"]');
+    // admin approves the quotation → tentative, yellow box
+    await p.evaluate(() => { const q = Store.quote('QT-2611-042'); delete q.bookOk; q.status = 'sent'; App.render(); }); await click('[data-act=qBookOk]'); await click('.modal-bg .acts .btn:last-child');
+    await p.evaluate(() => document.querySelector('section.card:has([data-act=qStatus])').scrollIntoView({ block: 'center' })); await shot('quote-approve');
+    await go('#/doc/QT-2611-042'); await shot('quote-doc'); await click('[data-act=docVer][data-v="1"]'); await shot('quote-doc-full'); await click('[data-act=qdTab][data-v=edit]'); await shot('quote-doc-edit');
+    await click('[data-act=qdCancel]'); await click('[data-act=docVer][data-v="0"]');
+    await go('#/doc/QT-2611-044'); await p.evaluate(() => { const r = document.querySelector('.qd-rimgs'); if (r) r.scrollIntoView({ block: 'center' }); }); await shot('quote-doc-rooms');
     await p.evaluate(() => { App.state.wiz = null; }); await go('#/new');
     for (const [f, v] of [['title', 'สัมมนาประจำปี 2027'], ['client', 'บจก. ตัวอย่าง จำกัด']]) { try { await p.fill(`[data-f=${f}]`, v); await p.dispatchEvent(`[data-f=${f}]`, 'input'); await p.dispatchEvent(`[data-f=${f}]`, 'change'); } catch (e) { errs.push('fill ' + f); } }
     await shot('wiz1');
@@ -41,6 +50,13 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await click('#emSiteBtn'); await click('#emDeptBtn'); await click('#emPosBtn'); await shot('staff-plus', true); await close();
     await click('[data-act=empImport]'); await shot('staff-import'); await close();
     await click('[data-act=stTab][data-v=rules]'); await shot('staff-rules');
+    // work roster: front office, a few shifts filled
+    await p.evaluate(() => { App.state.ui.staffTab = 'roster'; App.state.ui.roster = null; App.render(); }); await W(300); await click('[data-act=rsDept][data-v=front]');
+    if (await p.$('[data-act=rsNew]')) await click('[data-act=rsNew]');
+    await p.evaluate(() => { const ui = App.state.ui.roster, r = Store.db.rosters.find(x => x.id.endsWith(':front:' + ui.key)); if (!r) return; const codes = ['ช7', 'ช7', 'ช7', 'บ2', 'บ2', 'OFF', 'ช7', 'ช7', 'EX', 'ช7', 'ช7', 'OFF', 'VC'];
+      r.rows.forEach((row, i) => { const ds = Object.keys(row.cells || {}); row.cells = {}; let d = new Date(+ui.key.slice(0, 4), +ui.key.slice(5) - 2, 26); for (let k = 0; k < 31; k++) { const iso = U.iso(d); const c = codes[(k + i * 3) % codes.length]; if (iso.slice(5) <= ui.key.slice(5) + '-25' || true) row.cells[iso] = c; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1); } row.code = String(20050 + i); row.vcStart = 6; });
+      r.occ = {}; Store.save(); App.render(); }); await W(300);
+    await click('[data-act=rsBrush][data-v="ช7"]'); await shot('roster'); await click('[data-act=rsBrush][data-v="ช7"]');
     await go('#/tasks'); await shot('tasks'); await click('[data-act=tkNew]'); await shot('task-new'); await click('[data-to=dept]'); await shot('task-site'); await close();
     await click('[data-act=tpOpen]'); await click('[data-tp-mode=org]'); await click('[data-tp-zoom=fit]'); await shot('task-perms-org'); await click('[data-tp-mode=form]'); await shot('task-perms-form'); await close();
     await go('#/home'); await click('[data-act=tkView]'); await shot('task-view'); await close();
