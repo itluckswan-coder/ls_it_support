@@ -39,8 +39,8 @@
 <div class="split left">
   <aside>
     <h1 style="margin-bottom:18px">จัดเลี้ยง</h1>
-    <div class="small muted" style="margin-bottom:8px">ประเภท</div>
-    <div class="cat-list">${D.FOOD_CATS.map(c => `<button class="${ui.cat === c.id ? 'on' : ''}" data-act="foodCat" data-v="${c.id}"><span>${c.name}</span><span class="n">${count(c.id)}</span></button>`).join('')}</div>
+    <div class="between" style="margin-bottom:8px"><span class="small muted">ประเภท</span>${editor ? `<span class="row" style="gap:6px"><button class="icon-btn sm" data-act="fcEdit" data-v="add" title="เพิ่มประเภท" aria-label="เพิ่มประเภท">＋</button><button class="icon-btn sm" data-act="fcEdit" title="แก้ไข / ลบประเภท" aria-label="แก้ไข / ลบประเภท">${ICON.pen}</button></span>` : ''}</div>
+    <div class="cat-list">${D.FOOD_CATS.map(c => `<button class="${ui.cat === c.id ? 'on' : ''}" data-act="foodCat" data-v="${H(c.id)}"><span>${H(c.name)}</span><span class="n">${count(c.id)}</span></button>`).join('')}</div>
     <div class="small muted" style="margin:22px 0 8px">ราคา / ท่าน</div>
     <div class="range2"><div class="track"><i style="left:${pct(ui.lo)}%;right:${100 - pct(ui.hi)}%"></i></div>
       <input type="range" min="${PMIN}" max="${PMAX}" step="10" value="${ui.lo}" data-change="foodLo" aria-label="ราคาต่ำสุด"><input type="range" min="${PMIN}" max="${PMAX}" step="10" value="${ui.hi}" data-change="foodHi" aria-label="ราคาสูงสุด"></div>
@@ -109,6 +109,42 @@
     if (f.cat === 'package') { it.name = f.name + ' (' + f.sub + ')'; it.desc = D.foodFeat(f).slice(0, 2).join(' · '); }
     q.items.push(it); App.touch(q, 'เพิ่ม ' + f.name);
   }
+  /* catering categories: add / rename / remove (price editors only); a category that still has menus cannot be removed */
+  App.ACT.fcEdit = el => {
+    if (!App.can('edit_prices')) return;
+    const list = D.FOOD_CATS.filter(c => c.id !== 'all').map(c => ({ id: c.id, name: c.name }));
+    const used = id => D.FOOD.filter(f => f.cat === id).length;
+    const draw = bg => {
+      bg.querySelector('#fcRows').innerHTML = list.map((c, i) => `<div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:nowrap">
+        <input class="input" data-i="${i}" value="${H(c.name)}" placeholder="ชื่อประเภท" aria-label="ชื่อประเภท" style="flex:1;min-width:0">
+        <span class="xs muted" style="width:62px;text-align:right">${used(c.id)} รายการ</span>
+        ${c.id === 'package' ? '<span style="width:34px"></span>' : `<button type="button" class="icon-btn sm" data-del="${i}" title="ลบประเภท" aria-label="ลบประเภท ${H(c.name)}" style="color:var(--red)">🗑</button>`}</div>`).join('');
+      bg.querySelectorAll('#fcRows input').forEach(inp => inp.oninput = () => { list[inp.dataset.i].name = inp.value; });
+      bg.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+        const c = list[b.dataset.del], n = used(c.id);
+        if (n) { bg.querySelector('#fcErr').textContent = `ลบ “${c.name}” ไม่ได้ — ยังมีเมนู ${n} รายการในประเภทนี้ ย้ายเมนูไปประเภทอื่นก่อน`; return; }
+        list.splice(b.dataset.del, 1); bg.querySelector('#fcErr').textContent = ''; draw(bg);
+      });
+    };
+    const addRow = bg => { list.push({ id: 'c_' + Math.random().toString(36).slice(2, 8), name: '' }); draw(bg); const ins = bg.querySelectorAll('#fcRows input'); ins[ins.length - 1].focus(); };
+    App.modal(`<h2>ประเภทจัดเลี้ยง</h2><p class="muted" style="margin-top:-8px">เพิ่ม แก้ชื่อ หรือลบประเภท · ประเภทที่ยังมีเมนูอยู่ลบไม่ได้</p>
+      <div id="fcRows"></div><button type="button" class="link" id="fcAdd">+ เพิ่มประเภท</button>
+      <div class="small red" id="fcErr" style="min-height:20px;margin-top:8px" role="alert"></div>
+      <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="fcOk">บันทึก</button></div>`, bg => {
+      draw(bg);
+      bg.querySelector('#fcAdd').onclick = () => addRow(bg);
+      if (el && el.dataset.v === 'add') addRow(bg);
+      bg.querySelector('#fcOk').onclick = () => {
+        const out = list.map(c => ({ id: c.id, name: String(c.name || '').trim() })).filter(c => c.name);
+        const names = out.map(c => c.name.toLowerCase());
+        if (names.some((n, i) => names.indexOf(n) !== i)) { bg.querySelector('#fcErr').textContent = 'มีชื่อประเภทซ้ำกัน'; return; }
+        const st = Store.db.settings || (Store.db.settings = {});
+        st.foodCats = out; D.applyFoodCats(out); Store.save();
+        const ui = App.state.ui.food; if (ui && !D.FOOD_CATS.some(c => c.id === ui.cat)) ui.cat = 'all';
+        App.closeModal(); App.render(); App.toast('บันทึกประเภทจัดเลี้ยงแล้ว');
+      };
+    });
+  };
   Object.assign(App.ACT, {
     foodCat(el) { App.state.ui.food.cat = el.dataset.v; App.render(); },
     foodSort(el) { App.state.ui.food.sort = el.dataset.v; App.render(); },

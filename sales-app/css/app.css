@@ -117,6 +117,7 @@ main{padding:28px 32px 48px;max-width:1440px;margin:0 auto}
 .link{color:var(--teal-d);font-weight:500;font-size:13px}
 .link.red{color:var(--red)}
 .icon-btn{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:#fff}
+.icon-btn.sm{width:30px;height:30px;font-size:14px}
 .icon-btn:hover{border-color:#cfccc2}
 .us-edit{width:28px;height:28px;flex:none;color:var(--muted)}
 .us-edit:hover{color:var(--red);border-color:var(--red)}
