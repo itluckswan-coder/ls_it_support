@@ -40,7 +40,19 @@
   const dayOf = () => Math.max(1, Number(App.state.params[1]) || 1);
   const canEdit = () => App.canPlan();
   const isAdmin = () => { const me = App.me(); return !!me && me.role === 'admin'; };
-  function planOf(b, day) { return b && b.plans && b.plans[day]; }
+  // the meeting rooms a quotation uses, in its order (linked lines, or lines typed in by hand that name a room)
+  const lcs = x => String(x || '').toLowerCase();
+  const meetRoomOf = it => D.MEETING_ROOMS.find(r => r.id === it.ref) || (it.ref ? null : D.MEETING_ROOMS.find(r => [r.th, String(r.th || '').replace(/^ห้อง/, ''), r.name].filter(x => x && x.length > 2).some(x => lcs(it.name).includes(lcs(x)))));
+  function meetRooms(q) { const out = []; for (const it of q.items.filter(i => i.sec === 'meet')) { const r = meetRoomOf(it); if (r && !out.includes(r)) out.push(r); } return out; }
+  App.planRooms = meetRooms;
+  // with several meeting rooms each room has its own plan per day: b.plans["<day>:<room>"] (one room: b.plans[<day>])
+  const roomParam = () => App.state.route === 'plan' && App.state.params[2] ? App.state.params[2] : null;
+  const pkey = (day, room) => room ? day + ':' + room : String(day);
+  function planOf(b, day, room) {
+    if (room === undefined) room = roomParam();
+    const pl = b && b.plans; if (!pl) return undefined;
+    return pl[pkey(day, room)] || (room && pl[day] && pl[day].room === room ? pl[day] : undefined);
+  }
   // bounding box of an item in metres (rotation rounded to the nearest quarter turn, other angles use the longer side)
   function box(i) {
     const [w, h] = dims(i), q = ((Math.round(i.rot / 90) % 2) + 2) % 2, odd = i.rot % 90 !== 0;
@@ -62,10 +74,10 @@
   const seatsOf = p => p.items.reduce((a, i) => a + (SEATED.includes(i.type) ? i.seats : 0), 0);
   // the meeting room and layout used on a given day of the quote
   function roomFor(q, day) {
-    const meets = q.items.filter(i => i.sec === 'meet' && D.MEETING_ROOMS.some(r => r.id === i.ref));
+    const rp = roomParam(), meets = q.items.filter(i => i.sec === 'meet' && (rp ? (meetRoomOf(i) || {}).id === rp : D.MEETING_ROOMS.some(r => r.id === i.ref)));
     const it = meets.find(i => (i.sched || []).some(s => s.day === day)) || meets[0];
-    const id = (it && it.ref) || q.room;
-    return { id, room: D.MEETING_ROOMS.find(r => r.id === id), layout: (it && it.layout) || 'banquet' };
+    const id = rp || (it && it.ref) || q.room;
+    return { id, room: D.MEETING_ROOMS.find(r => r.id === id), layout: (it && it.layout) || 'banquet', pax: it && Number(it.pax) || 0 };
   }
 
   /* ---------- generators ---------- */
@@ -119,7 +131,7 @@
     return 0;
   }
   function autoPlan(q, day, layout) {
-    const rf = roomFor(q, day), [w, h] = roomDim(rf.id), pax = Number(q.pax) || 0;
+    const rf = roomFor(q, day), [w, h] = roomDim(rf.id), pax = (roomParam() && rf.pax) || Number(q.pax) || 0; // each room of several: its own guests when the line says
     const p = { title: (q.title || '') + ' · ' + ((rf.room && (rf.room.th || rf.room.name)) || 'ห้องจัดงาน') + ' · ' + pax + ' ท่าน', room: rf.room ? rf.id : undefined, W: w, H: h, items: [] };
     const lay = layout || rf.layout, gen = { theatre: genTheatre, classroom: genClass, ushape: genUshape, banquet: genBanquet, cocktail: (p2, a, b2, n) => genBanquet(p2, a, b2, n, 8) }[lay] || genBanquet;
     p._auto = true; p.missing = gen(p, w, h, pax) || 0; delete p._auto;
@@ -236,7 +248,7 @@
   // undo: snapshots of the plan (or the room setup) taken before every change
   const UNDO_MAX = 60;
   let hist = { key: null, stack: [], last: null };
-  const histKey = () => setupMode() ? 'setup:' + setupRoom() : 'plan:' + App.state.params[0] + ':' + dayOf();
+  const histKey = () => setupMode() ? 'setup:' + setupRoom() : 'plan:' + App.state.params[0] + ':' + pkey(dayOf(), roomParam());
   const snapNow = () => { const d = P(); return JSON.stringify(d ? (setupMode() ? { W: d.W, H: d.H, items: d.items } : d) : null); };
   function histSync() { if (hist.key !== histKey()) hist = { key: histKey(), stack: [], last: snapNow() }; }
   function record() {
@@ -247,15 +259,29 @@
   const undoBtn = () => `<button class="btn ghost" id="fpUndo" data-act="fpUndo" ${hist.key === histKey() && hist.stack.length ? '' : 'disabled'} title="ย้อนกลับ (Ctrl+Z)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>ย้อนกลับ</button>`;
   App.V.plan = {
     title: 'ออกแบบผังงาน', nav: 'beo',
+    // the room picker: one card per meeting room of the quotation, in order
+    pick(b, q, days, day, rooms) {
+      const lay = r => { const it = q.items.find(i => i.sec === 'meet' && meetRoomOf(i) === r && i.layout); return it ? (D.LAYOUTS.find(l => l.id === it.layout) || {}).name || '' : ''; };
+      return `<div class="page-hd"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>ออกแบบผังงาน</h1><div class="small muted">${H(q.title)} · ${H(q.client)} · ใช้ห้องประชุม ${rooms.length} ห้อง — เลือกห้องที่จะทำผัง</div></div>
+        ${days.length > 1 ? `<div class="seg white">${days.map((d, i) => `<a class="${day === i + 1 ? 'on' : ''}" href="#/plan/${encodeURIComponent(b.id)}/${i + 1}">วันที่ ${i + 1}</a>`).join('')}</div>` : ''}</div>
+      <div class="fp-rooms">${rooms.map((r, n) => { const pl = planOf(b, day, r.id), seats = pl ? App.planSeats(pl) : 0;
+        return `<a class="fp-room card" href="#/plan/${encodeURIComponent(b.id)}/${day}/${encodeURIComponent(r.id)}">
+          <span class="fp-room-ph" style="background-image:url('${H(r.img || '')}')"><b>${n + 1}</b></span>
+          <span class="fp-room-tx"><b>${H(r.th || r.name)}</b><span class="small muted">${H(r.name)}${lay(r) ? ' · ' + H(lay(r)) : ''}</span>
+          <span class="badge ${pl ? 'st-confirmed' : 'st-draft'}">${pl ? 'มีผังแล้ว · ' + seats + ' ที่นั่ง' : 'ยังไม่มีผัง'}</span>
+          <span class="btn ${pl ? 'ghost' : 'red'} sm" style="margin-top:8px">${pl ? 'แก้ไขผัง' : 'ทำผังห้องนี้'}</span></span></a>`; }).join('')}</div>`;
+    },
     render(params) {
       const b = curBeo(), q = b && Store.quote(b.quoteId);
       if (!b || !q) return '<div class="empty">ไม่พบใบฟังก์ชัน — <a href="#/beo">กลับไปหน้าใบฟังก์ชัน</a></div>';
       if (!App.canPlan()) return `<div class="empty">ออกแบบผังงานใช้ได้เฉพาะผู้ดูแลระบบ ฝ่ายขาย แผนก F&B และแผนกจัดเลี้ยง — <a href="#/beo/${encodeURIComponent(b.id)}">กลับไปใบฟังก์ชัน</a></div>`;
-      const days = U.daysOf(q.start, q.end), day = Math.min(dayOf(), days.length);
-      const p = planOf(b, day), edit = canEdit();
+      const days = U.daysOf(q.start, q.end), day = Math.min(dayOf(), days.length), rooms = meetRooms(q), rp = roomParam();
+      // several meeting rooms: choose which room's plan to work on first
+      if (rooms.length > 1 && !rooms.some(r => r.id === rp)) return App.V.plan.pick(b, q, days, day, rooms);
+      const p = planOf(b, day), edit = canEdit(), rq = rp ? '/' + encodeURIComponent(rp) : '';
       histSync();
       const head = `<div class="page-hd"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>ออกแบบผังงาน</h1><div class="small muted">${H(q.title)} · ${H(q.client)} · ${U.fmtRange(q.start, q.end)} · ${U.n(q.pax)} ท่าน</div></div>
-        <div class="row wrap">${days.length > 1 ? `<div class="seg white">${days.map((d, i) => `<a class="${day === i + 1 ? 'on' : ''}" href="#/plan/${encodeURIComponent(b.id)}/${i + 1}">วันที่ ${i + 1}</a>`).join('')}</div>` : ''}
+        <div class="row wrap">${days.length > 1 ? `<div class="seg white">${days.map((d, i) => `<a class="${day === i + 1 ? 'on' : ''}" href="#/plan/${encodeURIComponent(b.id)}/${i + 1}${rq}">วันที่ ${i + 1}</a>`).join('')}</div>` : ''}${rooms.length > 1 ? `<a class="btn ghost" href="#/plan/${encodeURIComponent(b.id)}/${day}">← เลือกห้อง</a>` : ''}
         ${edit && (p || hist.stack.length) ? undoBtn() : ''}${isAdmin() ? `<a class="btn ghost" href="#/plansetup${p && p.room ? '/' + encodeURIComponent(p.room) : ''}">แก้ไขปรับปรุง</a>` : ''}${p ? '<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button>' : ''}</div></div>`;
       if (!p) {
         const rf = roomFor(q, day), lay = (D.LAYOUTS.find(l => l.id === rf.layout) || {}).name || '';
@@ -472,7 +498,7 @@
     return libItems().map(c => `<span class="fp-lib"><button class="btn ghost sm" data-act="fpAddC" data-id="${H(c.id)}">+ ${H(c.name)}</button>${canLib() ? `<button class="fp-x" data-act="fpItemDel" data-id="${H(c.id)}" aria-label="เอา ${H(c.name)} ออกจากรายการ">×</button>` : ''}</span>`).join('');
   }
   function setPlan(p) {
-    const b = curBeo(); b.plans = b.plans || {}; b.plans[dayOf()] = p; sel = []; Store.save(); record(); App.render();
+    const b = curBeo(); b.plans = b.plans || {}; b.plans[pkey(dayOf(), roomParam())] = p; sel = []; Store.save(); record(); App.render();
     if (p.missing) App.toast(`วางไม่พอ ${p.missing} โต๊ะ — ปรับผังเพิ่มเติมได้`);
   }
   // apply a change to every selected item
@@ -496,7 +522,7 @@
       histSync(); if (!hist.stack.length) return;
       const prev = hist.stack.pop(), data = JSON.parse(prev);
       if (setupMode()) { const d = setupDoc(); Object.assign(d, { W: data.W, H: data.H, items: data.items }); saveSetup(); }
-      else { const b = curBeo(); b.plans = b.plans || {}; if (data) b.plans[dayOf()] = data; else delete b.plans[dayOf()]; Store.save(); }
+      else { const b = curBeo(), k = pkey(dayOf(), roomParam()); b.plans = b.plans || {}; if (data) b.plans[k] = data; else delete b.plans[k]; Store.save(); }
       hist.last = prev; sel = []; App.render(); App.toast('ย้อนกลับแล้ว');
     },
     fpTplNew() {
