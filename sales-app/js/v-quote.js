@@ -12,6 +12,7 @@
   const qid = id => encodeURIComponent(id);
   // deleting a quote is for sales managers and admins only (the server enforces the same rule)
   const canDelQ = () => { const me = App.me(); return !!me && (me.role === 'admin' || me.role === 'manager'); };
+  const ownerName = q => { const u = q.owner && (Store.db.users || []).find(x => x.id === q.owner); return u ? u.name : ''; };
   const TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
   const timeNow = iso => iso ? iso.slice(11, 16) : '';
 
@@ -34,11 +35,12 @@
   ${['all', 'draft', 'sent', 'tentative', 'confirmed', 'cancelled'].map(s => `<button class="chip ${ui.st === s ? 'on' : ''}" data-act="qlSt" data-v="${s}">${s === 'all' ? 'ทั้งหมด' : D.STATUS[s]} <span class="n">${cnt(s)}</span></button>`).join('')}
 </div>
 <section class="card" style="overflow:hidden">
-<table class="tbl resp"><thead><tr><th>เลขที่</th><th>ลูกค้า / งาน</th><th>วันงาน</th><th>ท่าน</th><th class="r">ยอดสุทธิ (฿)</th><th class="r">สถานะ</th></tr></thead><tbody>
+<table class="tbl resp"><thead><tr><th>เลขที่</th><th class="hide-m">ผู้รับผิดชอบ</th><th>ลูกค้า / งาน</th><th>วันงาน</th><th>ท่าน</th><th class="r">ยอดสุทธิ (฿)</th><th class="r">สถานะ</th></tr></thead><tbody>
 ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td class="mono small muted hide-m">${H(q.id)}</td>
-  <td><b style="font-weight:500">${H(q.client)}</b><div class="sub">${H(q.title)} · <span class="mono">${H(q.id)}</span></div></td>
+  <td class="hide-m">${(n => n ? `<span class="row" style="gap:8px;flex-wrap:nowrap"><span class="avatar sm">${H(U.initials(n))}</span><span class="small">${H(n)}</span></span>` : '<span class="muted">—</span>')(ownerName(q))}</td>
+  <td><b style="font-weight:500">${H(q.client)}</b><div class="sub">${H(q.title)} · <span class="mono">${H(q.id)}</span><span class="show-m">${H(ownerName(q) || "—")}</span></div></td>
   <td class="hide-m">${U.fmtRange(q.start, q.end)}</td><td class="hide-m num">${U.n(q.pax)}</td>
-  <td class="r num b">${U.n(App.calc(q).net, 2)}<div class="sub show-m" style="font-weight:400">${U.fmtRange(q.start, q.end, { year: false })} · ${U.n(q.pax)} ท่าน</div></td><td class="r"><div class="row" style="gap:8px;justify-content:flex-end;flex-wrap:nowrap">${App.statusBadge(q.status)}${canDel ? `<button class="icon-btn us-edit emp-del" data-act="qDelete" data-id="${H(q.id)}" title="ลบใบเสนอราคา" aria-label="ลบใบเสนอราคา ${H(q.id)}">${TRASH}</button>` : ''}</div></td></tr>`).join('') || '<tr><td colspan="6"><div class="empty">ไม่พบใบเสนอราคา</div></td></tr>'}
+  <td class="r num b">${U.n(App.calc(q).net, 2)}<div class="sub show-m" style="font-weight:400">${U.fmtRange(q.start, q.end, { year: false })} · ${U.n(q.pax)} ท่าน</div></td><td class="r"><div class="row" style="gap:8px;justify-content:flex-end;flex-wrap:nowrap">${App.statusBadge(q.status)}${canDel ? `<button class="icon-btn us-edit emp-del" data-act="qDelete" data-id="${H(q.id)}" title="ลบใบเสนอราคา" aria-label="ลบใบเสนอราคา ${H(q.id)}">${TRASH}</button>` : ''}</div></td></tr>`).join('') || '<tr><td colspan="7"><div class="empty">ไม่พบใบเสนอราคา</div></td></tr>'}
 </tbody></table></section>`;
     }
   };
