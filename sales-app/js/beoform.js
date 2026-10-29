@@ -45,7 +45,7 @@
       no: '', issued: U.today(), org: q.clientFull || q.client || '', coord: [q.contact, q.phone].filter(Boolean).join(' '), quote: q.id,
       date: U.fmtRange(q.start, q.end, { long: true }),
       venue: [isParty ? 'งานเลี้ยง' : 'ประชุม', room ? '@' + (room.th || room.name).replace(/^ห้อง/, '') : '', t0 ? t0 + 'น. - ' + t1 + 'น.' : ''].filter(Boolean).join(' '),
-      // ประเภทงาน: the type of event and who comes, as picked on the function sheet (else meeting / party from the quote)
+      // ประเภทงาน: the type of event and who comes, as picked on the function sheet (else meeting / party from the quote; see values())
       type: (t => t.kinds.length || t.guests.length ? [t.kinds.join(' + '), t.guests.join(' และ ')].filter(Boolean).join('\n') : isParty ? 'งานเลี้ยง' : 'ประชุม / สัมมนา')(App.beoTagNames ? App.beoTagNames(b) : { kinds: [], guests: [] }),
       pax: b.confirmPax || (q.pax + ' ท่าน'),
       pricing: q.items.filter(i => i.sec !== 'room' && i.price).map(i => `${i.name}@${money(i.price)}/${unitTxt(i)}`).join('\n'),
@@ -66,6 +66,9 @@
   function values(b, q) {
     const a = auto(b, q), f = b.fn || {}, v = {};
     for (const k of Object.keys(a)) v[k] = f[k] != null ? f[k] : a[k];
+    // ประเภทงาน follows the attendee / event-type picks on the function sheet whenever there are any (over text typed earlier)
+    const tg = App.beoTagNames ? App.beoTagNames(b) : { kinds: [], guests: [] };
+    if (tg.kinds.length || tg.guests.length) v.type = a.type;
     v.menu = Array.isArray(f.menu) ? f.menu : a.menu;
     v.split = f.split || {}; // cells divided with “วาดตาราง”: { field: node }, node = { o:1 } | { text } | { d:'v'|'h', at, a, b }
     v.rich = f.rich || {}; // formatted copies of fields where only part of the text is styled
