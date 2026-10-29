@@ -5,7 +5,7 @@ const RANK = { sales: 1, acc: 1, head: 2, manager: 3, admin: 4 };
 const ALL_PERMS = ['create_quote', 'discount10', 'discount_over', 'view_beo', 'customers', 'staff', 'users', 'edit_prices', 'leave_hr'];
 const PBKDF2_ITER = 10000; // kept modest so login fits the Workers free-plan CPU budget
 const SESSION_DAYS = { remember: 30, normal: 1 };
-const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task', 'leave'];
+const KINDS = ['quote', 'beo', 'staff', 'employees', 'settings', 'catalog', 'task', 'leave', 'roster'];
 // properties (สถานที่): a quotation's site (missing = resort); function sheets and staff plans follow their quotation.
 // user.sites limits which an account may open (missing or empty = all); admins open all
 const SITE_IDS = ['resort', 'boutique', 'maneein'];
@@ -17,6 +17,7 @@ async function docSiteOk(env, user, kind, id, data) {
   if (userSites(user).length === SITE_IDS.length) return true;
   if (kind === 'quote') return siteOk(user, data ? data.site : await quoteSite(env, id));
   if (kind === 'beo' || kind === 'staff') { const s = await quoteSite(env, kind === 'beo' ? data && data.quoteId : id); return s == null || siteOk(user, s); }
+  if (kind === 'roster') return siteOk(user, (data && data.site) || String(id).split(':')[0]);
   return true;
 }
 const MAX_IMAGE_BYTES = 1500000;
@@ -129,7 +130,7 @@ async function state(env, since, user) {
   if (user && userSites(user).length < SITE_IDS.length) {
     const qs = new Map((await env.DB.prepare("SELECT id, json_extract(data, '$.site') AS site FROM docs WHERE kind = 'quote'").all()).results.map(r => [r.id, r.site || 'resort']));
     const ok = qid => !qs.has(qid) || siteOk(user, qs.get(qid));
-    siteDocs = docs.filter(d => d.deleted || (d.kind === 'quote' ? ok(d.id) : d.kind === 'staff' ? ok(d.id) : d.kind === 'beo' ? ok(JSON.parse(d.data).quoteId) : true));
+    siteDocs = docs.filter(d => d.deleted || (d.kind === 'quote' ? ok(d.id) : d.kind === 'staff' ? ok(d.id) : d.kind === 'beo' ? ok(JSON.parse(d.data).quoteId) : d.kind === 'roster' ? siteOk(user, JSON.parse(d.data).site) : true));
   }
   return {
     serverTime: now(),
@@ -140,6 +141,35 @@ async function state(env, since, user) {
 }
 
 /* ---------------- business rules ---------------- */
+// the monthly work roster (ตารางการทำงาน, mirrors js/roster.js): heads of department fill their department's rows,
+// HR (leave_hr) and admins fill any; signed in turn by a head (หัวหน้า) → HR (ทรัพยากรบุคคล) → an admin (ผู้จัดการ);
+// a change to the table after anyone signed clears the signatures
+const isHr = u => u.role === 'admin' || !!(u.perms && u.perms.leave_hr);
+const isHeadRole = u => u.role === 'head' || u.role === 'manager';
+function applyRoster(user, data, prev) {
+  if (!isHr(user) && !isHeadRole(user)) fail(403, 'แก้ไขตารางการทำงานได้เฉพาะหัวหน้าแผนก ฝ่ายบุคคล และผู้ดูแลระบบ');
+  if (JSON.stringify(data).length > 400000) fail(413, 'ตารางการทำงานใหญ่เกินไป');
+  const body = r => { const { sign, ...c } = r || {}; return JSON.stringify(c); };
+  if (!isHr(user) && prev) {
+    // a head changes only the rows of their own department (a new table may start with every row)
+    const mine = deptOf(user), pr = new Map(((prev && prev.rows) || []).map(r => [r.id, JSON.stringify(r)]));
+    const nr = new Map((data.rows || []).map(r => [r.id, JSON.stringify(r)]));
+    for (const r of data.rows || []) if (pr.get(r.id) !== JSON.stringify(r) && r.dept !== mine) fail(403, 'หัวหน้าแผนกแก้ไขได้เฉพาะแถวของแผนกตัวเอง');
+    for (const r of (prev && prev.rows) || []) if (!nr.has(r.id) && r.dept !== mine) fail(403, 'หัวหน้าแผนกแก้ไขได้เฉพาะแถวของแผนกตัวเอง');
+  }
+  const ps = (prev && prev.sign) || {}, ns = data.sign || {};
+  if (prev && body(prev) !== body(data)) { data.sign = {}; return; }
+  const may = { head: isHeadRole(user) || user.role === 'admin', hr: isHr(user), gm: user.role === 'admin' };
+  const order = ['head', 'hr', 'gm'], out = {};
+  for (const k of order) {
+    if (JSON.stringify(ps[k] || null) === JSON.stringify(ns[k] || null)) { if (ps[k]) out[k] = ps[k]; continue; }
+    if (!ns[k]) continue; // withdrawn
+    if (!may[k]) fail(403, 'คุณไม่มีสิทธิ์ลงนามช่องนี้');
+    if (order.slice(0, order.indexOf(k)).some(x => !out[x])) fail(400, 'ต้องลงนามตามลำดับ หัวหน้า → ทรัพยากรบุคคล → ผู้จัดการ');
+    out[k] = { by: user.id, byName: user.name, at: now() };
+  }
+  data.sign = out;
+}
 // what a function sheet's approval looks at: not its workflow fields, and not its tags (who comes, kind of event — labels for the departments)
 const beoContent = b => {
   const { approval, status, rev, revNote, signoff, ss, tags, ...c } = b || {};
@@ -254,6 +284,7 @@ async function applyRules(env, user, kind, id, data, prev) {
     if (!data.to || !['user', 'dept'].includes(data.to.type)) fail(400, 'ระบุผู้รับมอบหมาย');
     if (JSON.stringify(data).length > 20000) fail(413, 'รายละเอียดงานยาวเกินไป');
   }
+  if (kind === 'roster') applyRoster(user, data, prev);
   if (kind === 'leave') {
     if (!prev) {
       // a new request: always the caller's own, unsigned and waiting for the head of department
