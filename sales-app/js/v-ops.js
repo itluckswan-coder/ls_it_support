@@ -509,11 +509,13 @@
     const t = tiers.find(x => x.upTo == null || pax <= x.upTo) || tiers[tiers.length - 1];
     return Math.max(0, Number(t.n) || 0);
   };
+  // only the departments with rules switched on get shifts, each sized by its rule; the others are added by hand
   function genPlan(q) {
     const plan = genPlanBase(q);
-    for (const day of Object.values(plan.days)) for (const [dp, shifts] of Object.entries(day)) { const n = ruleNeed(dp, q.pax); if (n != null) shifts.forEach(s => { s.need = n; }); }
+    for (const day of Object.values(plan.days)) for (const [dp, shifts] of Object.entries(day)) { const n = ruleNeed(dp, q.pax); if (n == null) delete day[dp]; else shifts.forEach(s => { s.need = n; }); }
     return plan;
   }
+  const ruleDepts = () => D.DEPTS.filter(d => { const t = staffRules()[d.id]; return t && t.length; });
   function genPlanBase(q) {
     const days = {}, pax = q.pax;
     const need = { kitchen: Math.max(2, Math.ceil(pax / 10)), banquet: Math.max(2, Math.ceil(pax / 12)), av: q.items.some(i => i.ref === 'svc:av') ? 2 : 1, front: q.items.some(i => i.sec === 'room') ? 4 : 2, hk: q.items.some(i => i.sec === 'room') ? Math.max(2, Math.ceil(q.items.filter(i => i.sec === 'room').reduce((a, r) => a + Number(r.q1), 0) / 6)) : 2 };
@@ -546,7 +548,7 @@
       const R = ui.rulesDraft, dis = canEdit ? '' : 'disabled';
       const card = dp => {
         const tiers = R[dp.id];
-        const body = !tiers ? '<p class="small muted" style="margin:6px 0 0">ใช้การคำนวณอัตโนมัติของระบบ (ตามจำนวนลูกค้าและรายการในใบเสนอ)</p>' : `
+        const body = !tiers ? '<p class="small muted" style="margin:6px 0 0">ไม่จัดรอบให้แผนกนี้ตอนสร้างแผน — เปิด “ใช้เงื่อนไข” เพื่อให้สร้างรอบตามจำนวนลูกค้า หรือเพิ่มรอบเองภายหลัง</p>' : `
           <table class="tbl" style="margin-top:8px"><thead><tr><th>จำนวนลูกค้าต่องาน</th><th class="r">พนักงานต่อรอบ</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>
           ${tiers.map((t, i) => { const from = i ? (Number(tiers[i - 1].upTo) || 0) + 1 : 1, last = i === tiers.length - 1; return `<tr>
             <td><div class="row" style="gap:6px;flex-wrap:nowrap">${last ? `<span>${from} คนขึ้นไป</span>` : `<span style="white-space:nowrap">${from} –</span><input class="input" style="width:76px;height:36px" type="number" min="${from}" value="${t.upTo}" data-change="ruleUp" data-d="${dp.id}" data-i="${i}" ${dis} aria-label="ถึงจำนวนลูกค้า"><span>คน</span>`}</div></td>
@@ -605,7 +607,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       App.state.ui.staffQ = q.id;
       const plan = db.staff[q.id];
       const head = (extra) => `<div class="page-hd"><div><h1>รอบพนักงาน</h1><div class="small muted"><button class="link" data-act="stPickQ">${H(q.id)} · ${H(q.title)} · ${H(q.client)} · ${q.pax} ท่าน ▾</button></div></div>${extra || ''}</div>`;
-      if (!plan) return head() + `<div class="card pad" style="text-align:center"><p class="muted">ยังไม่มีแผนรอบพนักงานสำหรับงานนี้</p><button class="btn red" data-act="stGen">สร้างแผนจากใบเสนอราคา</button></div>`;
+      if (!plan) return head() + `<div class="card pad" style="text-align:center"><p class="muted">ยังไม่มีแผนรอบพนักงานสำหรับงานนี้</p>${(rd => rd.length ? `<p class="small muted" style="margin:-4px 0 14px">จัดรอบตามเงื่อนไขจำนวนพนักงาน (${U.n(q.pax)} ท่าน) · ${rd.map(d => `${H(d.short)} ${ruleNeed(d.id, q.pax)} คน/รอบ`).join(' · ')}</p>` : '<p class="small muted" style="margin:-4px 0 14px">ยังไม่ได้ตั้งเงื่อนไขจำนวนพนักงานของแผนกใด — ตั้งได้ที่แท็บ “เงื่อนไขจำนวนพนักงาน”</p>')(ruleDepts())}<button class="btn red" data-act="stGen">สร้างแผนจากใบเสนอราคา</button></div>`;
       const dates = Object.keys(plan.days).sort();
       const ui = App.state.ui.staff && App.state.ui.staff.q === q.id ? App.state.ui.staff : (App.state.ui.staff = { q: q.id, date: dates[0], ot: null });
       if (!plan.days[ui.date]) ui.date = dates[0];
@@ -721,7 +723,10 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   };
   Object.assign(App.ACT, {
     stPickQ() { App.pickQuoteModal('เลือกงาน', id => { App.state.ui.staff = null; App.go('#/staff/' + encodeURIComponent(id)); }, q => q.status !== 'cancelled' && q.status !== 'draft'); },
-    stGen() { const q = Store.quote(App.state.ui.staffQ); Store.db.staff[q.id] = genPlan(q); Store.save(); App.render(); App.toast('สร้างแผนแล้ว — กดที่รอบเพื่อมอบหมายพนักงาน'); },
+    stGen() {
+      const q = Store.quote(App.state.ui.staffQ);
+      if (!ruleDepts().length) { App.toast('ยังไม่ได้ตั้งเงื่อนไขจำนวนพนักงาน — ตั้งที่แท็บ “เงื่อนไขจำนวนพนักงาน” ก่อน'); return; }
+      Store.db.staff[q.id] = genPlan(q); Store.save(); App.render(); App.toast('สร้างแผนแล้ว — กดที่รอบเพื่อมอบหมายพนักงาน'); },
     stDate(el) { App.state.ui.staff.date = el.dataset.v; App.state.ui.staff.ot = null; App.render(); },
     stShare() {
       const q = Store.quote(App.state.ui.staffQ), p = SP(), date = App.state.ui.staff.date, day = p.days[date];
