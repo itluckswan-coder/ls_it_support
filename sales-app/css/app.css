@@ -343,6 +343,15 @@ textarea.input{height:auto;min-height:96px;padding:12px 14px;line-height:1.6;res
 .mg-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55)}
 .mg-dots i.on{background:#fff}
 .mg-n{position:absolute;top:6px;right:6px;font-size:11px;padding:1px 7px;border-radius:9px;background:rgba(23,33,31,.6);color:#fff}
+.mg-zoom{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;background:rgba(23,33,31,.6);color:#fff;display:grid;place-items:center;z-index:2}
+.mg-zoom:hover{background:rgba(23,33,31,.8)}
+.lbox{position:fixed;inset:0;z-index:1000;background:rgba(10,14,13,.94);display:flex;align-items:center;justify-content:center}
+.lbox img{width:96vw;height:88vh;object-fit:contain;user-select:none}
+.lb-x{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;font-size:20px}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.18);color:#fff;font-size:30px;line-height:1}
+.lb-nav.prev{left:14px}.lb-nav.next{right:14px}
+.lb-x:hover,.lb-nav:hover{background:rgba(255,255,255,.3)}
+.lb-n{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);color:#fff;font-size:14px;background:rgba(0,0,0,.4);padding:4px 12px;border-radius:12px;white-space:nowrap}
 .side-ph{height:190px}
 .me-cap{display:grid;grid-template-columns:auto 1fr;gap:8px 14px;align-items:center}
 .me-cap .input{width:84px}

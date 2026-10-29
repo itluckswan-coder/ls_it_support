@@ -587,6 +587,25 @@
       return out.sort((a, b) => a.p - b.p);
     }
   };
+  /* full-screen photo viewer: arrows / swipe / ← → keys, Esc or ✕ closes */
+  App.lightbox = (imgs, start, title) => {
+    if (!imgs || !imgs.length) return;
+    let i = Math.max(0, Math.min(imgs.length - 1, start || 0));
+    document.getElementById('lbox')?.remove();
+    const box = document.createElement('div'); box.id = 'lbox'; box.className = 'lbox'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', title || 'ภาพเต็มจอ');
+    const draw = () => {
+      box.innerHTML = `<img src="${U.esc(imgs[i])}" alt="${U.esc((title || '') + ' ' + (i + 1) + '/' + imgs.length)}">
+        <button type="button" class="lb-x" aria-label="ปิด">✕</button>
+        ${imgs.length > 1 ? `<button type="button" class="lb-nav prev" aria-label="รูปก่อนหน้า">‹</button><button type="button" class="lb-nav next" aria-label="รูปถัดไป">›</button>` : ''}
+        <span class="lb-n">${title ? U.esc(title) + ' · ' : ''}${i + 1}/${imgs.length}</span>`;
+    };
+    const go = d => { if (imgs.length > 1) { i = (i + d + imgs.length) % imgs.length; draw(); } };
+    const close = () => { box.remove(); document.removeEventListener('keydown', key); document.body.style.overflow = ''; };
+    const key = e => { if (e.key === 'Escape') close(); else if (e.key === 'ArrowLeft') go(-1); else if (e.key === 'ArrowRight') go(1); };
+    box.onclick = e => { if (e.target.closest('.lb-x') || e.target === box) close(); else if (e.target.closest('.lb-nav')) go(e.target.closest('.prev') ? -1 : 1); };
+    let x0 = null; box.ontouchstart = e => { x0 = e.touches[0].clientX; }; box.ontouchend = e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1); x0 = null; };
+    draw(); document.body.appendChild(box); document.body.style.overflow = 'hidden'; document.addEventListener('keydown', key); box.querySelector('.lb-x').focus();
+  };
   App.ACT.openQuote = el => App.go('#/quote/' + encodeURIComponent(el.dataset.id));
 
   /* ---------- boot ---------- */

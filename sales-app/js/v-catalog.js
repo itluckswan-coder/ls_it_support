@@ -291,6 +291,7 @@
       <div class="mg-track">${imgs.map((src, i) => `<div class="mg-sl" style="background-image:url('${H(src)}')" role="img" aria-label="${H(room.name)} ${i + 1}/${imgs.length}"></div>`).join('')}</div>
       ${imgs.length > 1 ? `<button type="button" class="mg-nav prev" data-act="meetGal" data-d="-1" aria-label="รูปก่อนหน้า">‹</button><button type="button" class="mg-nav next" data-act="meetGal" data-d="1" aria-label="รูปถัดไป">›</button>
       <div class="mg-dots">${imgs.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('')}</div><span class="mg-n">1/${imgs.length}</span>` : ''}
+      <button type="button" class="mg-zoom" data-act="meetZoom" title="ขยายภาพเต็มจอ" aria-label="ขยายภาพเต็มจอ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
     </div>`;
   }
   function galSync(mg) {
@@ -371,6 +372,8 @@
     meetLayout(el) { App.state.ui.meet.layout = el.dataset.v; App.render(); },
     meetSel(el) { App.state.ui.meet.sel = el.dataset.v; App.render(); if (window.innerWidth <= 1100) document.querySelector('aside.card')?.scrollIntoView({ behavior: 'smooth' }); },
     meetHalf(el) { App.state.ui.meet.half = el.dataset.v === '1'; App.render(); },
+    // the photo on show, full screen
+    meetZoom(el) { const mg = el.closest('.mg'), room = D.MEETING_ROOMS.find(r => r.id === mg.dataset.room), tr = mg.querySelector('.mg-track'); if (room) App.lightbox(room.imgs || [], Math.round(tr.scrollLeft / (tr.clientWidth || 1)), room.th || room.name); },
     meetGal(el) { const tr = el.closest('.mg').querySelector('.mg-track'), n = tr.children.length, i = Math.round(tr.scrollLeft / tr.clientWidth) + Number(el.dataset.d); tr.scrollTo({ left: ((i + n) % n) * tr.clientWidth, behavior: 'smooth' }); },
     meetEdit(el) { if (App.can('edit_prices')) meetEditor(el.dataset.v); },
     meetAdd() {
