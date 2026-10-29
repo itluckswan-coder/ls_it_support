@@ -1067,3 +1067,12 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
   .rs .rs-vh{font-size:7px}.rs-legend i{height:9px}.rs-sig-line{min-height:16px}
   .rs th:nth-child(3){width:118px}
 }
+
+/* floor plans: choose the meeting room when a quotation uses several */
+.fp-rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px}
+.fp-room{display:flex;flex-direction:column;overflow:hidden;color:inherit;text-decoration:none;padding:0}
+.fp-room:hover{box-shadow:0 8px 22px rgba(0,0,0,.12)}
+.fp-room-ph{height:150px;background:var(--gray-soft) center/cover;position:relative}
+.fp-room-ph b{position:absolute;left:10px;top:10px;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;font-size:14px}
+.fp-room-tx{display:flex;flex-direction:column;gap:4px;padding:14px 16px 16px;align-items:flex-start}
+.fp-room-tx>b{font:600 18px var(--fh)}
