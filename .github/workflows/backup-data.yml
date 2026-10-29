@@ -1,0 +1,85 @@
+name: Backup data
+
+# Run by hand only (Actions → Backup data → Run workflow): each run is a full snapshot of everything up to that moment.
+# The result is one password-protected 7z file (AES-256, file names hidden too) kept as this run's artifact for 90 days;
+# download it and keep it somewhere safe. This repository is public, so nothing is ever stored unencrypted.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup-data
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BACKUP_PASSWORD: ${{ secrets.BACKUP_PASSWORD }}
+    steps:
+      - name: Check secrets
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing (the same secrets the deploy uses)."; exit 1
+          fi
+          if [ "${#BACKUP_PASSWORD}" -lt 12 ]; then
+            echo "::error::Add a BACKUP_PASSWORD secret of at least 12 characters in Settings → Secrets and variables → Actions. It locks the backup file; keep it somewhere safe — without it the backup cannot be opened."; exit 1
+          fi
+          # same clean-up as the deploy workflow: stray spaces/quotes/newlines pasted into the secrets
+          acct=$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]"' | tr 'A-F' 'a-f')
+          token=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '"'"'"'\r')
+          if printf '%s' "$token" | grep -q 'Bearer'; then token=$(printf '%s' "$token" | sed -E 's/.*Bearer[[:space:]]+([A-Za-z0-9_-]+).*/\1/'); fi
+          token=$(printf '%s' "$token" | tr -d '[:space:]')
+          echo "::add-mask::$acct"; echo "CLOUDFLARE_ACCOUNT_ID=$acct" >> "$GITHUB_ENV"
+          echo "::add-mask::$token"; echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+          echo "STAMP=$(TZ=Asia/Bangkok date +%Y-%m-%d_%H%M)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Export the database (everything in D1)
+        run: |
+          node scripts/ensure-d1.mjs
+          mkdir -p "$RUNNER_TEMP/backup"
+          npx wrangler d1 export luckswan-sales --remote --output="$RUNNER_TEMP/backup/database.sql"
+          echo "database.sql: $(wc -c < "$RUNNER_TEMP/backup/database.sql") bytes, $(grep -c '^INSERT' "$RUNNER_TEMP/backup/database.sql") rows"
+
+      - name: Add the code (full history) and the restore guide
+        working-directory: .
+        run: |
+          B="$RUNNER_TEMP/backup"
+          git bundle create "$B/ls_it_support.bundle" --all
+          git archive --format=zip -o "$B/source-code.zip" HEAD
+          cp docs/backup/RESTORE.md "$B/RESTORE.md"
+          printf 'Luck Swan sales — backup %s (Asia/Bangkok)\ncommit %s\n' "$STAMP" "$(git rev-parse HEAD)" > "$B/BACKUP-INFO.txt"
+
+      - name: Lock the backup with the password
+        working-directory: ${{ runner.temp }}/backup
+        run: |
+          command -v 7z >/dev/null || sudo apt-get install -y p7zip-full
+          7z a -t7z -mhe=on -mx=9 -p"$BACKUP_PASSWORD" "$RUNNER_TEMP/luckswan-backup-$STAMP.7z" . > /dev/null
+          rm -rf "$RUNNER_TEMP/backup"
+          ls -l "$RUNNER_TEMP"/luckswan-backup-*.7z
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luckswan-backup-${{ env.STAMP }}
+          path: ${{ runner.temp }}/luckswan-backup-*.7z
+          retention-days: 90
+          compression-level: 0
