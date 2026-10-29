@@ -770,11 +770,18 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
           ${ed && room && !note ? `<button type="button" class="link no-print" data-act="qdMeetAuto" style="margin-top:6px">+ ใส่รายละเอียดห้องจากระบบ</button>` : ''}</div></div></td></tr>`;
       };
       // guest-room photos under the room line (one strip per room type): the type's photo unless changed on this quotation
-      // (q.docEdit.rimg[key] = list of photos, [] = none); boutique / custom rooms start without one
-      const rKey = it => it.ref && it.ref !== 'late' ? 'r.' + it.ref : ik(it);
-      const rSys = it => { const t = D.ROOM_TYPES.find(r => r.id === it.ref); return t && t.img ? [t.img] : []; };
+      // (q.docEdit.rimg[key] = list of photos, [] = none). A line typed in by hand (no ref) is matched to a room type or a
+      // meeting room by its name, e.g. "Deluxe Triple …" → Deluxe, "ห้องกินรี (…)" → Kinnaree; boutique / unmatched lines start without one
+      const lc = x => String(x || '').toLowerCase();
+      const famOf = t => t.fam.replace(/ ชั้น .*$/, '').replace(/ \(.*\)$/, '');
+      const typeOf = it => D.ROOM_TYPES.find(r => r.id === it.ref) || (it.ref ? null : D.ROOM_TYPES.filter(t => t.img && lc(it.name).includes(lc(famOf(t)))).sort((a, b) => famOf(b).length - famOf(a).length)[0]);
+      const meetOf = it => D.MEETING_ROOMS.find(r => r.id === it.ref) || (it.ref ? null : D.MEETING_ROOMS.find(r => [r.th, String(r.th || '').replace(/^ห้อง/, ''), r.name].filter(x => x && x.length > 2).some(x => lc(it.name).includes(lc(x)))));
+      const rKey = it => { if (it.sec === 'meet') { const m = meetOf(it); return m ? 'm.' + m.id : ik(it); } const t = typeOf(it); return t ? 'r.' + t.id : it.ref && it.ref !== 'late' ? 'r.' + it.ref : ik(it); };
+      const rSys = it => { if (it.sec === 'meet') { const m = meetOf(it); return m && m.img ? [m.img] : []; } const t = typeOf(it); return t && t.img ? [t.img] : []; };
       const roomPics = (it, i, all) => {
         if (it.ref === 'late' || it.free || all.findIndex(x => rKey(x) === rKey(it)) !== i) return '';
+        // in the meeting section only room lines get a photo slot (not e.g. an LED screen)
+        if (it.sec === 'meet' && !meetOf(it) && !/ห้อง|room|hall|ลาน/i.test(it.name || '')) return '';
         const k = rKey(it), own = (X.rimg || {})[k], list = own !== undefined ? own : rSys(it);
         if (!ed) return list.length ? `<tr><td colspan="5" style="padding-top:0"><div class="qd-rimgs">${list.map(u => `<img src="${H(u)}" alt="">`).join('')}</div></td></tr>` : '';
         return `<tr><td colspan="5" style="padding-top:0"><div class="qd-rimgs">${list.map((u, j) => `<div class="qd-img"><img src="${H(u)}" alt=""><button type="button" class="ce-x" data-act="qdRImgDel" data-k="${H(k)}" data-i="${j}" aria-label="ลบรูป">${ICON.x}</button></div>`).join('')}
@@ -790,7 +797,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const groups = [['room', 'ห้องพัก'], ['food', 'อาหารและเครื่องดื่ม'], ['meet', 'ห้องประชุม ณ โรงแรมลักษวรรณรีสอร์ท'], ['other', 'บริการอื่น ๆ']].filter(([k]) => q.items.some(i => i.sec === k));
       const mainRoom = D.MEETING_ROOMS.find(r => q.items.some(i => i.sec === 'meet' && i.ref === r.id));
       App.state.ui.doc.meetAuto = meetAuto(mainRoom);
-      App.state.ui.doc.rSys = Object.fromEntries(q.items.filter(i => i.sec === 'room').map(it => [rKey(it), rSys(it)]));
+      App.state.ui.doc.rSys = Object.fromEntries(q.items.filter(i => i.sec === 'room' || i.sec === 'meet').map(it => [rKey(it), rSys(it)]));
       return `<article class="doc${ed ? ' qd-editing' : ''}" id="qdPaper">
   <div style="display:flex;justify-content:space-between;gap:20px;align-items:flex-start">
     <div><b>${H(S.company)}</b><br>${H(S.address)}<br>ติดต่อโรงแรม ${H(S.phone)} / ติดต่อสำนักงานใหญ่ ${H(S.hq)}<br>สาขา <span style="background:#cfe6fb;padding:1px 40px 1px 8px;color:#1a3fd8">${F('branch', App.prop(App.siteOfQ(q)).th)}</span></div>
@@ -805,7 +812,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   </div>
   <table><thead><tr><th>คำอธิบาย/รายละเอียด</th><th class="c">ระยะเวลาการใช้บริการ</th><th class="c">จำนวน หน่วย</th><th class="c">${unit ? 'ราคาต่อหน่วย' : ''}</th><th class="r">ราคารวม</th></tr></thead><tbody>
   ${groups.map(([k, name], gi) => `<tr class="grp"><td colspan="5">${gi + 1}. ${name}</td></tr>` +
-    (k === 'meet' && mainRoom ? meetBlock(k, mainRoom) : k === 'room' ? q.items.filter(i => i.sec === k).map((it, i, all) => row(it) + roomPics(it, i, all)).join('') : q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
+    (k === 'meet' && mainRoom ? meetBlock(k, mainRoom) : k === 'room' || k === 'meet' ? q.items.filter(i => i.sec === k).map((it, i, all) => row(it) + roomPics(it, i, all)).join('') : q.items.filter(i => i.sec === k).map(row).join(''))).join('')}
   </tbody></table>
   <div style="display:flex;justify-content:flex-end;margin-top:12px"><table style="width:auto;min-width:260px">
     ${c.credit ? `<tr><td>ยอดรวมรายการ</td><td class="r">${U.n2(c.gross)}</td></tr><tr><td>หักค่าห้องประชุมด้วยค่าบุฟเฟ่ต์กลางวัน/เบรก${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}</td><td class="r">−${U.n2(c.credit)}</td></tr>` : ''}
