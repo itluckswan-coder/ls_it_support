@@ -7,6 +7,7 @@
   // a user's department, from the free-text dept on their account (mirrors DEPT_WORDS in worker/src/index.js)
   const DEPT_WORDS = { kitchen: ['ครัว', 'f&b'], banquet: ['จัดเลี้ยง', 'banquet'], av: ['ช่าง', 'av'], front: ['ส่วนหน้า', 'front'], hk: ['แม่บ้าน', 'housekeeping'], acc: ['บัญชี', 'account'] };
   const deptOf = u => { const d = String((u && u.dept) || '').toLowerCase(); return Object.keys(DEPT_WORDS).find(k => DEPT_WORDS[k].some(w => d.includes(w))) || null; };
+  App.userDept = deptOf;
   const dept = id => D.DEPTS.find(d => d.id === id) || { name: id, short: id, color: '#999', bg: '#eee', fg: '#333' };
   const isAdmin = () => { const me = App.me(); return !!me && me.role === 'admin'; };
   // assigning work: the admin, and the roles the admin allowed (⚙ settings, js/task-perms.js); each assigner manages their own tasks

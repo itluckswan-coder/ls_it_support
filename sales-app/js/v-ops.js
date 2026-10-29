@@ -534,8 +534,8 @@
     title: 'พนักงาน',
     render(p) {
       const tab = App.state.ui.staffTab || 'shifts';
-      const tabs = `<div class="seg white" style="margin-bottom:18px" role="tablist"><button role="tab" class="${tab === 'shifts' ? 'on' : ''}" data-act="stTab" data-v="shifts">รอบพนักงาน</button><button role="tab" class="${tab === 'emps' ? 'on' : ''}" data-act="stTab" data-v="emps">พนักงานทั้งหมด</button><button role="tab" class="${tab === 'rules' ? 'on' : ''}" data-act="stTab" data-v="rules">เงื่อนไขจำนวนพนักงาน</button></div>`;
-      return tabs + (tab === 'emps' ? App.V.staff.renderEmps() : tab === 'rules' ? App.V.staff.renderRules() : App.V.staff.renderShifts(p));
+      const tabs = `<div class="seg white no-print" style="margin-bottom:18px" role="tablist"><button role="tab" class="${tab === 'shifts' ? 'on' : ''}" data-act="stTab" data-v="shifts">รอบพนักงาน</button><button role="tab" class="${tab === 'emps' ? 'on' : ''}" data-act="stTab" data-v="emps">พนักงานทั้งหมด</button><button role="tab" class="${tab === 'rules' ? 'on' : ''}" data-act="stTab" data-v="rules">เงื่อนไขจำนวนพนักงาน</button><button role="tab" class="${tab === 'roster' ? 'on' : ''}" data-act="stTab" data-v="roster">ตารางการทำงาน</button></div>`;
+      return tabs + (tab === 'emps' ? App.V.staff.renderEmps() : tab === 'roster' && App.V.staff.renderRoster ? App.V.staff.renderRoster() : tab === 'rules' ? App.V.staff.renderRules() : App.V.staff.renderShifts(p));
     },
     /* ---- staffing rules: people needed per shift by guest count ---- */
     renderRules() {
