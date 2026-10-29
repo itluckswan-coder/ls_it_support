@@ -119,7 +119,9 @@
   }
   applyRoomRates(null);
 
-  const FOOD_CATS = [
+  // catering categories (ประเภทจัดเลี้ยง): editable by price editors, kept in settings.foodCats; 'all' is always first and
+  // 'package' (seminar packages) can be renamed but not removed, since the packages pages rely on it
+  const FOOD_CATS_DEFAULT = [
     { id: 'all', name: 'ทั้งหมด' },
     { id: 'package', name: 'แพ็กเกจสัมมนา' },
     { id: 'coffee', name: 'Coffee break' },
@@ -128,6 +130,13 @@
     { id: 'cocktail', name: 'Cocktail' },
     { id: 'wedding', name: 'งานแต่งงาน' }
   ];
+  const FOOD_CATS = FOOD_CATS_DEFAULT.map(c => Object.assign({}, c));
+  function applyFoodCats(list) {
+    const src = Array.isArray(list) && list.length ? list.filter(c => c && c.id && c.id !== 'all') : FOOD_CATS_DEFAULT.slice(1);
+    if (!src.some(c => c.id === 'package')) src.unshift(FOOD_CATS_DEFAULT[1]);
+    FOOD_CATS.length = 0; FOOD_CATS.push(FOOD_CATS_DEFAULT[0]);
+    src.forEach(c => FOOD_CATS.push({ id: String(c.id), name: String(c.name || c.id).slice(0, 40) }));
+  }
 
   // photos used by the package item lists (img: null shows a "รอรูปเมนู" placeholder in the carousel)
   const PH = { coffee: 'img/food1-0.jpg', lunch: 'img/food2-0.jpg', dinner: 'img/food2-1.jpg', room: 'img/room-deluxe.jpg', meeting: 'img/meet-thikhampon.jpg' };
@@ -523,7 +532,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyMeetRooms(this.db && this.db.settings && this.db.settings.meetRooms); applyDepts(this.db && this.db.settings && this.db.settings.depts); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyMeetRooms(this.db && this.db.settings && this.db.settings.meetRooms); applyDepts(this.db && this.db.settings && this.db.settings.depts); applyFoodCats(this.db && this.db.settings && this.db.settings.foodCats); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },
@@ -548,7 +557,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;

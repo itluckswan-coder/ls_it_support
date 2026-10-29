@@ -115,7 +115,7 @@
       const db = { v: 1, settings: seed.settings, users: [], quotes: [], beos: [], employees: [], staff: {}, tasks: [], leaves: [], seq: {} };
       this.ver = {}; this.snap = {}; this.userSnap = {};
       Store.db = db;
-      g.DATA.applyDepts(null); g.DATA.applyMeetRooms(null); g.DATA.applyCatalog(null); // built-in menu unless the shared database has an edited one
+      g.DATA.applyDepts(null); g.DATA.applyFoodCats(null); g.DATA.applyMeetRooms(null); g.DATA.applyCatalog(null); // built-in menu unless the shared database has an edited one
       for (const d of j.docs) this.applyDoc(d, true);
       for (const u of j.users) this.applyUser(u);
       this.serverTime = j.serverTime;
@@ -144,7 +144,7 @@
       else if (d.kind === 'task') replace(db.tasks || (db.tasks = []));
       else if (d.kind === 'leave') replace(db.leaves || (db.leaves = []));
       else if (d.kind === 'employees') db.employees = data.list || [];
-      else if (d.kind === 'settings') { db.settings = Object.assign({}, Store.seedData().settings, data); g.DATA.applyRoomRates(db.settings.roomRates); g.DATA.applyMeetRooms(db.settings.meetRooms); g.DATA.applyDepts(db.settings.depts); }
+      else if (d.kind === 'settings') { db.settings = Object.assign({}, Store.seedData().settings, data); g.DATA.applyRoomRates(db.settings.roomRates); g.DATA.applyMeetRooms(db.settings.meetRooms); g.DATA.applyDepts(db.settings.depts); g.DATA.applyFoodCats(db.settings.foodCats); }
       else if (d.kind === 'catalog' && d.id === 'food') { db.catalog = { food: data.list || [] }; g.DATA.applyCatalog(db.catalog.food); }
       this.ver[key] = d.version;
       this.snap[key] = JSON.stringify(d.kind === 'employees' ? { list: db.employees } : d.kind === 'settings' ? db.settings : d.kind === 'catalog' ? { list: db.catalog.food } : data);
