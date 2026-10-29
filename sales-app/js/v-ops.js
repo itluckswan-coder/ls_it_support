@@ -49,6 +49,8 @@
     kinds: { name: 'ลักษณะงาน', def: ['ค่ายนักเรียนมีกิจกรรม', 'เข้าร่วมแข่งขันกิจกรรม', 'เปิดตัวสินค้า', 'งานเลี้ยงกินข้าว', 'งานเลี้ยงมีพิธีการ', 'Team building', 'คลาสสอน', 'แข่งขันวิชาการ', 'แข่งขันกีฬา', 'จัดบูธแสดงสินค้า'] }
   };
   const btList = k => { const s = (Store.db.settings || {}).beoTags; return s && Array.isArray(s[k]) ? s[k] : BT[k].def.map((name, i) => ({ id: k[0] + i, name })); };
+  // the names picked on a function sheet: { guests: [...], kinds: [...] } (used by the printed forms)
+  App.beoTagNames = b => Object.fromEntries(['guests', 'kinds'].map(k => { const list = btList(k); return [k, ((b && b.tags && b.tags[k]) || []).map(id => (list.find(x => x.id === id) || {}).name).filter(Boolean)]; }));
   const btSave = (k, list) => { const st = Store.db.settings || (Store.db.settings = {}); st.beoTags = Object.assign({}, st.beoTags, { [k]: list }); Store.save(); };
   // the lists are shared settings, changed by the sales roles only (admins, sales managers, sales staff; the worker checks too)
   const btCanList = () => App.salesRole();

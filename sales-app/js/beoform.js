@@ -45,7 +45,8 @@
       no: '', issued: U.today(), org: q.clientFull || q.client || '', coord: [q.contact, q.phone].filter(Boolean).join(' '), quote: q.id,
       date: U.fmtRange(q.start, q.end, { long: true }),
       venue: [isParty ? 'งานเลี้ยง' : 'ประชุม', room ? '@' + (room.th || room.name).replace(/^ห้อง/, '') : '', t0 ? t0 + 'น. - ' + t1 + 'น.' : ''].filter(Boolean).join(' '),
-      type: isParty ? 'งานเลี้ยง' : 'ประชุม / สัมมนา',
+      // ประเภทงาน: the type of event and who comes, as picked on the function sheet (else meeting / party from the quote)
+      type: (t => t.kinds.length || t.guests.length ? [t.kinds.join(' + '), t.guests.join(' และ ')].filter(Boolean).join('\n') : isParty ? 'งานเลี้ยง' : 'ประชุม / สัมมนา')(App.beoTagNames ? App.beoTagNames(b) : { kinds: [], guests: [] }),
       pax: b.confirmPax || (q.pax + ' ท่าน'),
       pricing: q.items.filter(i => i.sec !== 'room' && i.price).map(i => `${i.name}@${money(i.price)}/${unitTxt(i)}`).join('\n'),
       layout: dept('banquet').map(x => '- ' + x).join('\n'),
