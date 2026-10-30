@@ -1,0 +1,59 @@
+name: Reset admin account
+
+# For when no administrator can sign in to the sales app. Run by hand only (Actions → Reset admin account → Run workflow).
+# Makes the e-mail in the ADMIN_RESET_EMAIL secret an active administrator with the password in ADMIN_RESET_PASSWORD
+# (created if missing, updated if it exists — its other data is kept). Both stay in secrets: the repository is public,
+# and nothing about the users is printed. Delete ADMIN_RESET_PASSWORD after signing in and change the password in the app.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: admin-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      ADMIN_RESET_EMAIL: ${{ secrets.ADMIN_RESET_EMAIL }}
+      ADMIN_RESET_PASSWORD: ${{ secrets.ADMIN_RESET_PASSWORD }}
+    steps:
+      - name: Check secrets
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are missing (the same secrets the deploy uses)."; exit 1
+          fi
+          if [ -z "$ADMIN_RESET_EMAIL" ] || [ "${#ADMIN_RESET_PASSWORD}" -lt 8 ]; then
+            echo "::error::Add the secrets ADMIN_RESET_EMAIL (the e-mail to sign in with) and ADMIN_RESET_PASSWORD (8+ characters) in Settings → Secrets and variables → Actions."; exit 1
+          fi
+          echo "::add-mask::$ADMIN_RESET_EMAIL"
+          # same clean-up as the deploy workflow: stray spaces/quotes/newlines pasted into the secrets
+          acct=$(printf '%s' "$CLOUDFLARE_ACCOUNT_ID" | tr -d '[:space:]"' | tr 'A-F' 'a-f')
+          token=$(printf '%s' "$CLOUDFLARE_API_TOKEN" | tr -d '"'"'"'\r')
+          if printf '%s' "$token" | grep -q 'Bearer'; then token=$(printf '%s' "$token" | sed -E 's/.*Bearer[[:space:]]+([A-Za-z0-9_-]+).*/\1/'); fi
+          token=$(printf '%s' "$token" | tr -d '[:space:]')
+          echo "::add-mask::$acct"; echo "CLOUDFLARE_ACCOUNT_ID=$acct" >> "$GITHUB_ENV"
+          echo "::add-mask::$token"; echo "CLOUDFLARE_API_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Reset the account
+        run: |
+          node scripts/ensure-d1.mjs > /dev/null
+          node scripts/reset-admin.mjs
