@@ -1,0 +1,57 @@
+name: Remove the old ShawPlus from this account
+
+# Run by hand, once. ShawPlus (the pharmacy ordering app) used to run on this repo's Cloudflare account
+# and now runs on the pharmacy's own account (https://shawplus.shawplus.workers.dev, data copied 31 Oct
+# 2569). This deletes ShawPlus's old Worker "shawplus" and D1 database "shawplus" from this account.
+# Luck Swan Sales (worker and database "luckswan-sales") is never touched. It refuses to delete anything
+# unless the new site answers with its data in place.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'พิมพ์ DELETE เพื่อยืนยันการลบ ShawPlus เก่าออกจากบัญชี Luck Swan (ลบถาวร)'
+        required: true
+
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEW_SITE: https://shawplus.shawplus.workers.dev
+    steps:
+      - name: Check the confirmation, and that the new ShawPlus is up with its data
+        working-directory: .
+        env:
+          CONFIRM: ${{ github.event.inputs.confirm }}
+        run: |
+          if [ "$(printf '%s' "$CONFIRM" | tr -d '[:space:]"'"'"'' | tr 'a-z' 'A-Z')" != "DELETE" ]; then echo "::error::พิมพ์คำว่า DELETE ในช่องแรกเพื่อยืนยัน · You typed: '$CONFIRM'"; exit 1; fi
+          health=$(curl -sS -m 20 "$NEW_SITE/api/health" || true)
+          echo "New site: $NEW_SITE/api/health -> $health"
+          echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q '"setup":false' || { echo "::error::The new ShawPlus does not answer with its data, so nothing was deleted."; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Delete the old ShawPlus web app (Worker "shawplus")
+        run: |
+          printf 'name = "shawplus"\ncompatibility_date = "2025-01-01"\n' > "$RUNNER_TEMP/old-shawplus.toml"
+          npx wrangler delete shawplus --config "$RUNNER_TEMP/old-shawplus.toml" --force || echo "::warning::Worker shawplus was not found (already removed?)"
+
+      - name: Delete the old ShawPlus database (D1 "shawplus")
+        run: |
+          out=$(npx wrangler d1 list --json)
+          id=$(printf '%s' "$out" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const l=JSON.parse(s.slice(s.indexOf('[')));const d=l.find(x=>x.name==='shawplus');console.log(d?d.uuid:'')})")
+          if [ -z "$id" ]; then echo "D1 database shawplus is not in this account (already removed)"; exit 0; fi
+          printf 'name = "shawplus"\ncompatibility_date = "2025-01-01"\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "shawplus"\ndatabase_id = "%s"\n' "$id" > "$RUNNER_TEMP/old-shawplus.toml"
+          npx wrangler d1 delete shawplus -y --config "$RUNNER_TEMP/old-shawplus.toml"
+          echo "### The old ShawPlus is removed from this account. The new one: $NEW_SITE" >> "$GITHUB_STEP_SUMMARY"
