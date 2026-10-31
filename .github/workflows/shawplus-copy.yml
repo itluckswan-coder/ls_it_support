@@ -71,6 +71,9 @@ jobs:
           npx wrangler d1 export shawplus --remote --config "$RUNNER_TEMP/old.toml" --output "$RUNNER_TEMP/shawplus.sql"
           echo "Rows copied, by table:"; grep -oE '^INSERT INTO "?[A-Za-z_0-9]+"?' "$RUNNER_TEMP/shawplus.sql" | sed -E 's/INSERT INTO "?([A-Za-z_0-9]+)"?/\1/' | sort | uniq -c
           grep -q '^INSERT INTO "users"' "$RUNNER_TEMP/shawplus.sql" || { echo "::error::The copy has no logins, so it is not ShawPlus's live data."; exit 1; }
+          # D1 refuses statements over 100 KB; rows with a photo or a long log go in as an INSERT plus UPDATEs
+          node ../.github/scripts/split-long-sql.mjs "$RUNNER_TEMP/shawplus.sql" "$RUNNER_TEMP/shawplus-split.sql"
+          mv "$RUNNER_TEMP/shawplus-split.sql" "$RUNNER_TEMP/shawplus.sql"
 
       - name: Put the data into the pharmacy's account
         env:
@@ -101,4 +104,4 @@ jobs:
       - name: Remove the copy of the data
         if: always()
         working-directory: .
-        run: rm -f "$RUNNER_TEMP/shawplus.sql" "$RUNNER_TEMP/old.toml" "$RUNNER_TEMP/new.toml"
+        run: rm -f "$RUNNER_TEMP/shawplus.sql" "$RUNNER_TEMP/shawplus-split.sql" "$RUNNER_TEMP/old.toml" "$RUNNER_TEMP/new.toml"
