@@ -238,7 +238,8 @@
     for (const i of p.items) {
       const [dw, dh] = dims(i);
       gr += `<g data-id="${i.id}" transform="translate(${i.x * S} ${i.y * S}) rotate(${i.rot})" style="cursor:move">${shape(i)}` +
-        (sel && sel.includes(i.id) ? `<rect x="${-dw * S / 2 - 4}" y="${-dh * S / 2 - 4}" width="${dw * S + 8}" height="${dh * S + 8}" fill="none" stroke="#A8262D" stroke-width="2" stroke-dasharray="6 4"/>` : '') + '</g>';
+        (sel && sel.includes(i.id) ? `<rect x="${-dw * S / 2 - 4}" y="${-dh * S / 2 - 4}" width="${dw * S + 8}" height="${dh * S + 8}" fill="none" stroke="#A8262D" stroke-width="2" stroke-dasharray="6 4"/>` +
+          (sel.length === 1 ? `<g data-rot="1" style="cursor:grab"><line x1="0" y1="${-dh * S / 2 - 4}" x2="0" y2="${-dh * S / 2 - 30}" stroke="#A8262D" stroke-width="2"/><circle cy="${-dh * S / 2 - 38}" r="11" fill="#fff" stroke="#A8262D" stroke-width="2.5"/><path d="M-5 ${-dh * S / 2 - 41} a5 5 0 1 1 1 6" fill="none" stroke="#A8262D" stroke-width="2"/><circle cy="${-dh * S / 2 - 38}" r="20" fill="transparent"/></g>` : '') : '') + '</g>';
     }
     const seats = seatsOf(p);
     return { vw, vh, svg: `<rect width="${vw}" height="${vh}" fill="#fff"/><text x="${S}" y="${S * 0.95}" font-size="26" font-weight="700" fill="#222">${H(p.title || '')}</text>
@@ -249,7 +250,7 @@
   App.planSeats = seatsOf;
 
   /* ---------- the editor page ---------- */
-  let sel = [], drag = null, marq = null;
+  let sel = [], drag = null, marq = null, turn = null;
   // undo: snapshots of the plan (or the room setup) taken before every change
   const UNDO_MAX = 60;
   let hist = { key: null, stack: [], last: null };
@@ -398,7 +399,10 @@
     const list = picked(p), tip = '<div class="xs muted" style="margin-top:8px">ลากบนพื้นที่ว่างเพื่อคลุมเลือกหลายชิ้น · Shift/Ctrl + คลิก เพื่อเพิ่ม/เอาออกทีละชิ้น · ลูกศรขยับทีละ 10 ซม.</div>';
     if (!list.length) return `<h3>ที่เลือกอยู่</h3><div class="small muted">แตะที่โต๊ะหรือของในผังเพื่อเลือก</div>${p.items.length ? '<button class="btn ghost sm" style="width:100%;margin-top:8px" data-act="fpAll">เลือกทั้งหมด</button>' : ''}${tip}`;
     const seated = list.filter(i => SEATED.includes(i.type)), seatBtns = `<button class="icon-btn" data-act="fpSeat" data-v="-1" aria-label="ลดที่นั่ง">−</button><button class="icon-btn" data-act="fpSeat" data-v="1" aria-label="เพิ่มที่นั่ง">+</button>`;
-    const actions = `<div class="fp-grid"><button class="btn ghost sm" data-act="fpRot">⟳ หมุน 15°</button><button class="btn ghost sm" data-act="fpDup">คัดลอก</button><button class="btn ghost sm fp-wide" data-act="fpDel" style="color:var(--red)">ลบ${list.length > 1 ? ' ' + list.length + ' ชิ้น' : ''}</button></div>`;
+    const one = list.length === 1 ? list[0] : null;
+    const actions = `<div class="small muted" style="margin-bottom:4px">หมุนตามเข็มนาฬิกา${one ? ' · ตอนนี้ ' + one.rot + '°' : ''}</div>
+      <div class="fp-rot">${[15, 45, 90, 180].map(d => `<button class="btn ghost sm" data-act="fpRot" data-v="${d}" aria-label="หมุน ${d} องศา">⟳ ${d}°</button>`).join('')}</div>
+      <div class="fp-grid"><button class="btn ghost sm" data-act="fpDup">คัดลอก</button><button class="btn ghost sm fp-wide" data-act="fpDel" style="color:var(--red)">ลบ${list.length > 1 ? ' ' + list.length + ' ชิ้น' : ''}</button></div>`;
     if (list.length > 1) {
       const kinds = Object.entries(list.reduce((m, i) => (m[NAMES[i.type]] = (m[NAMES[i.type]] || 0) + 1, m), {})).map(([k, n]) => k + ' ' + n).join(' · ');
       return `<h3>เลือกอยู่ ${list.length} ชิ้น</h3><div class="small muted" style="margin-bottom:8px">${H(kinds)}</div>
@@ -434,6 +438,7 @@
     s.addEventListener('pointerdown', e => {
       const gEl = e.target.closest('[data-id]'), p = P(), [x, y] = pos(e), add = e.shiftKey || e.ctrlKey || e.metaKey;
       e.preventDefault(); s.setPointerCapture(e.pointerId);
+      if (e.target.closest('[data-rot]') && gEl) { const it = p.items.find(i => i.id === Number(gEl.dataset.id)); if (it) { turn = { it, moved: false }; return; } }
       if (!gEl) {
         // empty floor: start a selection box (Shift/Ctrl keeps what is already selected)
         marq = { x0: x, y0: y, x1: x, y1: y, base: add ? sel.slice() : [] };
@@ -457,6 +462,13 @@
         sel = marq.base.concat(hit.filter(id => !marq.base.includes(id)));
         drawSvg(); return;
       }
+      if (turn) {
+        // the handle sits straight above the item at 0°, so the angle from the centre plus 90° is the item's turn
+        let a = Math.atan2(y - turn.it.y, x - turn.it.x) * 180 / Math.PI + 90;
+        a = ((Math.round(a / 5) * 5) % 360 + 360) % 360;
+        if (a !== turn.it.rot) { turn.it.rot = a; turn.moved = true; drawSvg(); }
+        return;
+      }
       if (!drag) return;
       const dx = x - drag.x, dy = y - drag.y;
       for (const [i, ox, oy] of drag.orig) { i.x = Math.round((ox + dx) * 10) / 10; i.y = Math.round((oy + dy) * 10) / 10; }
@@ -465,7 +477,8 @@
     const end = () => {
       if (marq) { marq = null; drawSvg(); refreshSide(); }
       if (drag && drag.moved) { save(); refreshSide(); }
-      drag = null;
+      if (turn && turn.moved) { save(); refreshSide(); }
+      drag = null; turn = null;
     };
     s.addEventListener('pointerup', end); s.addEventListener('pointercancel', end);
   }
@@ -600,13 +613,14 @@
     fpItemDel(el) { const c = libItems().find(x => x.id === el.dataset.id); if (c) App.confirm('เอา “' + c.name + '” ออกจากรายการเพิ่มของ? (ของที่วางในผังแล้วยังอยู่)', () => { setFloor(f => { f.custom = (f.custom || []).filter(x => x.id !== c.id); }); App.render(); }, 'เอาออก'); },
     fpAll() { const p = P(); if (!p) return; sel = p.items.map(i => i.id); drawSvg(); refreshSide(); },
     fpNone() { sel = []; drawSvg(); refreshSide(); },
-    fpRot() {
+    fpRot(el) {
       // several items turn together around their common centre
       const p = P(), list = p ? picked(p) : []; if (!list.length) return;
-      const cx = list.reduce((a, i) => a + i.x, 0) / list.length, cy = list.reduce((a, i) => a + i.y, 0) / list.length, r = Math.PI / 12, c = Math.cos(r), sn = Math.sin(r);
+      const deg = Number(el && el.dataset && el.dataset.v) || 15;
+      const cx = list.reduce((a, i) => a + i.x, 0) / list.length, cy = list.reduce((a, i) => a + i.y, 0) / list.length, r = deg * Math.PI / 180, c = Math.cos(r), sn = Math.sin(r);
       for (const i of list) {
         if (list.length > 1) { const dx = i.x - cx, dy = i.y - cy; i.x = Math.round((cx + dx * c - dy * sn) * 10) / 10; i.y = Math.round((cy + dx * sn + dy * c) * 10) / 10; }
-        i.rot = (i.rot + 15) % 360;
+        i.rot = (i.rot + deg) % 360;
       }
       save(); drawSvg(); refreshSide();
     },
