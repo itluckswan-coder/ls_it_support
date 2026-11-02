@@ -7,9 +7,9 @@
 
   // room sizes in metres (width × depth)
   const ROOM_DIM = { kinnaree: [24, 18], thikhampon: [13.9, 12.1], ruenhong: [20, 7], prayamengrai: [10, 7], pool: [30, 20] };
-  const NAMES = { round: 'โต๊ะกลม', rect: 'โต๊ะยาว', chairrow: 'แถวเก้าอี้', class: 'โต๊ะห้องเรียน', stage: 'เวที', screen: 'จอ', podium: 'โพเดียม', lect: 'โต๊ะบรรยาย', sound: 'คุมเสียง', buffet: 'บุฟเฟ่ต์', reg: 'ลงทะเบียน', sofa: 'โซฟา', carpet: 'พรมแดง', door: 'ประตู', pillar: 'เสา', block: 'บล็อก/ป้าย', custom: 'สิ่งของอื่น' };
+  const NAMES = { round: 'โต๊ะกลม', rect: 'โต๊ะยาว', chairrow: 'แถวเก้าอี้', class: 'โต๊ะห้องเรียน', stage: 'เวที', screen: 'จอ', podium: 'โพเดียม', lect: 'โต๊ะบรรยาย', sound: 'คุมเสียง', buffet: 'บุฟเฟ่ต์', reg: 'ลงทะเบียน', sofa: 'โซฟา', carpet: 'พรมแดง', door: 'ประตู', pillar: 'เสา', block: 'บล็อก/ป้าย', text: 'กล่องข้อความ', custom: 'สิ่งของอื่น' };
   // default sizes in metres (w × d); a round table is its diameter. Tables sized by seat count keep their own length.
-  const DEF_SIZE = { round: [2.9, 2.9], stage: [7, 2.4], buffet: [3, 0.8], screen: [3, 0.25], sound: [1.5, 0.8], podium: [0.6, 0.6], sofa: [2, 0.8], reg: [2.4, 0.7], lect: [2.4, 0.9], carpet: [2.4, 14.4], door: [1, 0.3], pillar: [0.6, 0.6], block: [2, 1] };
+  const DEF_SIZE = { round: [2.9, 2.9], stage: [7, 2.4], buffet: [3, 0.8], screen: [3, 0.25], sound: [1.5, 0.8], podium: [0.6, 0.6], sofa: [2, 0.8], reg: [2.4, 0.7], lect: [2.4, 0.9], carpet: [2.4, 14.4], door: [1, 0.3], pillar: [0.6, 0.6], block: [2, 1], text: [4, 1] };
   const SIZED = Object.keys(DEF_SIZE);
   const floor = () => (Store.db.settings && Store.db.settings.floor) || {};
   // room size and locked fixtures from แก้ไขปรับปรุง, else the built-in size
@@ -67,7 +67,7 @@
       // generated plans work around the room's locked fixtures and do not repeat them (a fixed stage means no second stage)
       const fixed = fixedOf(p.room);
       if (!SEATED.includes(type) && fixed.some(f => f.type === type)) return null;
-      const b = box(it); if (fixed.some(f => overlaps(box(f), b))) return null;
+      const b = box(it); if (fixed.some(f => f.type !== 'text' && overlaps(box(f), b))) return null; // a text box is only writing, it takes no floor space
     }
     p.items.push(it); return it;
   }
@@ -212,6 +212,11 @@
       const fill = /^#[0-9a-f]{6}$/i.test(i.color || '') ? i.color : '#e4e2da';
       return (i.shape === 'round' ? `<ellipse rx="${w * S / 2}" ry="${h * S / 2}" fill="${fill}" stroke="#555" stroke-width="1.5"/>` : `<rect x="${-w * S / 2}" y="${-h * S / 2}" width="${w * S}" height="${h * S}" rx="3" fill="${fill}" stroke="#555" stroke-width="1.5"/>`) + T(H(i.label || NAMES.custom), w > 2 ? 13 : 9);
     }
+    if (i.type === 'text') {
+      // writing on the plan: a see-through box (still clickable) with the text as large as fits
+      const t = String(i.label || NAMES.text), sz = Math.max(8, Math.min(h * S * 0.62, w * S / Math.max(1, t.length * 0.6)));
+      return `<rect x="${-w * S / 2}" y="${-h * S / 2}" width="${w * S}" height="${h * S}" fill="#fff" fill-opacity="0"/>` + T(H(t), Math.round(sz), '#222');
+    }
     s = `<rect x="${-w * S / 2}" y="${-h * S / 2}" width="${w * S}" height="${h * S}" rx="3" fill="${FILL[i.type]}" stroke="#555" stroke-width="${i.type === 'door' ? 2 : 1.5}"/>`;
     if (i.type === 'door') s += `<path d="M${-S / 2} 0 A${S} ${S} 0 0 1 ${S / 2} ${S * 0.9}" fill="none" stroke="#999" stroke-dasharray="4 3"/>`;
     if (!['screen', 'door', 'pillar'].includes(i.type)) s += T(H(i.type === 'block' && i.label ? i.label : NAMES[i.type]), w > 2 ? 13 : 9, i.type === 'carpet' ? '#fff' : '#333');
@@ -348,7 +353,7 @@
       <div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${d.W}" data-change="fsW" aria-label="กว้าง (เมตร)"><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${d.H}" data-change="fsH" aria-label="ลึก (เมตร)"></div>
       <div class="xs muted" style="margin-top:6px">พื้นที่ ${(d.W * d.H).toFixed(1)} ตร.ม.${(D.MEETING_ROOMS.find(r => r.id === id) || {}).area ? ' · ข้อมูลห้อง ' + D.MEETING_ROOMS.find(r => r.id === id).area + ' ตร.ม.' : ''}</div></section>
     <section class="card pad"><div class="fp-h"><h3>เพิ่มของที่ห้ามย้าย</h3><button class="fp-plus" data-act="fpItemNew" aria-label="เพิ่มของที่ห้ามย้ายชิ้นใหม่" title="เพิ่มของที่ห้ามย้ายชิ้นใหม่ กำหนดชื่อ ขนาด และสีเอง">+</button></div><div class="xs muted" style="margin-bottom:8px">เช่น เวทีถาวร เสา ประตู จอ — จะแสดงเป็นเส้นประในทุกผังของห้องนี้ และย้ายในผังงานไม่ได้</div>
-      <div class="fp-grid">${['stage', 'screen', 'door', 'pillar', 'block', 'sound', 'buffet', 'carpet', 'podium', 'reg'].map(t => `<button class="btn ghost sm" data-act="fpAdd" data-v="${t}">+ ${NAMES[t]}</button>`).join('')}${libButtons()}</div></section>
+      <div class="fp-grid">${['stage', 'screen', 'door', 'pillar', 'block', 'sound', 'buffet', 'carpet', 'podium', 'reg', 'text'].map(t => `<button class="btn ghost sm" data-act="fpAdd" data-v="${t}">+ ${NAMES[t]}</button>`).join('')}${libButtons()}</div></section>
     <section class="card pad" id="fpSel">${selPanel(d)}</section>
   </aside>
   <div class="fp-main">
@@ -369,6 +374,9 @@
     after() { drawSvg(); bindSvg(); }
   };
   function setSizes(fn) { const st = Store.db.settings, f = st.floor = Object.assign({ rooms: {}, sizes: {} }, st.floor); f.sizes = Object.assign({}, f.sizes); fn(f.sizes); Store.save(); App.render(); }
+  // typing in a text box: the plan redraws on every key (the side panel stays, so the cursor keeps its place); saved after a pause
+  const saveSoon = U.debounce(save, 600);
+  App.INP.fpText = el => { const p = P(), list = p ? picked(p) : []; if (!list.length) return; list.forEach(it => { if (it.type === 'text') it.label = el.value.slice(0, 80); }); drawSvg(); saveSoon(); };
   Object.assign(App.CHG, {
     fsW(el) { const d = setupDoc(); d.W = Math.max(4, Math.min(80, Number(el.value) || d.W)); saveSetup(); record(); App.render(); },
     fsH(el) { const d = setupDoc(); d.H = Math.max(4, Math.min(80, Number(el.value) || d.H)); saveSetup(); record(); App.render(); },
@@ -402,7 +410,8 @@
       ${SEATED.includes(it.type) ? `<div class="row" style="margin-bottom:8px"><span style="flex:1">ที่นั่ง: <b>${it.seats}</b></span>${seatBtns}</div>` : ''}
       ${SIZED.includes(it.type) || it.type === 'custom' ? `<div class="small muted" style="margin-bottom:4px">${it.type === 'round' ? 'เส้นผ่านศูนย์กลาง (ม.)' : 'ขนาด กว้าง × ลึก (ม.)'}</div>
         <div class="row" style="gap:6px;margin-bottom:8px"><input class="input" type="number" min="0.1" max="40" step="0.1" value="${dims(it)[0]}" data-change="fpSize" data-k="w" aria-label="กว้าง">${it.type === 'round' ? '' : `<span>×</span><input class="input" type="number" min="0.1" max="40" step="0.1" value="${dims(it)[1]}" data-change="fpSize" data-k="h" aria-label="ลึก">`}</div>` : ''}
-      ${it.type === 'block' || it.type === 'custom' ? `<input class="input" value="${H(it.label || '')}" placeholder="ข้อความบนบล็อก เช่น ห้องควบคุม" data-change="fpLabel" aria-label="ข้อความบนบล็อก" style="margin-bottom:8px">` : ''}
+      ${it.type === 'text' ? `<label class="small muted" for="fpText">ข้อความ</label><input class="input" id="fpText" maxlength="80" value="${H(it.label || '')}" placeholder="พิมพ์ข้อความ เช่น ทางเข้า VIP" data-input="fpText" aria-label="ข้อความในกล่อง" style="margin:4px 0 8px">`
+        : it.type === 'block' || it.type === 'custom' ? `<input class="input" value="${H(it.label || '')}" placeholder="ข้อความบนบล็อก เช่น ห้องควบคุม" data-change="fpLabel" aria-label="ข้อความบนบล็อก" style="margin-bottom:8px">` : ''}
       ${actions}${tip}`;
   }
   const setupMode = () => App.state.route === 'plansetup';
@@ -481,7 +490,7 @@
     const items = t.items.filter(i => i && NAMES[i.type] && isFinite(i.x) && isFinite(i.y)).slice(0, 800).map(i => {
       const o = { type: i.type, x: Number(i.x), y: Number(i.y), rot: Number(i.rot) || 0, seats: Math.max(0, Math.min(40, Number(i.seats) || 0)) };
       for (const k of ['w', 'h']) if (Number(i[k]) > 0) o[k] = Math.min(40, Number(i[k]));
-      if (i.label) o.label = String(i.label).slice(0, 40);
+      if (i.label) o.label = String(i.label).slice(0, i.type === 'text' ? 80 : 40);
       if (i.type === 'custom') { o.shape = i.shape === 'round' ? 'round' : 'rect'; if (/^#[0-9a-f]{6}$/i.test(i.color || '')) o.color = i.color; }
       return o;
     });
@@ -517,7 +526,13 @@
       const go = () => setPlan(histPlan(h));
       if (P().items.length) App.confirm('แทนที่ผังปัจจุบันด้วยแปลน “' + h.r + ' · ' + h.l + '”?', go, 'แทนที่'); else go();
     },
-    fpAdd(el) { const p = P(), G = setupMode() ? p : geom(p), n = p.items.length % 5; sel = [mk(p, el.dataset.v, G.W / 2 + n * 0.4, G.H / 2 + n * 0.4).id]; save(); drawSvg(); refreshSide(); },
+    fpAdd(el) {
+      const p = P(), G = setupMode() ? p : geom(p), n = p.items.length % 5, it = mk(p, el.dataset.v, G.W / 2 + n * 0.4, G.H / 2 + n * 0.4);
+      if (it.type === 'text') it.label = NAMES.text;
+      sel = [it.id]; save(); drawSvg(); refreshSide();
+      // a new text box: the cursor goes straight into its text, ready to type over
+      const t = document.getElementById('fpText'); if (t) { t.focus(); t.select(); }
+    },
     fpUndo() {
       histSync(); if (!hist.stack.length) return;
       const prev = hist.stack.pop(), data = JSON.parse(prev);
@@ -614,7 +629,7 @@
     fpSize(el) {
       step(it => { const d = dims(it), v = Math.max(0.1, Math.min(40, Number(el.value) || 0.1)); if (it.type === 'round') { it.w = it.h = v; } else { it.w = el.dataset.k === 'w' ? v : d[0]; it.h = el.dataset.k === 'h' ? v : d[1]; } });
     },
-    fpLabel(el) { step(it => { it.label = el.value.slice(0, 40); }); },
+    fpLabel(el) { step(it => { it.label = el.value.slice(0, it.type === 'text' ? 80 : 40); }); },
     fpTitle(el) { P().title = el.value.slice(0, 120); save(); drawSvg(); },
     fpW(el) { P().W = Math.max(4, Math.min(80, Number(el.value) || 20)); save(); drawSvg(); refreshSide(); },
     fpH(el) { P().H = Math.max(4, Math.min(80, Number(el.value) || 14)); save(); drawSvg(); refreshSide(); }
