@@ -868,6 +868,13 @@
     'ยังไม่ได้ตั้งเงื่อนไขจำนวนพนักงาน — ตั้งที่แท็บ “เงื่อนไขจำนวนพนักงาน” ก่อน': ['No head-count rules yet — set them in the “Head-count rules” tab first', 'ဝန်ထမ်းအရေအတွက် စည်းမျဉ်း မရှိသေးပါ — “ဝန်ထမ်းအရေအတွက် စည်းမျဉ်း” တွင် အရင်သတ်မှတ်ပါ'],
     'กล่องข้อความ': ['Text box', 'စာသားဘောက်စ်'], '+ กล่องข้อความ': ['+ Text box', '+ စာသားဘောက်စ်'],
     'พิมพ์ข้อความ เช่น ทางเข้า VIP': ['Type the text, e.g. VIP entrance', 'စာသားရိုက်ပါ ဥပမာ VIP ဝင်ပေါက်'], 'ข้อความในกล่อง': ['Text in the box', 'ဘောက်စ်ထဲရှိ စာသား'],
+    'รูปพื้นหลัง': ['Background picture', 'နောက်ခံပုံ'], 'ความเข้มของรูป': ['Picture strength', 'ပုံ၏ အရောင်ပြင်းအား'], 'ลบรูปพื้นหลัง': ['Remove background picture', 'နောက်ခံပုံ ဖျက်ရန်'],
+    'ลบรูปพื้นหลังของผังนี้?': ['Remove this plan\'s background picture?', 'ဤအစီအစဉ်၏ နောက်ခံပုံကို ဖျက်မလား?'], 'กำลังอัปโหลดรูป…': ['Uploading the picture…', 'ပုံတင်နေသည်…'],
+    'อัปโหลดไฟล์เทมเพลต (.json) หรือรูปผัง (.jpg, .png)': ['Upload a template file (.json) or a floor-plan picture (.jpg, .png)', 'Template ဖိုင် (.json) သို့မဟုတ် အစီအစဉ်ပုံ (.jpg, .png) တင်ရန်'],
+    'รูปผังจะขึ้นเป็นพื้นหลังจางๆ ของผังนี้ แล้ววางโต๊ะทับตามรูปได้': ['The picture goes faintly under this plan so tables can be placed over it', 'ပုံကို ဤအစီအစဉ်အောက်တွင် မှိန်မှိန်ပြပြီး စားပွဲများကို အပေါ်တွင် နေရာချနိုင်သည်'],
+    'ไฟล์นี้ไม่ใช่ไฟล์เทมเพลต (.json) หรือรูปผัง (.jpg, .png)': ['This is not a template file (.json) or a floor-plan picture (.jpg, .png)', 'ဤဖိုင်သည် template (.json) သို့မဟုတ် အစီအစဉ်ပုံ (.jpg, .png) မဟုတ်ပါ'],
+    'รองรับเฉพาะรูป JPG, PNG, WebP': ['Only JPG, PNG and WebP pictures', 'JPG, PNG, WebP ပုံများသာ'], 'รูปผังใส่ได้ในหน้าออกแบบผังงานของแต่ละงาน': ['A floor-plan picture goes on an event\'s plan page', 'အစီအစဉ်ပုံကို ပွဲတစ်ခုချင်း၏ အစီအစဉ်စာမျက်နှာတွင် ထည့်ပါ'],
+    'ใส่รูปผังเป็นพื้นหลังแล้ว — ปรับความเข้มหรือลบได้ที่แผง “รูปพื้นหลัง”': ['Picture set as the background — adjust or remove it in “Background picture”', 'နောက်ခံပုံ ထည့်ပြီး — “နောက်ခံပုံ” တွင် ပြင်ရန်/ဖျက်ရန်'],
     // wizard
     'ลูกค้า': ['Customer', 'ဖောက်သည်'], 'อาหาร': ['Food', 'အစားအစာ'], 'สรุป': ['Summary', 'အနှစ်ချုပ်'], 'กรอกข้อมูลพื้นฐาน — แก้ไขได้ภายหลัง': ['Fill in the basics — you can change them later', 'အခြေခံအချက်အလက် ဖြည့်ပါ — နောက်မှ ပြင်နိုင်'],
     'ชื่องาน *': ['Event name *', 'ပွဲအမည် *'], 'ลูกค้า / บริษัท *': ['Customer / company *', 'ဖောက်သည် / ကုမ္ပဏီ *'], 'ถัดไป: ห้องประชุม': ['Next: meeting room', 'နောက်တစ်ဆင့်: အစည်းအဝေးခန်း'], 'ถัดไป: อาหาร': ['Next: food', 'နောက်တစ်ဆင့်: အစားအစာ'],
