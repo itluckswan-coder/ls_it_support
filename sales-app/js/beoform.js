@@ -259,9 +259,11 @@
   // the unsaved copy being edited on the sheet; nothing is stored until "บันทึกแก้ไขข้อมูล"
   function draft(b) {
     const ui = fnUi();
-    if (!ui.draft || ui.draft.bid !== b.id) {
+    // an untouched copy is rebuilt every time, so changes made meanwhile (a department card, the quotation) show up
+    if (!ui.draft || ui.draft.bid !== b.id || !ui.dirty) {
       const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []), more: clone(v.more), sty: clone(v.sty), rich: clone(v.rich), split: clone(v.split) };
       for (const k of EDIT_KEYS) d.v[k] = v[k] == null ? '' : String(v[k]);
+      d.base = Object.assign({}, d.v); // what each box showed when editing began
       ui.draft = d; ui.dirty = false;
     }
     return ui.draft;
@@ -472,7 +474,8 @@
       const b = curB(), d = fnUi().draft; if (!b || !d || !canEdit()) return;
       const a = auto(b, Store.quote(b.quoteId));
       setFn(f => {
-        for (const k of EDIT_KEYS) { const val = d.v[k]; if (val === (a[k] == null ? '' : String(a[k]))) delete f[k]; else f[k] = val.slice(0, 4000); }
+        // only boxes that were changed are stored: an untouched box keeps following the system (department cards, quotation)
+        for (const k of EDIT_KEYS) { const val = d.v[k]; if (d.base && val === d.base[k]) continue; if (val === (a[k] == null ? '' : String(a[k]))) delete f[k]; else f[k] = val.slice(0, 4000); }
         // drop style entries that no longer change anything
         const tidyMap = o => {
           if (o.sty) { for (const k of Object.keys(o.sty)) if (!css(o.sty[k])) delete o.sty[k]; if (!Object.keys(o.sty).length) delete o.sty; }

@@ -393,7 +393,14 @@
       App.modal(`<h2>${H(dept(id).name)}</h2><div class="field"><label class="f">รายการสั่งงาน (บรรทัดละ 1 รายการ)</label><textarea class="input" name="items" rows="6">${H(d.items.join('\n'))}</textarea></div>
         <div class="field"><label class="f">ผู้รับผิดชอบ</label><input class="input" name="owner" value="${H(d.owner)}"></div>
         <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">บันทึก</button></div>`,
-      bg => bg.querySelector('#ok').onclick = () => { const f = App.formData(bg); d.items = f.items.split('\n').map(s => s.trim()).filter(Boolean); d.owner = f.owner; Store.save(); App.closeModal(); App.render(); });
+      bg => bg.querySelector('#ok').onclick = () => {
+        const f = App.formData(bg), items = f.items.split('\n').map(s => s.trim()).filter(Boolean), changed = items.join('\n') !== d.items.join('\n');
+        d.items = items; d.owner = f.owner;
+        // the newest change wins: the function sheet's box fed by this department drops text typed there earlier and shows the card again
+        const k = { banquet: 'layout', kitchen: 'kitchen', hk: 'hk', av: 'av', front: 'front' }[id];
+        if (changed && k && b.fn && b.fn[k] != null) { delete b.fn[k]; if (b.fn.rich) delete b.fn.rich[k]; }
+        Store.save(); App.closeModal(); App.render();
+      });
     },
     beoNote() {
       const b = curB();
