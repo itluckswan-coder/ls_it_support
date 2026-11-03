@@ -49,11 +49,11 @@
       type: (t => t.kinds.length || t.guests.length ? [t.kinds.join(' + '), t.guests.join(' และ ')].filter(Boolean).join('\n') : isParty ? 'งานเลี้ยง' : 'ประชุม / สัมมนา')(App.beoTagNames ? App.beoTagNames(b) : { kinds: [], guests: [] }),
       pax: b.confirmPax || (q.pax + ' ท่าน'),
       pricing: q.items.filter(i => i.sec !== 'room' && i.price).map(i => `${i.name}@${money(i.price)}/${unitTxt(i)}`).join('\n'),
-      layout: dept('banquet').map(x => '- ' + x).join('\n'),
+      layout: dept('banquet').map(x => markLine(x, '- ')).join('\n'),
       fyi: [b.note, ...sched].filter(Boolean).join('\n'),
       stage: '', vinyl: '',
       menu, kitchen: dept('kitchen').join('\n'),
-      hk: dept('hk').join('\n'), av: dept('av').map(x => '/ ' + x).join('\n'),
+      hk: dept('hk').join('\n'), av: dept('av').map(x => markLine(x, '/ ')).join('\n'),
       total: money(c.net) + ' บาท', cost: cost.join('\n'), bill: 'แจ้งภายหลัง',
       checkin: rooms.length ? U.fmtD(q.start) : '-', checkout: rooms.length ? U.fmtD(U.addDays(q.end, 1)) : '-',
       roomType: rooms.length ? rooms.map(i => i.name).join('\n') : '-', roomQty: rooms.length ? rooms.map(i => i.q1 + ' ห้อง × ' + (i.q2 || 1) + ' คืน').join('\n') : '-',
@@ -62,10 +62,15 @@
       appr: b.signoff ? b.signoff.byName : '', apprTitle: b.signoff ? 'อนุมัติ ' + U.fmtD(b.signoff.at.slice(0, 10)) : ''
     };
   }
+  // the sheet boxes fed by a department card (two-way: editing either one changes both) and the mark before each line
+  const DEPT_BOX = { layout: ['banquet', '- '], kitchen: ['kitchen', ''], hk: ['hk', ''], av: ['av', '/ '], front: ['front', ''] };
+  const markLine = (x, m) => !m || x.startsWith(m.trim()) ? x : m + x; // a line that already starts with the mark keeps one
+  const boxToItems = (text, m) => String(text || '').split('\n').map(x => x.trim()).filter(Boolean).map(x => m && x.startsWith(m.trim()) ? x.slice(m.trim().length).trim() : x).filter(Boolean);
+  App.DEPT_BOX = DEPT_BOX;
   // what shows: typed-in value if there is one, else the value from the system
   function values(b, q) {
     const a = auto(b, q), f = b.fn || {}, v = {};
-    for (const k of Object.keys(a)) v[k] = f[k] != null ? f[k] : a[k];
+    for (const k of Object.keys(a)) v[k] = f[k] != null && !DEPT_BOX[k] ? f[k] : a[k];
     // ประเภทงาน follows the attendee / event-type picks on the function sheet whenever there are any (over text typed earlier)
     const tg = App.beoTagNames ? App.beoTagNames(b) : { kinds: [], guests: [] };
     if (tg.kinds.length || tg.guests.length) v.type = a.type;
@@ -475,7 +480,17 @@
       const a = auto(b, Store.quote(b.quoteId));
       setFn(f => {
         // only boxes that were changed are stored: an untouched box keeps following the system (department cards, quotation)
-        for (const k of EDIT_KEYS) { const val = d.v[k]; if (d.base && val === d.base[k]) continue; if (val === (a[k] == null ? '' : String(a[k]))) delete f[k]; else f[k] = val.slice(0, 4000); }
+        for (const k of EDIT_KEYS) {
+          const val = d.v[k];
+          if (DEPT_BOX[k]) {
+            // the box and its department card are one list: a change here goes to the card, nothing is kept on the sheet
+            delete f[k];
+            if (!d.base || val !== d.base[k]) { const [dp, m] = DEPT_BOX[k], dd = (b.depts = b.depts || {})[dp] || (b.depts[dp] = { items: [], owner: '', ack: false }); dd.items = boxToItems(val, m).slice(0, 200); }
+            continue;
+          }
+          if (d.base && val === d.base[k]) continue;
+          if (val === (a[k] == null ? '' : String(a[k]))) delete f[k]; else f[k] = val.slice(0, 4000);
+        }
         // drop style entries that no longer change anything
         const tidyMap = o => {
           if (o.sty) { for (const k of Object.keys(o.sty)) if (!css(o.sty[k])) delete o.sty[k]; if (!Object.keys(o.sty).length) delete o.sty; }
