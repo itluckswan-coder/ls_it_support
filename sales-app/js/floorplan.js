@@ -71,7 +71,12 @@
     }
     p.items.push(it); return it;
   }
-  const seatsOf = p => p.items.reduce((a, i) => a + (SEATED.includes(i.type) ? i.seats : 0), 0);
+  // a picture of a floor plan (from a customer, a photo of a drawing) laid faintly under the plan to place tables over it
+  const BG_OK = /^(api\/images\/[0-9a-f]{32}|data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+)$/;
+  const bgOf = p => p && p.bg && BG_OK.test(p.bg.src || '') ? p.bg : null;
+  // "ใช้รูปนี้เป็นผังงาน": the picture is the plan; the drawn items stay stored but hidden, and the seats are typed in
+  const picOnly = p => { const b = bgOf(p); return !!(b && b.only); };
+  const seatsOf = p => picOnly(p) ? Math.max(0, Number(p.bg.seats) || 0) : p.items.reduce((a, i) => a + (SEATED.includes(i.type) ? i.seats : 0), 0);
   // the meeting room and layout used on a given day of the quote
   function roomFor(q, day) {
     const rp = roomParam(), meets = q.items.filter(i => i.sec === 'meet' && (rp ? (meetRoomOf(i) || {}).id === rp : D.MEETING_ROOMS.some(r => r.id === i.ref)));
@@ -228,6 +233,13 @@
   function build(p, sel, noFixed) {
     const G = noFixed ? { W: p.W, H: p.H, fixed: [] } : geom(p), w = G.W, h = G.H, vw = (w + 2) * S, vh = (h + 3) * S;
     let gr = '';
+    const bgi = noFixed ? null : bgOf(p);
+    if (bgi && bgi.only) {
+      // the uploaded picture is the whole plan: full strength, no grid, no drawn items
+      return { vw, vh, svg: `<rect width="${vw}" height="${vh}" fill="#fff"/><text x="${S}" y="${S * 0.95}" font-size="26" font-weight="700" fill="#222">${H(p.title || '')}</text>
+      <image href="${H(bgi.src)}" x="${S}" y="${2 * S}" width="${w * S}" height="${h * S}" preserveAspectRatio="xMidYMid meet"/><text x="${S}" y="${vh - S * 0.35}" font-size="14" fill="#666">ผังจากรูปที่อัปโหลด${seatsOf(p) ? ' · ที่นั่งรวม ' + seatsOf(p) + ' ที่' : ''}</text>` };
+    }
+    if (bgi) gr += `<image href="${H(bgi.src)}" x="0" y="0" width="${w * S}" height="${h * S}" preserveAspectRatio="xMidYMid meet" opacity="${Math.max(10, Math.min(100, Number(bgi.op) || 100)) / 100}"/>`;
     for (let x = 0; x <= w; x++) gr += `<line x1="${x * S}" y1="0" x2="${x * S}" y2="${h * S}" stroke="#eee"/>`;
     for (let y = 0; y <= h; y++) gr += `<line x1="0" y1="${y * S}" x2="${w * S}" y2="${y * S}" stroke="#eee"/>`;
     gr += `<rect width="${w * S}" height="${h * S}" fill="none" stroke="#333" stroke-width="4"/>`;
@@ -305,14 +317,21 @@
       ${p.room ? `<div class="small"><b>${H(roomName(p.room))}</b> ${geom(p).W} × ${geom(p).H} ม.${fixedOf(p.room).length ? ' · ของที่ห้ามย้าย ' + fixedOf(p.room).length + ' ชิ้น (เส้นประ)' : ''}</div>
         <div class="xs muted" style="margin-top:4px">ขนาดห้องและของที่ห้ามย้ายแก้ได้ที่ ${isAdmin() ? `<a href="#/plansetup/${encodeURIComponent(p.room)}">แก้ไขปรับปรุง</a>` : 'แก้ไขปรับปรุง (ผู้ดูแลระบบ)'}</div>`
       : `<div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${p.W}" data-change="fpW" aria-label="กว้าง (เมตร)" ${edit ? '' : 'disabled'}><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${p.H}" data-change="fpH" aria-label="ลึก (เมตร)" ${edit ? '' : 'disabled'}></div>`}</section>
+    ${edit && bgOf(p) ? `<section class="card pad">${picOnly(p) ? `<h3>ผังจากรูป</h3><div class="small muted" style="margin-bottom:8px">ใช้รูปที่อัปโหลดเป็นผังงาน · โต๊ะและของที่วาดไว้ถูกซ่อนไว้ ไม่ได้ลบ</div>
+      <label class="small muted" for="fpBgSeats">จำนวนที่นั่ง (พิมพ์เอง)</label><input class="input" id="fpBgSeats" type="number" min="0" max="5000" value="${Number(p.bg.seats) || ''}" placeholder="เช่น ${U.n(Number(q.pax) || 0)}" data-change="fpBgSeats" style="margin:4px 0 8px">
+      <button class="btn ghost sm" style="width:100%" data-act="fpBgOnly" data-v="0">กลับไปใช้ผังที่วาด</button>`
+      : `<h3>รูปพื้นหลัง</h3><label class="small muted" for="fpBgOp">ความเข้มของรูป</label>
+      <input id="fpBgOp" type="range" min="10" max="100" step="5" value="${Number(bgOf(p).op) || 100}" data-change="fpBgOp" style="width:100%">
+      <button class="btn red sm" style="width:100%;margin-top:6px" data-act="fpBgOnly" data-v="1">ใช้รูปนี้เป็นผังงาน</button>`}
+      <button class="btn ghost sm" style="width:100%;margin-top:6px;color:var(--red)" data-act="fpBgDel">ลบรูป</button></section>` : ''}
     ${edit ? `<section class="card pad"><div class="fp-h"><h3>เทมเพลต</h3>${canLib() ? '<button class="fp-plus" data-act="fpTplNew" aria-label="เพิ่มเทมเพลต" title="เพิ่มเทมเพลต (บันทึกผังนี้ / อัปโหลดไฟล์)">+</button>' : ''}</div><div class="fp-grid">
       <button class="btn ghost sm" data-act="fpAuto">ตามใบเสนอราคา</button><button class="btn ghost sm" data-act="fpTpl" data-v="banquet">โต๊ะกลม</button>
       <button class="btn ghost sm" data-act="fpTpl" data-v="theatre">Theatre</button><button class="btn ghost sm" data-act="fpTpl" data-v="board">ห้องประชุม</button>
       <button class="btn ghost sm fp-wide" data-act="fpTpl" data-v="kin">ห้องกินรี 250 ท่าน</button><button class="btn ghost sm fp-wide" data-act="fpTpl" data-v="red">กินรี 200 ท่าน พรมแดงกลาง</button>
       ${libTpl().map(t => `<span class="fp-lib fp-wide"><button class="btn ghost sm" data-act="fpTplC" data-id="${H(t.id)}">${H(t.name)}</button>${canLib() ? `<button class="fp-x" data-act="fpTplDel" data-id="${H(t.id)}" aria-label="ลบเทมเพลต ${H(t.name)}">×</button>` : ''}</span>`).join('')}
       <button class="btn ghost sm fp-wide" data-act="fpTpl" data-v="blank" style="color:var(--red)">ล้างทั้งหมด</button></div></section>
-    <section class="card pad"><div class="fp-h"><h3>เพิ่มของ</h3><button class="fp-plus" data-act="fpItemNew" aria-label="เพิ่มสิ่งของใหม่" title="เพิ่มสิ่งของใหม่ กำหนดชื่อและขนาดเอง">+</button></div><div class="fp-grid">${Object.keys(NAMES).filter(t => t !== 'custom').map(t => `<button class="btn ghost sm" data-act="fpAdd" data-v="${t}">+ ${NAMES[t]}</button>`).join('')}${libButtons()}</div></section>
-    <section class="card pad" id="fpSel">${selPanel(p)}</section>
+    ${picOnly(p) ? '' : `<section class="card pad"><div class="fp-h"><h3>เพิ่มของ</h3><button class="fp-plus" data-act="fpItemNew" aria-label="เพิ่มสิ่งของใหม่" title="เพิ่มสิ่งของใหม่ กำหนดชื่อและขนาดเอง">+</button></div><div class="fp-grid">${Object.keys(NAMES).filter(t => t !== 'custom').map(t => `<button class="btn ghost sm" data-act="fpAdd" data-v="${t}">+ ${NAMES[t]}</button>`).join('')}${libButtons()}</div></section>
+    <section class="card pad" id="fpSel">${selPanel(p)}</section>`}
     <section class="card pad"><h3>แปลนที่เคยจัด (${HIST.length} งาน)</h3>
       <select class="input" id="fpHist" aria-label="แปลนที่เคยจัด">${HIST.map((h, i) => `<option value="${i}">${i + 1}. ${H(h.r)} · ${H(h.l)}${h.p ? ' ' + h.p : ''} (วันที่ ${H(h.d)})</option>`).join('')}</select>
       <div class="xs muted" id="fpHistInfo" style="margin:6px 0">${histInfo(0)}</div><button class="btn ghost sm" style="width:100%" data-act="fpHist">โหลดเป็นผังตั้งต้น</button></section>` : '<div class="note">คุณดูผังได้อย่างเดียว</div>'}
@@ -390,7 +409,7 @@
     const seats = seatsOf(p), out = [];
     if (pax && seats && seats !== pax) out.push(seats < pax ? `ที่นั่งน้อยกว่าจำนวนท่าน ${pax - seats} ที่` : `ที่นั่งมากกว่าจำนวนท่าน ${seats - pax} ที่`);
     const G = geom(p);
-    if (p.items.some(i => i.x < 0 || i.y < 0 || i.x > G.W || i.y > G.H)) out.push('มีของวางเกินขอบห้อง');
+    if (!picOnly(p) && p.items.some(i => i.x < 0 || i.y < 0 || i.x > G.W || i.y > G.H)) out.push('มีของวางเกินขอบห้อง');
     if (p.missing) out.push(`วางไม่พอ ${p.missing} โต๊ะในห้องขนาดนี้ — ลองลดขนาดโต๊ะ ขยายห้อง หรือจัดชิดขึ้น`);
     return out.length ? `<div class="note" style="margin-top:8px">${out.map(H).join(' · ')}</div>` : '';
   }
@@ -433,7 +452,7 @@
   }
   function save() { const p = P(); if (p) delete p.missing; if (setupMode()) saveSetup(); else Store.save(); record(); }
   function bindSvg() {
-    const s = document.getElementById('fpSvg'); if (!s || !(setupMode() ? isAdmin() : canEdit())) return;
+    const s = document.getElementById('fpSvg'); if (!s || !(setupMode() ? isAdmin() : canEdit()) || (!setupMode() && picOnly(P()))) return;
     const pos = e => { const pt = s.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(s.getScreenCTM().inverse()); return [(q.x - S) / S, (q.y - 2 * S) / S]; };
     s.addEventListener('pointerdown', e => {
       const gEl = e.target.closest('[data-id]'), p = P(), [x, y] = pos(e), add = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -485,7 +504,7 @@
   // Delete / R while the editor is open (not while typing or in a dialog)
   document.addEventListener('keydown', e => {
     if (!(App.state.route === 'plan' ? canEdit() : setupMode() && isAdmin()) || document.getElementById('modalBg')) return;
-    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !P()) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !P() || (!setupMode() && picOnly(P()))) return;
     if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); App.ACT.fpAll(); return; }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); App.ACT.fpUndo(); return; }
     if (!sel.length) return;
@@ -520,7 +539,11 @@
     return libItems().map(c => `<span class="fp-lib"><button class="btn ghost sm" data-act="fpAddC" data-id="${H(c.id)}">+ ${H(c.name)}</button>${canLib() ? `<button class="fp-x" data-act="fpItemDel" data-id="${H(c.id)}" aria-label="เอา ${H(c.name)} ออกจากรายการ">×</button>` : ''}</span>`).join('');
   }
   function setPlan(p) {
-    const b = curBeo(); b.plans = b.plans || {}; b.plans[pkey(dayOf(), roomParam())] = p; sel = []; Store.save(); record(); App.render();
+    const b = curBeo(); b.plans = b.plans || {};
+    // a new layout keeps the uploaded picture, as the background under it (the drawn plan is what is wanted now)
+    const old = planOf(b, dayOf()), bgi = bgOf(old);
+    if (bgi && !p.bg) { p.bg = Object.assign({}, bgi); delete p.bg.only; }
+    b.plans[pkey(dayOf(), roomParam())] = p; sel = []; Store.save(); record(); App.render();
     if (p.missing) App.toast(`วางไม่พอ ${p.missing} โต๊ะ — ปรับผังเพิ่มเติมได้`);
   }
   // apply a change to every selected item
@@ -557,21 +580,31 @@
       const p = setupMode() ? null : P();
       App.modal(`<h2>เพิ่มเทมเพลต</h2>
         ${p && p.items.length ? `<div class="field"><label class="f" for="tpName">บันทึกผังนี้เป็นเทมเพลต</label><div class="row" style="gap:8px"><input class="input" id="tpName" value="${H(p.title || '')}" placeholder="ชื่อเทมเพลต เช่น กินรี Classroom 120"><button class="btn red" id="tpSave" style="flex:none">บันทึก</button></div></div>` : ''}
-        <div class="field"><label class="f" for="tpFile">อัปโหลดไฟล์เทมเพลต (.json)</label><input class="input" id="tpFile" type="file" accept=".json,application/json" style="padding-top:10px"></div>
+        <div class="field"><label class="f" for="tpFile">อัปโหลดไฟล์เทมเพลต (.json)${p ? ' หรือรูปผัง (.jpg, .png)' : ''}</label><input class="input" id="tpFile" type="file" accept=".json,application/json${p ? ',image/jpeg,image/png,image/webp' : ''}" style="padding-top:10px"></div>
+        ${p ? '<div class="xs muted" style="margin-top:-6px;margin-bottom:6px">รูปผังจะขึ้นเป็นพื้นหลังจางๆ ของผังนี้ แล้ววางโต๊ะทับตามรูปได้</div>' : ''}
         <div class="xs muted">ไฟล์เทมเพลตได้จากปุ่ม “ดาวน์โหลดเป็นไฟล์เทมเพลต” ด้านล่าง หรือจากเครื่องอื่นของโรงแรม · เทมเพลตใช้ร่วมกันทุกคน</div>
         <div class="small red" id="tpErr" style="min-height:20px;margin-top:6px" role="alert"></div>
         <div class="acts">${p && p.items.length ? '<button class="btn ghost" id="tpDl">ดาวน์โหลดเป็นไฟล์เทมเพลต</button>' : ''}<button class="btn ghost" data-act="closeModal">ปิด</button></div>`, bg => {
         const err = bg.querySelector('#tpErr');
         const add = list => { setFloor(f => { f.templates = (f.templates || []).concat(list); }); App.closeModal(); App.render(); App.toast('เพิ่มเทมเพลต ' + list.map(t => t.name).join(', ') + ' แล้ว'); };
-        const save = bg.querySelector('#tpSave');
-        if (save) save.onclick = () => { const name = bg.querySelector('#tpName').value.trim(); if (!name) { err.textContent = 'กรุณาตั้งชื่อเทมเพลต'; return; } add([tplOf(p, name)]); };
+        const saveBtn = bg.querySelector('#tpSave');
+        if (saveBtn) saveBtn.onclick = () => { const name = bg.querySelector('#tpName').value.trim(); if (!name) { err.textContent = 'กรุณาตั้งชื่อเทมเพลต'; return; } add([tplOf(p, name)]); };
         const dl = bg.querySelector('#tpDl');
         if (dl) dl.onclick = () => U.download('template-' + curBeo().id + '-day' + dayOf() + '.json', JSON.stringify(tplOf(p, p.title || 'ผังงาน'), null, 1));
         bg.querySelector('#tpFile').onchange = e => {
           const file = e.target.files[0]; if (!file) return;
+          if (/^image\//.test(file.type) || /\.(jpe?g|png|webp|heic)$/i.test(file.name)) {
+            if (!p) { err.textContent = 'รูปผังใส่ได้ในหน้าออกแบบผังงานของแต่ละงาน'; return; }
+            if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { err.textContent = 'รองรับเฉพาะรูป JPG, PNG, WebP'; return; }
+            err.textContent = ''; err.className = 'small muted'; err.textContent = 'กำลังอัปโหลดรูป…';
+            g.CatalogImages.storeImage(file).then(src => {
+              p.bg = { src, op: 100 }; save(); App.closeModal(); App.render(); App.toast('ใส่รูปผังเป็นพื้นหลังแล้ว — ปรับความเข้มหรือลบได้ที่แผง “รูปพื้นหลัง”');
+            }).catch(x => { err.className = 'small red'; err.textContent = 'อัปโหลดรูปไม่สำเร็จ: ' + (x.message || x); });
+            return;
+          }
           if (file.size > 500000) { err.textContent = 'ไฟล์ใหญ่เกินไป'; return; }
           file.text().then(text => {
-            let j; try { j = JSON.parse(text); } catch (x) { err.textContent = 'ไฟล์ไม่ใช่ JSON ที่อ่านได้'; return; }
+            let j; try { j = JSON.parse(text); } catch (x) { err.textContent = 'ไฟล์นี้ไม่ใช่ไฟล์เทมเพลต (.json) หรือรูปผัง (.jpg, .png)'; return; }
             const list = (Array.isArray(j) ? j : Array.isArray(j.templates) ? j.templates : [j]).map(cleanTpl).filter(Boolean);
             if (!list.length) { err.textContent = 'ไม่พบผังในไฟล์นี้ (ต้องมี items และขนาดห้อง W, H)'; return; }
             add(list);
@@ -629,11 +662,23 @@
       sel = list.map(it => { const n = mk(p, it.type, it.x + 1, it.y + 1, it.rot, it.seats); ['w', 'h', 'label'].forEach(k => { if (it[k] != null) n[k] = it[k]; }); return n.id; });
       save(); drawSvg(); refreshSide();
     },
+    fpBgOnly(el) {
+      const p = P(); if (!p || !bgOf(p)) return;
+      const on = el.dataset.v === '1';
+      if (on) { p.bg.only = true; p.bg.op = 100; if (p.bg.seats == null) p.bg.seats = seatsOf(Object.assign({}, p, { bg: null })) || Number((Store.quote(curBeo().quoteId) || {}).pax) || 0; sel = []; }
+      else delete p.bg.only;
+      save(); App.render(); App.toast(on ? 'ใช้รูปที่อัปโหลดเป็นผังงานแล้ว — ใบฟังก์ชันและการพิมพ์ใช้รูปนี้' : 'กลับไปใช้ผังที่วาดแล้ว');
+    },
+    fpBgDel() { const p = P(); if (!p || !p.bg) return; App.confirm('ลบรูปพื้นหลังของผังนี้?', () => { delete p.bg; save(); App.render(); }, 'ลบ'); },
     fpDel() { const p = P(); if (!p || !sel.length) return; p.items = p.items.filter(i => !sel.includes(i.id)); sel = []; save(); drawSvg(); refreshSide(); },
     fpSeat(el) { step(it => { if (SEATED.includes(it.type)) it.seats = Math.max(1, Math.min(it.type === 'chairrow' ? 40 : 16, it.seats + Number(el.dataset.v))); }); },
-    fpPng() {
+    async fpPng() {
       const p = P(); if (!p) return;
-      const b = build(p, null, setupMode()), sc = 2, x = `<svg xmlns="http://www.w3.org/2000/svg" width="${b.vw * sc}" height="${b.vh * sc}" viewBox="0 0 ${b.vw} ${b.vh}" font-family="IBM Plex Sans Thai, Tahoma, sans-serif">${b.svg}</svg>`;
+      const b = build(p, null, setupMode()), sc = 2, bgi = setupMode() ? null : bgOf(p);
+      if (bgi && !/^data:/.test(bgi.src)) {
+        try { const bl = await (await fetch(bgi.src)).blob(); const du = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(bl); }); b.svg = b.svg.split(`href="${H(bgi.src)}"`).join(`href="${du}"`); } catch (e) { /* the PNG goes without the picture */ }
+      }
+      const x = `<svg xmlns="http://www.w3.org/2000/svg" width="${b.vw * sc}" height="${b.vh * sc}" viewBox="0 0 ${b.vw} ${b.vh}" font-family="IBM Plex Sans Thai, Tahoma, sans-serif">${b.svg}</svg>`;
       const img = new Image();
       img.onload = () => { const c = document.createElement('canvas'); c.width = b.vw * sc; c.height = b.vh * sc; c.getContext('2d').drawImage(img, 0, 0); const a = document.createElement('a'); a.download = setupMode() ? 'room-' + setupRoom() + '.png' : 'floorplan-' + curBeo().id + '-day' + dayOf() + '.png'; a.href = c.toDataURL('image/png'); a.click(); };
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(x);
@@ -644,6 +689,8 @@
       step(it => { const d = dims(it), v = Math.max(0.1, Math.min(40, Number(el.value) || 0.1)); if (it.type === 'round') { it.w = it.h = v; } else { it.w = el.dataset.k === 'w' ? v : d[0]; it.h = el.dataset.k === 'h' ? v : d[1]; } });
     },
     fpLabel(el) { step(it => { it.label = el.value.slice(0, it.type === 'text' ? 80 : 40); }); },
+    fpBgSeats(el) { const p = P(); if (!p || !p.bg) return; p.bg.seats = Math.max(0, Math.min(5000, Math.round(Number(el.value) || 0))); save(); drawSvg(); refreshSide(); const t = document.getElementById('fpTot'); if (t) t.textContent = seatsOf(p); },
+    fpBgOp(el) { const p = P(); if (!p || !p.bg) return; p.bg.op = Math.max(10, Math.min(100, Number(el.value) || 40)); save(); drawSvg(); },
     fpTitle(el) { P().title = el.value.slice(0, 120); save(); drawSvg(); },
     fpW(el) { P().W = Math.max(4, Math.min(80, Number(el.value) || 20)); save(); drawSvg(); refreshSide(); },
     fpH(el) { P().H = Math.max(4, Math.min(80, Number(el.value) || 14)); save(); drawSvg(); refreshSide(); }

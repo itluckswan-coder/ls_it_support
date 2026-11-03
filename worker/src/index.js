@@ -404,8 +404,10 @@ async function audit(env, user, kind, id, action, note) {
 
 /* ---------------- uploaded photos (menus / packages) ---------------- */
 async function putImage(req, env, user) {
-  // menu / room photos (price editors) and the meeting-room photo on a quotation (sales)
-  if (!can(user, 'edit_prices') && !can(user, 'create_quote')) fail(403, 'คุณไม่มีสิทธิ์อัปโหลดรูป');
+  // menu / room photos (price editors), the meeting-room photo on a quotation (sales), and a floor-plan picture
+  // under a plan (whoever may design plans: mirrors App.canPlan — admins, sales, F&B / banquet departments)
+  const plans = ['admin', 'manager', 'sales'].includes(user.role) || /f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen|จัดเลี้ยง|banquet/i.test(String(user.dept || ''));
+  if (!can(user, 'edit_prices') && !can(user, 'create_quote') && !plans) fail(403, 'คุณไม่มีสิทธิ์อัปโหลดรูป');
   const { mime, data } = await readJson(req);
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) fail(400, 'รองรับเฉพาะรูป JPG, PNG, WebP');
   if (typeof data !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(data)) fail(400, 'ข้อมูลรูปไม่ถูกต้อง');
