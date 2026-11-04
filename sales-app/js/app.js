@@ -283,12 +283,16 @@
         <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button><a class="btn red" href="#/new" data-act="closeModal">+ ใบเสนอราคาใหม่</a></div>`,
       bg => bg.querySelectorAll('.pick').forEach(b => b.onclick = () => { App.closeModal(); cb(b.dataset.id); }));
     },
+    // adding meeting rooms, rooms and catering to a quotation needs "สร้างและส่งใบเสนอราคา" (the server refuses the save anyway);
+    // without it those pages are for browsing only: no quotation bar, no add / update buttons
+    canQuote() { return App.can('create_quote'); },
     ctxBar(q, what) {
+      if (!App.canQuote()) return '';
       if (!q) return `<div class="row wrap"><span class="muted">ยังไม่ได้เลือกใบเสนอราคา</span><button class="link" data-act="pickCtx">เลือกใบเสนอ</button></div>`;
       return `<div class="row wrap" style="gap:6px"><span class="muted">${what || 'กำลังเพิ่มให้'}</span><b>${H(q.id)} · ${U.n(q.pax)} ท่าน</b><span class="muted small">(${H(q.client)})</span><button class="link" data-act="pickCtx">เปลี่ยน</button></div>`;
     },
     dock(q) {
-      if (!q) return '';
+      if (!q || !App.canQuote()) return '';
       const c = App.calc(q);
       return `<div class="dock no-print"><span class="lbl small">${H(q.id)} · ${q.items.length} รายการ</span><span class="v num">฿${U.n(Math.round(c.net))}</span><a class="btn red sm" href="#/quote/${encodeURIComponent(q.id)}">กลับไปใบเสนอ</a></div>`;
     },
