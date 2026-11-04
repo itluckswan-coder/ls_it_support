@@ -92,7 +92,7 @@
         <div class="between" style="align-items:flex-start;gap:8px"><h3 style="font-size:19px;margin:4px 0 0">${H(f.name)}</h3>${App.can('edit_prices') ? `<button class="btn ghost sm" style="height:30px;padding:0 12px;flex:none" data-act="foodEdit" data-v="${H(f.id)}">แก้ไข</button>` : ''}</div>
         <ul>${D.foodFeat(f).map(x => `<li>${H(x)}</li>`).join('')}</ul>
         <div class="price">${U.n(f.price)}.-${pkg ? ' Net' : ''} <small>/ ${H(f.unit)}${f.min ? ' · ขั้นต่ำ ' + f.min + ' ท่าน/วัน' : ''}</small></div>
-        ${inQ ? `<button class="btn soft block" style="margin-top:12px;height:46px" data-act="foodRemove" data-v="${f.id}">${ICON.check} อยู่ในใบเสนอแล้ว · ${U.n(inQ.q1)} ${H(/โต๊ะ|งาน/.test(f.unit) ? f.unit : 'ท่าน')}</button>`
+        ${!App.canQuote() ? '' : inQ ? `<button class="btn soft block" style="margin-top:12px;height:46px" data-act="foodRemove" data-v="${f.id}">${ICON.check} อยู่ในใบเสนอแล้ว · ${U.n(inQ.q1)} ${H(/โต๊ะ|งาน/.test(f.unit) ? f.unit : 'ท่าน')}</button>`
           : `<button class="btn ghost block" style="margin-top:12px;height:46px;border-color:var(--ink)" data-act="foodAdd" data-v="${f.id}">+ เพิ่มในใบเสนอ</button>`}
       </div></article>`;
   }
@@ -361,8 +361,8 @@
       <div class="amen">${r.amen.map(a => `<span>${H(a)}</span>`).join('')}</div>
       <div class="card" style="padding:14px 16px;margin:16px 0;display:flex;align-items:center;gap:12px"><div style="flex:1"><b>AV Package</b><div class="small muted">โปรเจกเตอร์คู่ ไมค์ไร้สาย 4 · ช่าง</div></div>${App.sw('AV Package', ui.av, 'data-change="meetAv"')}</div>
       <div class="between"><span class="small muted">${nd} วัน × ${U.n(price)}${ui.av ? ' + AV ' + U.n(8000 * nd) : ''}</span><b style="font:700 22px var(--fh)" class="num">${U.n(total)} ฿</b></div>
-      <div class="row" style="margin-top:14px;gap:8px"><span class="small muted">จองชั่วคราว</span><select class="input sm" style="width:auto" data-change="meetHold">${[0, 3, 7, 10, 14].map(d => `<option value="${d}" ${ui.holdDays === d ? 'selected' : ''}>${d ? d + ' วัน' : 'ไม่จอง'}</option>`).join('')}</select></div>
-      <button class="btn red block" style="margin-top:14px" data-act="meetAdd">${chosen ? 'อัปเดตในใบเสนอ' : 'เพิ่มในใบเสนอ'}${ui.holdDays ? ' + จองชั่วคราว ' + ui.holdDays + ' วัน' : ''}</button>
+      ${App.canQuote() ? `<div class="row" style="margin-top:14px;gap:8px"><span class="small muted">จองชั่วคราว</span><select class="input sm" style="width:auto" data-change="meetHold">${[0, 3, 7, 10, 14].map(d => `<option value="${d}" ${ui.holdDays === d ? 'selected' : ''}>${d ? d + ' วัน' : 'ไม่จอง'}</option>`).join('')}</select></div>
+      <button class="btn red block" style="margin-top:14px" data-act="meetAdd">${chosen ? 'อัปเดตในใบเสนอ' : 'เพิ่มในใบเสนอ'}${ui.holdDays ? ' + จองชั่วคราว ' + ui.holdDays + ' วัน' : ''}</button>` : ''}
     </div>
   </aside>
 </div>`;
@@ -501,7 +501,7 @@ ${sitePick}
     <div class="between"><div><div>ห้องฟรีสำหรับผู้จัด</div><div class="small muted">ทุก 20 ห้อง ฟรี 1 ห้อง</div></div><span class="badge" style="background:var(--yellow)">+${free} ห้อง</span></div>
     <div class="between" style="margin-top:14px"><span>Late check-out 14:00</span>${App.sw('Late check-out', ui.late, 'data-change="rmLate"')}</div>
     <div class="note" style="margin:16px 0">วันปล่อยห้อง (cut-off) ${U.fmtD(cutoff, { long: true })} — ห้องที่ยังไม่มีรายชื่อจะคืนเข้าระบบอัตโนมัติ</div>
-    <button class="btn red block" data-act="rmApply" ${tot ? '' : 'disabled'}>อัปเดตใบเสนอ</button>
+    ${App.canQuote() ? `<button class="btn red block" data-act="rmApply" ${tot ? '' : 'disabled'}>อัปเดตใบเสนอ</button>` : ''}
   </aside>
 </div>`;
     }
@@ -538,7 +538,7 @@ ${sitePick}
     <div class="sum-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><b>รวม ${tot} ห้อง × ${n} คืน</b><b class="num">${U.n(total)}</b></div>
     <div class="small muted">รองรับ ${tot * 2} ท่าน${q ? ' · ผู้เข้าร่วม ' + q.pax + ' ท่าน' : ''}</div>
     <div class="note" style="margin:16px 0">วันปล่อยห้อง (cut-off) ${U.fmtD(U.addDays(ui.ci, -14), { long: true })} — ห้องที่ยังไม่มีรายชื่อจะคืนเข้าระบบอัตโนมัติ</div>
-    <button class="btn red block" data-act="bqApply" ${tot || bf.pax || dn.pax ? '' : 'disabled'}>อัปเดตใบเสนอ</button>
+    ${App.canQuote() ? `<button class="btn red block" data-act="bqApply" ${tot || bf.pax || dn.pax ? '' : 'disabled'}>อัปเดตใบเสนอ</button>` : ''}
   </aside>
 </div>`;
   };
