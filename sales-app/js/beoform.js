@@ -258,6 +258,32 @@
 </div>`;
   }
 
+  /* ---------- บันทึก: the sheet as a picture (PNG / JPG) or a PDF file, made in the browser ---------- */
+  // the two drawing libraries ship with the app (vendor/, MIT) and load only when someone saves
+  const loadJs = src => new Promise((ok, bad) => { if (document.querySelector(`script[data-src="${src}"]`)) return ok(); const t = document.createElement('script'); t.src = src; t.dataset.src = src; t.onload = ok; t.onerror = () => bad(new Error('โหลดตัวแปลงไฟล์ไม่สำเร็จ')); document.head.appendChild(t); });
+  async function saveSheet(kind, b) {
+    await loadJs('vendor/html2canvas-1.4.1.min.js');
+    if (kind === 'pdf') await loadJs('vendor/jspdf-2.5.1.umd.min.js');
+    const el = document.getElementById('fnPaper'); if (!el) throw new Error('ไม่พบใบรายละเอียดฟังก์ชัน');
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await g.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, ignoreElements: x => x.classList && x.classList.contains('no-print') });
+    const base = 'function-' + String(b.id).replace(/[^A-Za-z0-9-]/g, '') + '-' + (fnUi().view === 'ops' ? 'operation' : 'sales');
+    if (kind === 'png' || kind === 'jpg') {
+      const type = kind === 'png' ? 'image/png' : 'image/jpeg';
+      const blob = await new Promise(r => canvas.toBlob(r, type, 0.92));
+      U.download(base + '.' + kind, blob, type); return;
+    }
+    // PDF on A4, turned to match the sheet: the whole sheet on one page, centred; a very long one goes on to more pages
+    const tall = canvas.height >= canvas.width, pdf = new g.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: tall ? 'portrait' : 'landscape' });
+    const PW = tall ? 210 : 297, PH = tall ? 297 : 210, m = 8, img = canvas.toDataURL('image/jpeg', 0.92);
+    const fitW = PW - 2 * m, fitH = PH - 2 * m, ihFull = canvas.height * fitW / canvas.width;
+    if (ihFull <= fitH * 1.35) {
+      const k = Math.min(fitW / canvas.width, fitH / canvas.height), w = canvas.width * k, h = canvas.height * k;
+      pdf.addImage(img, 'JPEG', (PW - w) / 2, m, w, h);
+    } else for (let y = 0, pg = 0; y < ihFull; y += fitH, pg++) { if (pg) pdf.addPage(); pdf.addImage(img, 'JPEG', m, m - y, fitW, ihFull); }
+    U.download(base + '.pdf', pdf.output('blob'), 'application/pdf');
+  }
+
   /* ---------- the page ---------- */
   const moneyRole = () => { const me = App.me(); return !!App.salesRole() || (!!me && me.role === 'acc' && !(App.roleOf && App.roleOf(me).custom)); };
   const EDIT_KEYS = ['no', 'issued', 'quote', 'org', 'coord', 'date', 'venue', 'type', 'pax', 'pricing', 'layout', 'fyi', 'stage', 'vinyl', 'kitchen', 'hk', 'av', 'total', 'cost', 'bill', 'checkin', 'checkout', 'roomType', 'roomQty', 'front', 'by', 'byTitle'];
@@ -289,7 +315,7 @@
         <div class="row wrap">${moneyRole() ? `<div class="seg white" role="group" aria-label="ฉบับของใบ"><button class="${ui.view !== 'ops' ? 'on' : ''}" data-act="fnView" data-v="sales">สำหรับเซลล์</button><button class="${ui.view === 'ops' ? 'on' : ''}" data-act="fnView" data-v="ops">สำหรับ Operation</button></div>` : ''}
         ${edit ? `<div class="seg white"><button class="${tab === 'preview' ? 'on' : ''}" data-act="fnTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${tab === 'form' ? 'on' : ''}" data-act="fnTab" data-v="form">แก้ไขข้อมูล</button></div>` : ''}
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
-        <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button></div></div>`;
+        <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button><button class="btn ghost" data-act="fnSave">บันทึก</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
       const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, appr: v.appr, apprTitle: v.apprTitle });
       const tdMode = ui.td ? ' tdraw-' + ui.td : '';
@@ -563,6 +589,23 @@
     },
     fnTD(el) { const ui = fnUi(); ui.td = ui.td === el.dataset.v ? null : el.dataset.v; App.render(); },
     fnDXDel(el) { const d = fnUi().draft; if (!d) return; d.extra.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
+    fnSave() {
+      const ui = fnUi(), b = curB(); if (!b) return;
+      if (ui.tab === 'form' && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนบันทึกเป็นไฟล์'); return; }
+      if (ui.tab !== 'preview') { dropDraft(); ui.tab = 'preview'; App.render(); }
+      App.modal(`<h2>บันทึกเป็นไฟล์</h2><p class="small muted" style="margin-top:-4px">บันทึกใบรายละเอียดฟังก์ชัน${moneyRole() ? (ui.view === 'ops' ? ' (สำหรับ Operation)' : ' (สำหรับเซลล์)') : ''} ลงเครื่องนี้</p>
+        <div class="grid g3" style="gap:8px;margin:14px 0">${[['png', 'รูปภาพ PNG', 'คมชัด'], ['jpg', 'รูปภาพ JPG', 'ไฟล์เล็ก ส่งทาง LINE'], ['pdf', 'PDF', 'กระดาษ A4']].map(([k, t, d]) => `<button class="btn ghost" style="height:auto;padding:12px;flex-direction:column;gap:2px" data-kind="${k}"><b>${t}</b><span class="xs muted">${d}</span></button>`).join('')}</div>
+        <div class="small" id="fsMsg" style="min-height:20px" role="status"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`, bg => {
+        const msg = bg.querySelector('#fsMsg');
+        bg.querySelectorAll('[data-kind]').forEach(x => x.onclick = () => {
+          bg.querySelectorAll('[data-kind]').forEach(y => { y.disabled = true; });
+          msg.className = 'small muted'; msg.textContent = 'กำลังสร้างไฟล์…';
+          saveSheet(x.dataset.kind, b).then(() => { App.closeModal(); App.toast('บันทึกไฟล์แล้ว'); })
+            .catch(e => { msg.className = 'small red'; msg.textContent = 'บันทึกไม่สำเร็จ: ' + (e.message || e); bg.querySelectorAll('[data-kind]').forEach(y => { y.disabled = false; }); });
+        });
+      });
+    },
     fnPrint() { const ui = fnUi(); if (ui.tab === 'form' && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนพิมพ์'); return; } if (ui.tab !== 'preview') { dropDraft(); ui.tab = 'preview'; App.render(); } setTimeout(() => window.print(), 50); },
     fnNo() { const d = fnUi().tab === 'form' && fnUi().draft; if (d) { d.v.no = nextNo(); fnUi().dirty = true; App.render(); return; } setFn(f => { f.no = nextNo(); }); App.toast('ออกเลข ' + curB().fn.no); },
     // "+": a small form laid out like the paper sheet — pick the department, give a heading and the details
