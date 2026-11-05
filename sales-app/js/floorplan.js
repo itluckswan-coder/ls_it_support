@@ -135,6 +135,58 @@
     if (!rot) mk(p, 'door', 1.5, h);
     return 0;
   }
+  /* ---------- rows × tables from the number of guests (แผง "จำนวนโต๊ะ / แถว"): suggested, then set by hand ---------- */
+  const GRID_LAYOUTS = ['classroom', 'theatre', 'banquet'];
+  const GRID_SEATS = { classroom: 3, theatre: 1, banquet: 10 };
+  // a suggestion that fits the room: as many across as the width takes, then enough rows for everyone
+  function gridSuggest(layout, pax, w, seats) {
+    pax = Math.max(1, Number(pax) || 1);
+    if (layout === 'theatre') { const per = Math.max(4, Math.min(30, Math.floor((w - 2.4) / 0.55))); const rows = Math.ceil(pax / per); return { seats: 1, rows, per: Math.ceil(pax / rows) }; }
+    if (layout === 'banquet') { seats = seats || 10; const d = sizeOf('round')[0], nc = Math.max(1, Math.floor((w - 0.4) / (d + 0.3))), t = Math.ceil(pax / seats), rows = Math.ceil(t / nc); return { seats, rows, per: Math.ceil(t / rows) }; }
+    seats = seats || 3; const pitch = Math.max(1.8, seats * 0.6), max = Math.max(1, Math.floor((w - 2.4) / pitch)), rows = Math.ceil(pax / (max * seats));
+    return { seats, rows, per: Math.ceil(Math.ceil(pax / rows) / seats) };
+  }
+  // how many rows the room's depth takes (same spacing as genGrid)
+  function gridMaxRows(layout, w, h) {
+    if (layout === 'theatre') return Math.max(0, Math.floor((h - 1.2 - 4.2) / 0.9) + 1);
+    if (layout === 'banquet') { const d = sizeOf('round')[0]; return Math.max(0, Math.floor((h - 0.6 - 3.15 - d) / d) + 1); }
+    return Math.max(0, Math.floor((h - 0.8 - (w >= 10 ? 4.8 : 5.2)) / 1.3) + 1);
+  }
+  // lays rows × per tables (theatre: rows of per chairs) with an optional centre aisle; returns how many did not fit
+  function genGrid(p, w, h, g) {
+    const rows = Math.max(1, Math.min(60, g.rows | 0)), per = Math.max(1, Math.min(60, g.per | 0)), seats = Math.max(1, Math.min(16, g.seats | 0)), ais = g.aisle && per >= 2 ? 1.2 : 0;
+    let miss = 0;
+    if (g.layout === 'theatre') {
+      addFront(p, w); mk(p, 'podium', w / 2 + 4, 1.4);
+      const a = ais ? Math.ceil(per / 2) : per, bN = per - a;
+      for (let r = 0; r < rows; r++) {
+        const y = 4.2 + r * 0.9;
+        if (y > h - 1.2) { miss += 1; continue; }
+        if (!bN) { if (!mk(p, 'chairrow', w / 2, y, 0, per)) miss++; continue; }
+        const la = a * 0.55, lb = bN * 0.55, x0 = (w - la - lb - ais) / 2;
+        if (!mk(p, 'chairrow', x0 + la / 2, y, 0, a)) miss++;
+        if (!mk(p, 'chairrow', x0 + la + ais + lb / 2, y, 0, bN)) miss++;
+      }
+      mk(p, 'door', 1.5, h); return miss;
+    }
+    if (g.layout === 'banquet') {
+      addFront(p, w); mk(p, 'sound', Math.max(1, w - 2), 1.4);
+      const d = sizeOf('round')[0], sx = d + 0.3, x0 = (w - per * sx - ais) / 2 + sx / 2;
+      for (let r = 0; r < rows; r++) {
+        const y = 3.15 + d / 2 + r * d;
+        for (let k = 0; k < per; k++) { if (y + d / 2 > h - 0.6 || !mk(p, 'round', x0 + k * sx + (ais && k >= per / 2 ? ais : 0), y, 0, seats)) miss++; }
+      }
+      mk(p, 'door', w - 1.5, h); return miss;
+    }
+    // classroom
+    mk(p, 'stage', w / 2, 1.5); mk(p, 'podium', w >= 10 ? w / 2 + 4.5 : w - 0.8, w >= 10 ? 1.4 : 3.5); mk(p, 'lect', w >= 10 ? w / 2 - 4.8 : w / 2, w >= 10 ? 1.4 : 3.5);
+    const pitch = Math.max(1.8, seats * 0.6), x0 = (w - per * pitch - ais) / 2 + pitch / 2, y0 = w >= 10 ? 4.8 : 5.2;
+    for (let r = 0; r < rows; r++) {
+      const y = y0 + r * 1.3;
+      for (let t = 0; t < per; t++) { if (y > h - 0.8 || !mk(p, 'class', x0 + t * pitch + (ais && t >= per / 2 ? ais : 0), y, 0, seats)) miss++; }
+    }
+    mk(p, 'door', 1.5, h); return miss;
+  }
   function autoPlan(q, day, layout) {
     const rf = roomFor(q, day), [w, h] = roomDim(rf.id), pax = (roomParam() && rf.pax) || Number(q.pax) || 0; // each room of several: its own guests when the line says
     const p = { title: (q.title || '') + ' · ' + ((rf.room && (rf.room.th || rf.room.name)) || 'ห้องจัดงาน') + ' · ' + pax + ' ท่าน', room: rf.room ? rf.id : undefined, W: w, H: h, items: [] };
@@ -317,6 +369,7 @@
       ${p.room ? `<div class="small"><b>${H(roomName(p.room))}</b> ${geom(p).W} × ${geom(p).H} ม.${fixedOf(p.room).length ? ' · ของที่ห้ามย้าย ' + fixedOf(p.room).length + ' ชิ้น (เส้นประ)' : ''}</div>
         <div class="xs muted" style="margin-top:4px">ขนาดห้องและของที่ห้ามย้ายแก้ได้ที่ ${isAdmin() ? `<a href="#/plansetup/${encodeURIComponent(p.room)}">แก้ไขปรับปรุง</a>` : 'แก้ไขปรับปรุง (ผู้ดูแลระบบ)'}</div>`
       : `<div class="row" style="gap:6px"><input class="input" type="number" min="4" max="80" step="0.1" value="${p.W}" data-change="fpW" aria-label="กว้าง (เมตร)" ${edit ? '' : 'disabled'}><span>×</span><input class="input" type="number" min="4" max="80" step="0.1" value="${p.H}" data-change="fpH" aria-label="ลึก (เมตร)" ${edit ? '' : 'disabled'}></div>`}</section>
+    ${edit && !picOnly(p) ? gridPanel(p, q) : ''}
     ${edit && bgOf(p) ? `<section class="card pad">${picOnly(p) ? `<h3>ผังจากรูป</h3><div class="small muted" style="margin-bottom:8px">ใช้รูปที่อัปโหลดเป็นผังงาน · โต๊ะและของที่วาดไว้ถูกซ่อนไว้ ไม่ได้ลบ</div>
       <label class="small muted" for="fpBgSeats">จำนวนที่นั่ง (พิมพ์เอง)</label><input class="input" id="fpBgSeats" type="number" min="0" max="5000" value="${Number(p.bg.seats) || ''}" placeholder="เช่น ${U.n(Number(q.pax) || 0)}" data-change="fpBgSeats" style="margin:4px 0 8px">
       <button class="btn ghost sm" style="width:100%" data-act="fpBgOnly" data-v="0">กลับไปใช้ผังที่วาด</button>`
@@ -405,6 +458,30 @@
   App.ACT.fsReset = el => setSizes(z => { delete z[el.dataset.t]; });
 
   function histInfo(i) { const h = HIST[i], d = HIST_ROOM[h.r] && roomDim(HIST_ROOM[h.r]); return (h.p && d ? 'พื้นที่ต่อคน ≈ ' + (d[0] * d[1] / h.p).toFixed(2) + ' ตร.ม. · ' : '') + h.note + (h.g ? '' : ' · (ยังไม่มีพิกัดพอจะโหลดเป็นผัง)'); }
+  // the panel's numbers: what the plan was last laid out with, else a fresh suggestion from the quotation
+  function gridOf(p, q) {
+    const ui = App.state.ui, key = (curBeo() || {}).id + ':' + pkey(dayOf(), roomParam());
+    if (ui.fpGrid && ui.fpGrid.key === key) return ui.fpGrid;
+    const rf = roomFor(q, dayOf()), G = geom(p), pax = (p.grid && p.grid.pax) || (roomParam() && rf.pax) || Number(q.pax) || 0;
+    let layout = (p.grid && p.grid.layout) || rf.layout; if (!GRID_LAYOUTS.includes(layout)) layout = 'classroom';
+    const g = p.grid ? Object.assign({}, p.grid) : Object.assign({ layout, pax, aisle: layout !== 'banquet' }, gridSuggest(layout, pax, G.W));
+    return (ui.fpGrid = Object.assign(g, { key, layout, pax }));
+  }
+  function gridPanel(p, q) {
+    const g = gridOf(p, q), tables = g.rows * g.per, seats = g.layout === 'theatre' ? tables : tables * g.seats;
+    const unit = g.layout === 'theatre' ? 'เก้าอี้' : 'โต๊ะ', num = (k, v, lab, max) => `<label class="small muted">${lab}<input class="input" type="number" min="1" max="${max}" value="${v}" data-change="fpG" data-k="${k}" style="margin-top:4px"></label>`;
+    const short = Number(g.pax) - seats, G = geom(p), maxR = gridMaxRows(g.layout, G.W, G.H);
+    return `<section class="card pad" id="fpGrid"><h3>จำนวนโต๊ะ / แถว</h3>
+      <div class="grid g2" style="gap:8px">${num('pax', g.pax, 'ผู้เข้าร่วม (ท่าน)', 5000)}
+        <label class="small muted">รูปแบบ<select class="input" data-change="fpG" data-k="layout" style="margin-top:4px">${GRID_LAYOUTS.map(l => `<option value="${l}" ${l === g.layout ? 'selected' : ''}>${H((D.LAYOUTS.find(x => x.id === l) || {}).name || l)}</option>`).join('')}</select></label>
+        ${num('rows', g.rows, 'จำนวนแถว', 60)}${num('per', g.per, unit + 'ต่อแถว', 60)}
+        ${g.layout === 'theatre' ? '' : num('seats', g.seats, 'ที่นั่งต่อโต๊ะ', 16)}
+        <label class="row small" style="gap:8px;cursor:pointer;align-self:end;padding-bottom:10px"><input type="checkbox" data-change="fpG" data-k="aisle" ${g.aisle ? 'checked' : ''}> ทางเดินกลาง</label></div>
+      <div class="small" style="margin:8px 0"><b>${g.rows} แถว × ${g.per} ${unit} = ${U.n(tables)} ${unit}</b>${g.layout === 'theatre' ? '' : ' · ' + U.n(seats) + ' ที่'}</div>
+      ${short > 0 ? `<div class="small red" style="margin-bottom:8px">ที่นั่งน้อยกว่าผู้เข้าร่วม ${U.n(short)} ที่</div>` : ''}
+      ${g.rows > maxR ? `<div class="small red" style="margin-bottom:8px">ห้องนี้วางได้ไม่เกิน ${maxR} แถว</div>` : ''}
+      <div class="row" style="gap:6px"><button class="btn red sm" style="flex:1" data-act="fpGridGo">จัดผังตามนี้</button><button class="btn ghost sm" data-act="fpGridAuto" title="คำนวณจากจำนวนผู้เข้าร่วมใหม่">คำนวณใหม่</button></div></section>`;
+  }
   function warn(p, pax) {
     const seats = seatsOf(p), out = [];
     if (pax && seats && seats !== pax) out.push(seats < pax ? `ที่นั่งน้อยกว่าจำนวนท่าน ${pax - seats} ที่` : `ที่นั่งมากกว่าจำนวนท่าน ${seats - pax} ที่`);
@@ -662,6 +739,18 @@
       sel = list.map(it => { const n = mk(p, it.type, it.x + 1, it.y + 1, it.rot, it.seats); ['w', 'h', 'label'].forEach(k => { if (it[k] != null) n[k] = it[k]; }); return n.id; });
       save(); drawSvg(); refreshSide();
     },
+    fpGridAuto() { const p = P(), q = Store.quote(curBeo().quoteId), g = gridOf(p, q); Object.assign(g, gridSuggest(g.layout, g.pax, geom(p).W, g.layout === 'banquet' ? g.seats : g.layout === 'classroom' ? g.seats : 0)); App.render(); },
+    fpGridGo() {
+      const b = curBeo(), q = Store.quote(b.quoteId), old = P(), g = gridOf(old, q), G = geom(old);
+      const go = () => {
+        const p = { title: old.title, room: old.room, W: old.W, H: old.H, items: [] };
+        p._auto = true; p.missing = genGrid(p, G.W, G.H, g) || 0; delete p._auto;
+        p.grid = { layout: g.layout, pax: Number(g.pax) || 0, rows: g.rows, per: g.per, seats: g.seats, aisle: !!g.aisle };
+        setPlan(p);
+        App.toast(p.missing ? `จัดผังแล้ว · วางไม่ลง ${p.missing} ${g.layout === 'theatre' ? 'แถว' : 'โต๊ะ'} ในห้องขนาดนี้` : 'จัดผังตามจำนวนแถว / โต๊ะแล้ว');
+      };
+      if (old.items.length) App.confirm('จัดโต๊ะใหม่ทั้งผังตามตัวเลขนี้? (กด ย้อนกลับ ได้ภายหลัง)', go, 'จัดผัง'); else go();
+    },
     fpBgOnly(el) {
       const p = P(); if (!p || !bgOf(p)) return;
       const on = el.dataset.v === '1';
@@ -689,6 +778,13 @@
       step(it => { const d = dims(it), v = Math.max(0.1, Math.min(40, Number(el.value) || 0.1)); if (it.type === 'round') { it.w = it.h = v; } else { it.w = el.dataset.k === 'w' ? v : d[0]; it.h = el.dataset.k === 'h' ? v : d[1]; } });
     },
     fpLabel(el) { step(it => { it.label = el.value.slice(0, it.type === 'text' ? 80 : 40); }); },
+    fpG(el) {
+      const p = P(), q = Store.quote(curBeo().quoteId), g = gridOf(p, q), k = el.dataset.k;
+      if (k === 'aisle') g.aisle = el.checked;
+      else if (k === 'layout') { g.layout = el.value; Object.assign(g, gridSuggest(g.layout, g.pax, geom(p).W)); g.aisle = g.layout !== 'banquet'; }
+      else { g[k] = Math.max(1, Math.min(k === 'pax' ? 5000 : k === 'seats' ? 16 : 60, Math.round(Number(el.value) || 1))); if (k === 'pax' || k === 'seats') Object.assign(g, gridSuggest(g.layout, g.pax, geom(p).W, g.layout === 'theatre' ? 0 : g.seats)); }
+      App.render();
+    },
     fpBgSeats(el) { const p = P(); if (!p || !p.bg) return; p.bg.seats = Math.max(0, Math.min(5000, Math.round(Number(el.value) || 0))); save(); drawSvg(); refreshSide(); const t = document.getElementById('fpTot'); if (t) t.textContent = seatsOf(p); },
     fpBgOp(el) { const p = P(); if (!p || !p.bg) return; p.bg.op = Math.max(10, Math.min(100, Number(el.value) || 40)); save(); drawSvg(); },
     fpTitle(el) { P().title = el.value.slice(0, 120); save(); drawSvg(); },
