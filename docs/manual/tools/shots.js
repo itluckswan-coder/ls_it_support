@@ -42,7 +42,7 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await go('#/beo/FS-2611-018'); await shot('beo'); await click('[data-act=btFold][data-k=guests]'); await click('[data-act=btFold][data-k=kinds]'); await click('[data-act=btPick][data-k=guests][data-v=g4]'); await click('[data-act=btPick][data-k=kinds][data-v=k6]'); await p.evaluate(() => document.querySelector('.bt-grid').scrollIntoView({ block: 'center' })); await shot('beo-tags');
     await go('#/plan/FS-2611-018/1'); await click('[data-act=fpAuto]'); await shot('plan');
     // a text box, selected: rotate handle and the 15 / 45 / 90 / 180 buttons
-    await click('[data-act=fpAdd][data-v=text]'); await p.keyboard.type('ทางเข้า VIP'); await W(700); await click('[data-act=fpRot][data-v="45"]');
+    await click('[data-act=fpAdd][data-v=text]'); await p.keyboard.type({ th: 'ทางเข้า VIP', en: 'VIP entrance', my: 'VIP ဝင်ပေါက်' }[L]); await W(700); await click('[data-act=fpRot][data-v="45"]');
     await p.setViewportSize({ width: 1280, height: 1820 }); await p.evaluate(() => window.scrollTo(0, 0)); await shot('plan-tools'); await p.setViewportSize({ width: 1280, height: 820 });
     await click('[data-act=fpDel]');
     // a floor-plan picture used as the plan (drawn here on a canvas; in real use it is an uploaded .jpg)
