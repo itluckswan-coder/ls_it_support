@@ -41,8 +41,22 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await go('#/beo'); await shot('beo-list');
     await go('#/beo/FS-2611-018'); await shot('beo'); await click('[data-act=btFold][data-k=guests]'); await click('[data-act=btFold][data-k=kinds]'); await click('[data-act=btPick][data-k=guests][data-v=g4]'); await click('[data-act=btPick][data-k=kinds][data-v=k6]'); await p.evaluate(() => document.querySelector('.bt-grid').scrollIntoView({ block: 'center' })); await shot('beo-tags');
     await go('#/plan/FS-2611-018/1'); await click('[data-act=fpAuto]'); await shot('plan');
+    // a text box, selected: rotate handle and the 15 / 45 / 90 / 180 buttons
+    await click('[data-act=fpAdd][data-v=text]'); await p.keyboard.type({ th: 'ทางเข้า VIP', en: 'VIP entrance', my: 'VIP ဝင်ပေါက်' }[L]); await W(700); await click('[data-act=fpRot][data-v="45"]');
+    await p.setViewportSize({ width: 1280, height: 1820 }); await p.evaluate(() => window.scrollTo(0, 0)); await shot('plan-tools'); await p.setViewportSize({ width: 1280, height: 820 });
+    await click('[data-act=fpDel]');
+    // a floor-plan picture used as the plan (drawn here on a canvas; in real use it is an uploaded .jpg)
+    await p.evaluate(() => {
+      const c = document.createElement('canvas'); c.width = 1200; c.height = 900; const x = c.getContext('2d');
+      x.fillStyle = '#fff'; x.fillRect(0, 0, 1200, 900); x.strokeStyle = '#222'; x.lineWidth = 10; x.strokeRect(30, 30, 1140, 840);
+      x.fillStyle = '#7d9cc9'; x.fillRect(360, 60, 480, 130); x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText('STAGE', 535, 140);
+      x.strokeStyle = '#a33'; x.lineWidth = 6; for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) { x.beginPath(); x.arc(220 + i * 190, 360 + j * 170, 55, 0, 7); x.stroke(); }
+      const b = Store.db.beos.find(z => z.id === 'FS-2611-018'), pl = b.plans['1'] || Object.values(b.plans)[0];
+      pl.bg = { src: c.toDataURL('image/jpeg', 0.8), op: 100, only: true, seats: 150 }; App.render();
+    }); await W(500); await p.evaluate(() => window.scrollTo(0, 0)); await shot('plan-image');
+    await p.evaluate(() => { const b = Store.db.beos.find(z => z.id === 'FS-2611-018'), pl = b.plans['1'] || Object.values(b.plans)[0]; delete pl.bg; Store.save(); App.render(); });
     await go('#/plansetup'); await shot('plansetup');
-    await go('#/fn/FS-2611-018'); await shot('fn');
+    await go('#/fn/FS-2611-018'); await shot('fn'); await click('[data-act=fnSave]'); await shot('fn-save'); await close();
     await go('#/ss/FS-2611-018'); await click('[data-act=ssTab][data-v=form]'); await shot('ss');
     await go('#/cal'); await click('[data-act=calNav][data-v="1"]'); await shot('cal-month'); await click('[data-act=calView][data-v=week]'); await shot('cal-week'); await click('[data-act=calView][data-v=pipe]'); await shot('cal-pipe');
     await go('#/staff'); await click('[data-act=stTab][data-v=shifts]'); await shot('staff-shifts'); await click('[data-act=stAssign]'); await shot('staff-assign'); await close();
