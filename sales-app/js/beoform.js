@@ -202,7 +202,8 @@
       : `<div class="fnf-x">${x.label ? `<b${sa(xst(x, 'label'))}>${rtx(x.label, xr(x, 'label'))} :</b> ` : ''}${wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text')), 'span')}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
     // the accounting / money part is for admins, sales managers, sales staff and accounting; everyone else sees the front desk part alone
-    const me = App.me(), showMoney = !!App.salesRole() || (!!me && me.role === 'acc' && !(App.roleOf && App.roleOf(me).custom));
+    // "สำหรับ Operation" shows them the operations copy too (what every other role sees)
+    const showMoney = moneyRole() && fnUi().view !== 'ops';
     // "+" inside each section while editing: adds a heading + detail row shaped like the rows above it
     const add = sec => ed ? `<button class="fnf-add" data-act="fnDXAdd" data-sec="${sec}" title="เพิ่มหัวข้อ/ช่องข้อมูลในส่วนนี้">＋ เพิ่มช่อง</button>` : '';
     const addRow = (sec, span) => ed ? `<tr class="fnf-addrow"><td colspan="${span}">${add(sec)}</td></tr>` : '';
@@ -258,6 +259,7 @@
   }
 
   /* ---------- the page ---------- */
+  const moneyRole = () => { const me = App.me(); return !!App.salesRole() || (!!me && me.role === 'acc' && !(App.roleOf && App.roleOf(me).custom)); };
   const EDIT_KEYS = ['no', 'issued', 'quote', 'org', 'coord', 'date', 'venue', 'type', 'pax', 'pricing', 'layout', 'fyi', 'stage', 'vinyl', 'kitchen', 'hk', 'av', 'total', 'cost', 'bill', 'checkin', 'checkout', 'roomType', 'roomQty', 'front', 'by', 'byTitle'];
   const clone = o => JSON.parse(JSON.stringify(o));
   const fnUi = () => App.state.ui.fn || (App.state.ui.fn = { tab: 'preview' });
@@ -284,7 +286,8 @@
       const tab = edit ? ui.tab : 'preview', own = b.fn || {};
       const head = `<div class="page-hd no-print"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>รายละเอียดฟังก์ชัน</h1>
         <div class="small muted">${H(q.title)} · ${H(q.client)} · ${H(v.no || 'ยังไม่มี Function No.')}${b.signoff ? ' · อนุมัติแล้ว' : ''}</div></div>
-        <div class="row wrap">${edit ? `<div class="seg white"><button class="${tab === 'preview' ? 'on' : ''}" data-act="fnTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${tab === 'form' ? 'on' : ''}" data-act="fnTab" data-v="form">แก้ไขข้อมูล</button></div>` : ''}
+        <div class="row wrap">${moneyRole() ? `<div class="seg white" role="group" aria-label="ฉบับของใบ"><button class="${ui.view !== 'ops' ? 'on' : ''}" data-act="fnView" data-v="sales">สำหรับเซลล์</button><button class="${ui.view === 'ops' ? 'on' : ''}" data-act="fnView" data-v="ops">สำหรับ Operation</button></div>` : ''}
+        ${edit ? `<div class="seg white"><button class="${tab === 'preview' ? 'on' : ''}" data-act="fnTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${tab === 'form' ? 'on' : ''}" data-act="fnTab" data-v="form">แก้ไขข้อมูล</button></div>` : ''}
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
@@ -470,6 +473,7 @@
     Store.save(); App.render();
   }
   Object.assign(App.ACT, {
+    fnView(el) { fnUi().view = el.dataset.v === 'ops' ? 'ops' : 'sales'; App.render(); },
     fnTab(el) {
       const ui = fnUi(), go = () => { if (el.dataset.v === 'preview') dropDraft(); ui.td = null; ui.tab = el.dataset.v; App.render(); };
       if (ui.tab === 'form' && el.dataset.v === 'preview' && ui.dirty) App.confirm('ทิ้งการแก้ไขที่ยังไม่บันทึก?', go, 'ทิ้งการแก้ไข'); else go();
