@@ -224,8 +224,8 @@
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
     // the front office's room blocks: Check-in / Check-out, then room type / number of rooms, once per stay
     const nst = Math.max(1, Number(v.stays) || 1);
-    // no lines inside the room blocks (as on the old paper form): only the section's outer frame stays
-    const stayRows = Array.from({ length: nst }, (_, i) => [`<th class="st st-l">Check-in :</th>${cell(stayKey('checkin', i), 'c st')}<th class="st">Check-out :</th>${cell(stayKey('checkout', i), 'c st st-r')}`, `<th class="st st-l">ห้องพัก (ประเภท) :</th>${cell(stayKey('roomType', i), 'c st')}<th class="st">จำนวนห้อง :</th>${cell(stayKey('roomQty', i), 'c st st-r')}`]).flat();
+    // room blocks: no lines inside a block, one line under each block (Check-in, Check-out, room, rooms, then the line)
+    const stayRows = Array.from({ length: nst }, (_, i) => [`<th class="st st-l">Check-in :</th>${cell(stayKey('checkin', i), 'c st')}<th class="st">Check-out :</th>${cell(stayKey('checkout', i), 'c st st-r')}`, `<th class="st st-l st-b">ห้องพัก (ประเภท) :</th>${cell(stayKey('roomType', i), 'c st st-b')}<th class="st st-b">จำนวนห้อง :</th>${cell(stayKey('roomQty', i), 'c st st-r st-b')}`]).flat();
     // the accounting / money part is for admins, sales managers, sales staff and accounting; everyone else sees the front desk part alone
     // "สำหรับ Operation" shows them the operations copy too (what every other role sees)
     const showMoney = moneyRole() && fnUi().view !== 'ops';

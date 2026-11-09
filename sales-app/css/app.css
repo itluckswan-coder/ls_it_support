@@ -753,6 +753,7 @@ main.bleed{padding:0;max-width:none}
 .fnf-t .st{border-top:none;border-bottom:none;background:#fff}
 .fnf-t .st:not(.st-l){border-left:none}
 .fnf-t .st:not(.st-r){border-right:none}
+.fnf-t .st.st-b{border-bottom:1px solid #333}
 .fnf-menu{text-align:center}
 .fnf-mt{font-weight:600;font-size:13px}
 .fnf-mh{font-weight:600;margin:2px 0 4px}
