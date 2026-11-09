@@ -18,20 +18,18 @@
     return 'RS' + (max + 1) + '/' + yy;
   }
 
-  /* ---------- stays: room lines with the same check-in day and nights make one block on the sheet ---------- */
-  const STAY_MAX = 8, STAY_KEYS = ['checkin', 'checkout', 'roomType', 'roomQty'];
+  /* ---------- stays: each room line of the quote is one block on the sheet (as on the old paper form) ---------- */
+  const STAY_MAX = 20, STAY_KEYS = ['checkin', 'checkout', 'roomType', 'roomQty'];
   function staysOf(q, rooms) {
-    const by = new Map();
-    for (const it of rooms) {
-      const ci = it.ci || q.start, n = Math.max(1, Number(it.q2) || 1), k = ci + '|' + n;
-      if (!by.has(k)) by.set(k, { ci, n, co: U.addDays(ci, n), lines: [] });
-      by.get(k).lines.push(it);
-    }
-    return [...by.values()].sort((a, b) => a.ci.localeCompare(b.ci) || a.n - b.n).slice(0, STAY_MAX);
+    const st = rooms.map((it, i) => { const ci = it.ci || q.start, n = Math.max(1, Number(it.q2) || 1); return { ci, n, co: U.addDays(ci, n), lines: [it], i }; });
+    st.sort((a, b) => a.ci.localeCompare(b.ci) || a.i - b.i);
+    // more lines than blocks: the rest go into the last block
+    if (st.length > STAY_MAX) { const last = st[STAY_MAX - 1]; for (const g of st.slice(STAY_MAX)) last.lines.push(g.lines[0]); }
+    return st.slice(0, STAY_MAX);
   }
   const stayKey = (k, i) => k + (i ? String(i + 1) : '');
   // saved before the split (old room boxes typed over, no block boxes, no stayV mark) → keep one block as typed
-  const legacyStays = f => !f.stayV && STAY_KEYS.some(k => f[k] != null) && !Object.keys(f).some(k => /^(checkin|checkout|roomType|roomQty)\d$/.test(k));
+  const legacyStays = f => !f.stayV && STAY_KEYS.some(k => f[k] != null) && !Object.keys(f).some(k => /^(checkin|checkout|roomType|roomQty)\d+$/.test(k));
   const STAY_EDIT = Array.from({ length: STAY_MAX }, (_, i) => STAY_KEYS.map(k => stayKey(k, i))).flat();
 
   /* ---------- values taken from the quote and the function sheet ---------- */
