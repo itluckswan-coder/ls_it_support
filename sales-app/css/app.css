@@ -750,6 +750,10 @@ main.bleed{padding:0;max-width:none}
 .fnf-t th{font-weight:600;text-align:right;width:130px;background:#fafafa}
 .fnf-t th.sec{text-align:center;width:auto;background:#f1f0eb}
 .fnf-t td.c{text-align:center;vertical-align:middle}
+.fnf-t .st{border-top:none;border-bottom:none;background:#fff}
+.fnf-t .st:not(.st-l){border-left:none}
+.fnf-t .st:not(.st-r){border-right:none}
+.fnf-t .st.st-b{border-bottom:1px solid #333}
 .fnf-menu{text-align:center}
 .fnf-mt{font-weight:600;font-size:13px}
 .fnf-mh{font-weight:600;margin:2px 0 4px}

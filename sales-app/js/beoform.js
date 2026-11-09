@@ -18,6 +18,20 @@
     return 'RS' + (max + 1) + '/' + yy;
   }
 
+  /* ---------- stays: each room line of the quote is one block on the sheet (as on the old paper form) ---------- */
+  const STAY_MAX = 20, STAY_KEYS = ['checkin', 'checkout', 'roomType', 'roomQty'];
+  function staysOf(q, rooms) {
+    const st = rooms.map((it, i) => { const ci = it.ci || q.start, n = Math.max(1, Number(it.q2) || 1); return { ci, n, co: U.addDays(ci, n), lines: [it], i }; });
+    st.sort((a, b) => a.ci.localeCompare(b.ci) || a.i - b.i);
+    // more lines than blocks: the rest go into the last block
+    if (st.length > STAY_MAX) { const last = st[STAY_MAX - 1]; for (const g of st.slice(STAY_MAX)) last.lines.push(g.lines[0]); }
+    return st.slice(0, STAY_MAX);
+  }
+  const stayKey = (k, i) => k + (i ? String(i + 1) : '');
+  // saved before the split (old room boxes typed over, no block boxes, no stayV mark) → keep one block as typed
+  const legacyStays = f => !f.stayV && STAY_KEYS.some(k => f[k] != null) && !Object.keys(f).some(k => /^(checkin|checkout|roomType|roomQty)\d+$/.test(k));
+  const STAY_EDIT = Array.from({ length: STAY_MAX }, (_, i) => STAY_KEYS.map(k => stayKey(k, i))).flat();
+
   /* ---------- values taken from the quote and the function sheet ---------- */
   function auto(b, q) {
     const c = App.calc(q), meet = q.items.filter(i => i.sec === 'meet'), food = q.items.filter(i => i.sec === 'food'), rooms = q.items.filter(i => i.sec === 'room');
@@ -41,6 +55,8 @@
     if (c.vat) cost.push(`VAT 7% ${money(c.vat)} บาท`);
     const sched = Object.entries(b.schedule || {}).flatMap(([d, rows]) => rows.slice().sort((a, x) => a.time.localeCompare(x.time)).map(r => (Object.keys(b.schedule).length > 1 ? 'วันที่ ' + d + ' ' : '') + r.time + ' ' + r.task));
     const owner = Store.db.users.find(u => u.id === q.owner);
+    const stays = staysOf(q, rooms), sk = i => i ? String(i + 1) : '';
+    const stayVals = {}; stays.forEach((g, i) => Object.assign(stayVals, { ['checkin' + sk(i)]: U.fmtD(g.ci), ['checkout' + sk(i)]: U.fmtD(g.co) + ' (' + g.n + ' คืน)', ['roomType' + sk(i)]: g.lines.map(l => l.name).join('\n'), ['roomQty' + sk(i)]: g.lines.map(l => l.q1 + ' ห้อง').join('\n') }));
     return {
       no: '', issued: U.today(), org: q.clientFull || q.client || '', coord: [q.contact, q.phone].filter(Boolean).join(' '), quote: q.id,
       date: U.fmtRange(q.start, q.end, { long: true }),
@@ -55,8 +71,9 @@
       menu, kitchen: dept('kitchen').join('\n'),
       hk: dept('hk').join('\n'), av: dept('av').map(x => markLine(x, '/ ')).join('\n'),
       total: money(c.net) + ' บาท', cost: cost.join('\n'), bill: 'แจ้งภายหลัง',
-      checkin: rooms.length ? U.fmtD(q.start) : '-', checkout: rooms.length ? U.fmtD(U.addDays(q.end, 1)) : '-',
-      roomType: rooms.length ? rooms.map(i => i.name).join('\n') : '-', roomQty: rooms.length ? rooms.map(i => i.q1 + ' ห้อง × ' + (i.q2 || 1) + ' คืน').join('\n') : '-',
+      checkin: '-', checkout: '-', roomType: '-', roomQty: '-', ...stayVals,
+      // the earlier one-box version (all rooms in one row), kept for sheets whose room boxes were typed over before the split
+      _legacy: { checkin: rooms.length ? U.fmtD(q.start) : '-', checkout: rooms.length ? U.fmtD(U.addDays(q.end, 1)) : '-', roomType: rooms.length ? rooms.map(i => i.name).join('\n') : '-', roomQty: rooms.length ? rooms.map(i => i.q1 + ' ห้อง × ' + (i.q2 || 1) + ' คืน').join('\n') : '-' },
       front: rooms.length ? dept('front').join('\n') : '** ไม่มีห้องพัก **',
       by: owner ? owner.name : '', byTitle: 'Sales and Marketing',
       appr: b.signoff ? b.signoff.byName : '', apprTitle: b.signoff ? 'อนุมัติ ' + U.fmtD(b.signoff.at.slice(0, 10)) : ''
@@ -70,7 +87,8 @@
   // what shows: typed-in value if there is one, else the value from the system
   function values(b, q) {
     const a = auto(b, q), f = b.fn || {}, v = {};
-    for (const k of Object.keys(a)) v[k] = f[k] != null && !DEPT_BOX[k] ? f[k] : a[k];
+    for (const k of Object.keys(a)) if (k !== '_legacy') v[k] = f[k] != null && !DEPT_BOX[k] ? f[k] : a[k];
+    for (const k of STAY_EDIT) if (!(k in a) && f[k] != null) v[k] = f[k];
     // ประเภทงาน follows the attendee / event-type picks on the function sheet whenever there are any (over text typed earlier)
     const tg = App.beoTagNames ? App.beoTagNames(b) : { kinds: [], guests: [] };
     if (tg.kinds.length || tg.guests.length) v.type = a.type;
@@ -80,6 +98,9 @@
     v.sty = f.sty || {}; // text style per field (size, colour, weight…) from the edit toolbar
     v.more = f.more || {}; // lines added inside a cell with its corner "+": { field: [{ t: 'h'|'d', text }] }
     v.appr = a.appr; v.apprTitle = a.apprTitle; // always the real sign-off
+    // room blocks: a sheet whose room boxes were typed over before the split keeps one block, as it was typed
+    if (legacyStays(f)) { for (const k of STAY_KEYS) v[k] = f[k] != null ? f[k] : a._legacy[k]; v.stays = 1; }
+    else v.stays = Math.max(1, ...Array.from({ length: STAY_MAX }, (_, i) => STAY_KEYS.some(k => a[stayKey(k, i)] != null || f[stayKey(k, i)] != null) ? i + 1 : 0));
     return { v, a };
   }
 
@@ -201,6 +222,10 @@
     const xIn = k => xs(k).map(x => ed ? `<div class="fnf-x fnf-ed">${xdel(x)}${box(`data-input="fnDX" data-i="${x.i}" data-k="label"`, x.label, 'หัวข้อ', 'b', xst(x, 'label'), xr(x, 'label'))}${box(`data-input="fnDX" data-i="${x.i}" data-k="text"`, x.text, 'รายละเอียด', '', xst(x, 'text'), xr(x, 'text'))}</div>`
       : `<div class="fnf-x">${x.label ? `<b${sa(xst(x, 'label'))}>${rtx(x.label, xr(x, 'label'))} :</b> ` : ''}${wrapS(xst(x, 'text'), rtx(x.text, xr(x, 'text')), 'span')}</div>`).join('');
     const acc = xs('acc'), front = xs('front'), mc = Math.max(1, v.menu.length);
+    // the front office's room blocks: Check-in / Check-out, then room type / number of rooms, once per stay
+    const nst = Math.max(1, Number(v.stays) || 1);
+    // room blocks: no lines inside a block, one line under each block (Check-in, Check-out, room, rooms, then the line)
+    const stayRows = Array.from({ length: nst }, (_, i) => [`<th class="st st-l">Check-in :</th>${cell(stayKey('checkin', i), 'c st')}<th class="st">Check-out :</th>${cell(stayKey('checkout', i), 'c st st-r')}`, `<th class="st st-l st-b">ห้องพัก (ประเภท) :</th>${cell(stayKey('roomType', i), 'c st st-b')}<th class="st st-b">จำนวนห้อง :</th>${cell(stayKey('roomQty', i), 'c st st-r st-b')}`]).flat();
     // the accounting / money part is for admins, sales managers, sales staff and accounting; everyone else sees the front desk part alone
     // "สำหรับ Operation" shows them the operations copy too (what every other role sees)
     const showMoney = moneyRole() && fnUi().view !== 'ops';
@@ -237,15 +262,15 @@
   </table>
   ${showMoney ? `<table class="fnf-t">
     <tr><th colspan="2" class="sec" style="width:50%">แผนกบัญชี / การเงิน</th><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
-    <tr><th>ยอดรวม :</th>${tdc('total', 'c fnf-total', ed ? T('total') : wrapS(sty.total, rtx(v.total, rich.total), 'span'))}<th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
-    <tr><th>รายละเอียดค่าใช้จ่าย :</th>${cell('cost', 'c')}<th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
+    <tr><th>ยอดรวม :</th>${tdc('total', 'c fnf-total', ed ? T('total') : wrapS(sty.total, rtx(v.total, rich.total), 'span'))}${stayRows[0]}</tr>
+    <tr><th${stayRows.length > 2 ? ` rowspan="${stayRows.length - 1}"` : ''}>รายละเอียดค่าใช้จ่าย :</th>${stayRows.length > 2 ? cell('cost', 'c').replace('<td ', `<td rowspan="${stayRows.length - 1}" `) : cell('cost', 'c')}${stayRows[1]}</tr>
+    ${stayRows.slice(2).map(r => `<tr>${r}</tr>`).join('')}
     <tr><th>ที่อยู่ออกบิล :</th>${cell('bill', 'c')}${tdc('front', 'c', T('front', '', 'หมายเหตุต้อนรับ'), 4)}</tr>
     ${Array.from({ length: Math.max(acc.length, front.length) }, (_, i) => `<tr>${acc[i] ? xth(acc[i]) + xtd(acc[i]) : '<td colspan="2"></td>'}${front[i] ? xth(front[i]) + xtd(front[i], 3) : '<td colspan="4"></td>'}</tr>`).join('')}
     ${ed ? `<tr class="fnf-addrow"><td colspan="2">${add('acc')}</td><td colspan="4">${add('front')}</td></tr>` : ''}
   </table>` : `<table class="fnf-t">
     <tr><th colspan="4" class="sec">แผนกต้อนรับ</th></tr>
-    <tr><th>Check-in :</th>${cell('checkin', 'c')}<th>Check-out :</th>${cell('checkout', 'c')}</tr>
-    <tr><th>ห้องพัก (ประเภท) :</th>${cell('roomType', 'c')}<th>จำนวนห้อง :</th>${cell('roomQty', 'c')}</tr>
+    ${stayRows.map(r => `<tr>${r}</tr>`).join('')}
     <tr>${tdc('front', 'c', T('front', '', 'หมายเหตุต้อนรับ'), 4)}</tr>
     ${front.map(x => `<tr>${xth(x)}${xtd(x, 3)}</tr>`).join('')}
     ${ed ? `<tr class="fnf-addrow"><td colspan="4">${add('front')}</td></tr>` : ''}
@@ -286,7 +311,7 @@
 
   /* ---------- the page ---------- */
   const moneyRole = () => { const me = App.me(); return !!App.salesRole() || (!!me && me.role === 'acc' && !(App.roleOf && App.roleOf(me).custom)); };
-  const EDIT_KEYS = ['no', 'issued', 'quote', 'org', 'coord', 'date', 'venue', 'type', 'pax', 'pricing', 'layout', 'fyi', 'stage', 'vinyl', 'kitchen', 'hk', 'av', 'total', 'cost', 'bill', 'checkin', 'checkout', 'roomType', 'roomQty', 'front', 'by', 'byTitle'];
+  const EDIT_KEYS = ['no', 'issued', 'quote', 'org', 'coord', 'date', 'venue', 'type', 'pax', 'pricing', 'layout', 'fyi', 'stage', 'vinyl', 'kitchen', 'hk', 'av', 'total', 'cost', 'bill', ...STAY_EDIT, 'front', 'by', 'byTitle'];
   const clone = o => JSON.parse(JSON.stringify(o));
   const fnUi = () => App.state.ui.fn || (App.state.ui.fn = { tab: 'preview' });
   // the unsaved copy being edited on the sheet; nothing is stored until "บันทึกแก้ไขข้อมูล"
@@ -317,7 +342,7 @@
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button><button class="btn ghost" data-act="fnSave">บันทึก</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
-      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, appr: v.appr, apprTitle: v.apprTitle });
+      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, stays: v.stays, appr: v.appr, apprTitle: v.apprTitle });
       const tdMode = ui.td ? ' tdraw-' + ui.td : '';
       return head + `<div class="fnf-bar no-print"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ<div id="fnDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
         <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div>${tools()}</div>
@@ -509,6 +534,7 @@
       const b = curB(), d = fnUi().draft; if (!b || !d || !canEdit()) return;
       const a = auto(b, Store.quote(b.quoteId));
       setFn(f => {
+        if (!legacyStays(f)) f.stayV = 1; // room boxes saved in the block layout
         // only boxes that were changed are stored: an untouched box keeps following the system (department cards, quotation)
         for (const k of EDIT_KEYS) {
           const val = d.v[k];
