@@ -392,7 +392,7 @@
           if (!ui.av && av) q.items = q.items.filter(i => i !== av);
           q.room = r.id;
           let held = false;
-          if (ui.holdDays && (q.status === 'draft' || q.status === 'sent')) { if (App.overlapOk(q)) { q.holdUntil = U.addDays(U.today(), ui.holdDays); q.status = 'tentative'; held = true; } else App.toast('ห้องทับเวลากับการจองอื่น — ยังไม่จองชั่วคราว ต้องให้ผู้ดูแลระบบอนุมัติในหน้าใบเสนอราคา'); }
+          if (ui.holdDays && q.bookOk && (q.status === 'draft' || q.status === 'pending')) { if (App.overlapOk(q)) { q.holdUntil = U.addDays(U.today(), ui.holdDays); q.status = 'tentative'; held = true; } else App.toast('ห้องทับเวลากับการจองอื่น — ยังไม่จองชั่วคราว ต้องให้ผู้ดูแลระบบอนุมัติในหน้าใบเสนอราคา'); }
           else if (ui.holdDays) { q.holdUntil = U.addDays(U.today(), ui.holdDays); held = true; }
           App.touch(q, `เลือกห้อง ${r.name}${held ? ' + จองชั่วคราวถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''}`);
           App.render(); App.toast('อัปเดต ' + q.id + ' แล้ว');

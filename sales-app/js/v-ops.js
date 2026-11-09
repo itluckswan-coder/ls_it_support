@@ -362,7 +362,7 @@
       App.pickQuoteModal('สร้างใบฟังก์ชันจากใบเสนอราคา', id => {
         const ex = Store.db.beos.find(b => b.quoteId === id);
         const b = ex || App.makeBEO(Store.quote(id)); App.go('#/beo/' + encodeURIComponent(b.id));
-      }, q => q.status !== 'cancelled' && q.status !== 'draft' && (!!q.bookOk || Store.db.beos.some(b => b.quoteId === q.id))); // only quotations the admin approved
+      }, q => Store.db.beos.some(b => b.quoteId === q.id) || (q.status === 'confirmed' && !!q.bookOk)); // only quotations the admin approved and the customer confirmed
     },
     beoSend() {
       const b = curB(), q = Store.quote(b.quoteId);
@@ -441,7 +441,7 @@
      CALENDAR (1k)
      ===================================================================== */
   const ST_COLOR = {
-    draft: ['#E4E2DA', '#3D4542', '#8A8A82'], sent: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#FFE08A', '#6B4E00', '#E0A800'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
+    draft: ['#E4E2DA', '#3D4542', '#8A8A82'], pending: ['#FFF1C2', '#7a5c00', '#D4A21A'], tentative: ['#FFE08A', '#6B4E00', '#E0A800'], confirmed: ['#DDF3EF', '#0B7C6F', '#0E9F8E']
   };
   // an event on the calendar opens its function sheet; a quote without one (e.g. a draft) opens the quote
   const beoOf = q => App.can('view_beo') && !App.navHidden().includes('beo') ? Store.db.beos.find(b => b.quoteId === q.id) : null;
@@ -455,7 +455,7 @@
       const [y, m] = ui.ym.split('-').map(Number);
       const first = new Date(y, m - 1, 1), startD = U.addDays(U.iso(first), -first.getDay());
       // drafts, tentative and confirmed quotes with a date show (sent and cancelled ones don't); a missing end date counts as a one-day event
-      const qs = App.siteQuotes().filter(q => q.status !== 'cancelled' && q.status !== 'sent' && q.start && (ui.area === 'all' || q.room === ui.area || (q.items || []).some(i => i.ref === ui.area))).map(q => q.end && q.end >= q.start ? q : Object.assign({}, q, { end: q.start }));
+      const qs = App.siteQuotes().filter(q => q.status !== 'cancelled' && q.status !== 'pending' && q.start && (ui.area === 'all' || q.room === ui.area || (q.items || []).some(i => i.ref === ui.area))).map(q => q.end && q.end >= q.start ? q : Object.assign({}, q, { end: q.start }));
       const inMonth = qs.filter(q => q.start.slice(0, 7) === ui.ym || q.end.slice(0, 7) === ui.ym);
       const stat = s => { const l = inMonth.filter(q => q.status === s); return [l.length, l.reduce((a, q) => a + App.calc(q).net, 0)]; };
       const evOn = d => qs.filter(q => d >= q.start && d <= q.end);

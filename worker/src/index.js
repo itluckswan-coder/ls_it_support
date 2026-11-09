@@ -228,13 +228,17 @@ async function applyRules(env, user, kind, id, data, prev) {
     if (pct > 10.0001 && !can(user, 'discount_over') && !(prev && prev.approval === 'approved' && JSON.stringify(prev.discount) === JSON.stringify(data.discount))) data.approval = 'pending';
     // approval to book a meeting room over another booking's times, and the quotation approval (อนุมัติใบเสนอราคา): only admins give or withdraw them
     if (user.role !== 'admin') for (const k of ['overlapOk', 'bookOk']) { if (prev && prev[k]) data[k] = prev[k]; else delete data[k]; }
+    // จองชั่วคราว / ยืนยันแล้ว only once the admin approved the quotation; only admins send one back (ตีกลับ)
+    if (user.role !== 'admin' && ['tentative', 'confirmed'].includes(data.status) && !data.bookOk && !(prev && prev.status === data.status)) fail(409, 'ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน');
+    if (user.role !== 'admin') { if (prev && prev.okBack && data.status !== 'pending') data.okBack = prev.okBack; else if (!prev || !prev.okBack) delete data.okBack; }
   }
   if (kind === 'beo') {
     if (!can(user, 'create_quote') && !can(user, 'staff')) fail(403, 'คุณมีสิทธิ์ดูใบฟังก์ชันอย่างเดียว');
     // a new function sheet needs its quotation approved by an admin (อนุมัติใบเสนอราคา)
     if (!prev) {
-      const qr = await env.DB.prepare("SELECT json_extract(data, '$.bookOk.by') AS ok FROM docs WHERE kind = 'quote' AND id = ? AND deleted = 0").bind(String(data.quoteId || '')).first();
+      const qr = await env.DB.prepare("SELECT json_extract(data, '$.bookOk.by') AS ok, json_extract(data, '$.status') AS st FROM docs WHERE kind = 'quote' AND id = ? AND deleted = 0").bind(String(data.quoteId || '')).first();
       if (!qr || !qr.ok) fail(403, 'ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน จึงออกใบฟังก์ชันได้');
+      if (qr.st !== 'confirmed') fail(403, 'ออกใบฟังก์ชันได้หลังลูกค้ายืนยันการจอง');
     }
     const rank = RANK[user.role] || 1;
     const changed = !prev || JSON.stringify(beoContent(prev)) !== JSON.stringify(beoContent(data));

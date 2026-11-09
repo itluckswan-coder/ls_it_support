@@ -140,7 +140,7 @@
       }
       const data = d.data;
       const replace = (arr) => { const i = arr.findIndex(x => x.id === d.id); if (i >= 0) arr[i] = data; else arr.push(data); };
-      if (d.kind === 'quote') replace(db.quotes);
+      if (d.kind === 'quote') { g.DATA.fixQuote(data); replace(db.quotes); }
       else if (d.kind === 'beo') { replace(db.beos); this.beoPrev[d.id] = JSON.stringify(data); }
       else if (d.kind === 'staff') db.staff[d.id] = data;
       else if (d.kind === 'task') replace(db.tasks || (db.tasks = []));
