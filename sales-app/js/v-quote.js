@@ -29,10 +29,10 @@
       const cnt = s => all.filter(q => s === 'all' || q.status === s).length;
       const canDel = canDelQ();
       return `
-<div class="page-hd"><div><h1>ใบเสนอราคา</h1><div class="muted small">${all.length} ใบ · ยืนยันแล้ว ${cnt('confirmed')} · รอลูกค้า ${cnt('sent')}</div></div><a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
+<div class="page-hd"><div><h1>ใบเสนอราคา</h1><div class="muted small">${all.length} ใบ · ยืนยันแล้ว ${cnt('confirmed')} · รออนุมัติ ${cnt('pending')} · รอลูกค้ายืนยัน ${cnt('tentative')}</div></div><a class="btn red" href="#/new">+ ใบเสนอราคาใหม่</a></div>
 <div class="row wrap" style="margin-bottom:16px">
   <input class="input" style="max-width:280px;border-radius:999px" placeholder="ค้นหาลูกค้า เลขที่…" value="${H(ui.q)}" data-change="qlSearch" aria-label="ค้นหาใบเสนอราคา">
-  ${['all', 'draft', 'sent', 'tentative', 'confirmed', 'cancelled'].map(s => `<button class="chip ${ui.st === s ? 'on' : ''}" data-act="qlSt" data-v="${s}">${s === 'all' ? 'ทั้งหมด' : D.STATUS[s]} <span class="n">${cnt(s)}</span></button>`).join('')}
+  ${['all', 'draft', 'pending', 'tentative', 'confirmed', 'cancelled'].map(s => `<button class="chip ${ui.st === s ? 'on' : ''}" data-act="qlSt" data-v="${s}">${s === 'all' ? 'ทั้งหมด' : D.STATUS[s]} <span class="n">${cnt(s)}</span></button>`).join('')}
 </div>
 <section class="card" style="overflow:hidden">
 <table class="tbl resp"><thead><tr><th>เลขที่</th><th class="hide-m">ผู้รับผิดชอบ</th><th>ลูกค้า / งาน</th><th>วันงาน</th><th>ท่าน</th><th class="r">ยอดสุทธิ (฿)</th><th class="r">สถานะ</th></tr></thead><tbody>
@@ -130,13 +130,15 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     </section>
     <section class="card pad">
       <div class="between" style="margin-bottom:12px"><h3>สถานะ</h3>${App.statusBadge(q.status)}</div>
+      ${apprStep(q)}
       <div class="row wrap">
-        ${q.status !== 'confirmed' ? `<button class="btn teal sm" data-act="qStatus" data-v="confirmed">ลูกค้ายืนยันการจอง</button>` : ''}
-        ${q.status !== 'tentative' && q.status !== 'confirmed' ? `<button class="btn ghost sm" data-act="qStatus" data-v="tentative">จองชั่วคราว</button>` : ''}
-        ${App.holding(q) ? `<button class="btn ghost sm" data-act="qToBeo">ใบฟังก์ชัน</button><a class="btn ghost sm" href="#/staff/${qid(q.id)}">จัดรอบพนักงาน</a>` : ''}
+        ${q.status === 'draft' ? `<button class="btn teal sm" data-act="qAskOk">ส่งขออนุมัติ</button>` : ''}
+        ${q.status !== 'confirmed' && q.status !== 'cancelled' && q.bookOk ? `<button class="btn teal sm" data-act="qStatus" data-v="confirmed">ลูกค้ายืนยันการจอง</button>` : ''}
+        ${q.status !== 'tentative' && q.status !== 'confirmed' && q.status !== 'cancelled' && q.bookOk ? `<button class="btn ghost sm" data-act="qStatus" data-v="tentative">จองชั่วคราว</button>` : ''}
+        ${q.status === 'confirmed' ? `<button class="btn ghost sm" data-act="qToBeo">ใบฟังก์ชัน</button>` : ''}${App.holding(q) ? `<a class="btn ghost sm" href="#/staff/${qid(q.id)}">จัดรอบพนักงาน</a>` : ''}
         ${q.status !== 'cancelled' ? `<button class="btn ghost sm" data-act="qStatus" data-v="cancelled" style="color:var(--red)">ยกเลิก</button>` : `<button class="btn ghost sm" data-act="qStatus" data-v="draft">กู้คืนเป็นร่าง</button>`}
       </div>
-      ${App.holding(q) && !q.bookOk && !Store.db.beos.some(b => b.quoteId === q.id) ? `<div class="xs muted" style="margin-top:10px">ออกใบฟังก์ชันได้หลังผู้ดูแลระบบกด “อนุมัติใบเสนอราคา”</div>` : ''}
+      ${q.status === 'tentative' && !Store.db.beos.some(b => b.quoteId === q.id) ? `<div class="xs muted" style="margin-top:10px">ออกใบฟังก์ชันได้หลังลูกค้ายืนยันการจอง</div>` : ''}
       ${bookOkBox(q)}
       ${canDelQ() ? `<button class="btn ghost red sm" style="width:100%;margin-top:12px" data-act="qDelete" data-id="${H(q.id)}">ลบใบเสนอราคา</button>` : ''}
       ${q.history && q.history.length ? `<div class="hr"></div><div class="small muted" style="margin-bottom:6px">ประวัติ</div>${q.history.slice(0, 5).map((h, i) => `<div class="row small" style="padding:4px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('')}` : ''}
@@ -327,6 +329,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     },
     qStatus(el) {
       const q = cur(), v = el.dataset.v;
+      // held / confirmed only after the admin approved the quotation (อนุมัติใบเสนอราคา)
+      if ((v === 'tentative' || v === 'confirmed') && !q.bookOk && App.me().role !== 'admin') { App.toast('ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน'); return; }
       if ((v === 'tentative' || v === 'confirmed') && !App.overlapOk(q)) {
         App.toast('ห้องประชุมทับเวลากับการจองอื่น — ต้องให้ผู้ดูแลระบบอนุมัติก่อน'); document.getElementById('qOverlap')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return;
       }
@@ -339,7 +343,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     },
     qDup() {
       const q = cur(), n = JSON.parse(JSON.stringify(q));
-      n.id = Store.nextId('QT'); n.status = 'draft'; n.history = []; n.views = 0; n.approval = null; n.holdUntil = ''; delete n.bookOk;
+      n.id = Store.nextId('QT'); n.status = 'draft'; n.history = []; n.views = 0; n.approval = null; n.holdUntil = ''; delete n.bookOk; delete n.askOk; delete n.okBack;
       n.createdAt = n.updatedAt = U.nowTH();
       n.items.forEach(i => i.id = U.uid('i'));
       n.history.unshift({ at: n.createdAt, t: 'สร้างจากสำเนา ' + q.id });
@@ -349,6 +353,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const q = cur(); const b = Store.db.beos.find(x => x.quoteId === q.id);
       // a function sheet is issued only from a quotation the admin approved (อนุมัติใบเสนอราคา)
       if (!b && !q.bookOk) { App.toast('ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน จึงออกใบฟังก์ชันได้'); return; }
+      if (!b && q.status !== 'confirmed') { App.toast('ออกใบฟังก์ชันได้หลังลูกค้ายืนยันการจอง'); return; }
       if (b) App.go('#/beo/' + qid(b.id)); else { const nb = App.makeBEO(q); App.go('#/beo/' + qid(nb.id)); }
     },
     qDetails() { detailsModal(cur()); },
@@ -708,7 +713,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const ui = App.state.ui.doc && App.state.ui.doc.id === q.id ? App.state.ui.doc :
         (App.state.ui.doc = { id: q.id, ch: 'email', to: [q.email].concat(q.cc || []).filter(Boolean), unit: true, online: true, full: false, msg: null });
       if (ui.msg == null) ui.msg = `เรียน ${q.contact || 'ลูกค้า'}\nขอบคุณที่ไว้วางใจ ${App.prop(App.siteOfQ(q)).th} ค่ะ แนบใบเสนอราคาสำหรับงาน${q.title} ${U.fmtRange(q.start, q.end)}${q.room ? ' ห้อง ' + ((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name || '') : ''}${q.holdUntil ? ' กันไว้ให้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''} ค่ะ`;
-      const pending = q.approval === 'pending' && App.calc(q).pct > 10;
+      const pending = q.approval === 'pending' && App.calc(q).pct > 10, noOk = !q.bookOk && q.status !== 'confirmed';
       const chLabel = { email: 'ส่งใบเสนอราคา', line: 'ส่งทาง LINE', link: 'คัดลอกลิงก์', pdf: 'พิมพ์ / บันทึก PDF' }[ui.ch];
       return `<div class="doc-wrap">
   <div class="doc-area"><div class="row no-print" style="max-width:820px;margin:0 auto 14px;flex-wrap:wrap;gap:8px"><a class="link" href="#/quote/${qid(q.id)}">${ICON.back} กลับไปแก้ไข</a><span class="spacer"></span>${App.can('create_quote') ? `<div class="seg white"><button class="${ui.edit ? '' : 'on'}" data-act="qdTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${ui.edit ? 'on' : ''}" data-act="qdTab" data-v="edit">แก้ไขข้อมูล</button></div>` : ''}<button class="btn ghost sm" data-act="docPrint">พิมพ์ / PDF</button></div>
@@ -726,7 +731,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     <div class="perm" style="border:0"><span>แสดงราคาต่อหน่วย</span>${App.sw('ราคาต่อหน่วย', ui.unit, 'data-change="docT" data-f="unit"')}</div>
     <div class="perm" style="border:0"><span>ยืนราคาถึง</span><input type="date" class="input sm" style="width:auto" value="${H(q.validUntil || '')}" data-change="docValid"></div>
     ${pending ? '<div class="note red" style="margin:10px 0">ส่วนลดเกิน 10% รออนุมัติจากผู้จัดการฝ่ายขาย จึงยังส่งไม่ได้</div>' : ''}
-    <button class="btn red block" style="margin-top:14px" data-act="docSend" ${pending && ui.ch !== 'pdf' ? 'disabled' : ''}>${chLabel}</button>
+    ${noOk && !pending ? '<div class="note red" style="margin:10px 0">ยังไม่ได้รับอนุมัติจากผู้ดูแลระบบ จึงยังส่งให้ลูกค้าไม่ได้ · พิมพ์ (PDF) ให้ผู้ดูแลระบบเซ็นได้</div>' : ''}
+    <button class="btn red block" style="margin-top:14px" data-act="docSend" ${(pending || noOk) && ui.ch !== 'pdf' ? 'disabled' : ''}>${chLabel}</button>
     <div class="hr"></div>
     <h3 style="margin-bottom:8px">ประวัติ</h3>
     ${(q.history || []).slice(0, 8).map((h, i) => `<div class="row small" style="padding:5px 0;align-items:flex-start"><i class="dot" style="margin-top:6px;background:${i ? '#cfccc2' : 'var(--teal)'}"></i><span class="muted">${H(h.t)} — ${U.fmtD(h.at.slice(0, 10), { year: false })} ${h.at.slice(11, 16)}</span></div>`).join('') || '<div class="small muted">ยังไม่มีประวัติ</div>'}
@@ -888,6 +894,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     qdImgRv() { const ui = DU(); if (ui.draft) { delete ui.draft.img; ui.dirty = true; App.render(); } },
     docSend() {
       const q = Store.quote(App.state.params[0]), ui = DU(), c = App.calc(q);
+      if (ui.ch !== 'pdf' && !q.bookOk && q.status !== 'confirmed') { App.toast('ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน จึงส่งให้ลูกค้าได้'); return; }
       const subject = `ใบเสนอราคา ${q.id} · ${q.title} · ${App.prop(App.siteOfQ(q)).th}`;
       const summary = `${ui.msg}\n\nเลขที่: ${q.id}\nงาน: ${q.title}\nวันที่: ${U.fmtRange(q.start, q.end)} · ${q.pax} ท่าน\nยอดสุทธิ: ${U.n2(c.net)} บาท (รวม Service และ VAT)\nยืนราคาถึง: ${U.fmtD(q.validUntil)}`;
       let note = '';
@@ -905,7 +912,6 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => App.toast('คัดลอกลิงก์แล้ว'), () => App.modal(`<h2>ลิงก์ใบเสนอราคา</h2><input class="input" value="${H(url)}" readonly onclick="this.select()"><div class="acts"><button class="btn dark" data-act="closeModal">ปิด</button></div>`));
         note = 'คัดลอกลิงก์ใบเสนอราคา';
       } else { window.print(); note = 'พิมพ์ / บันทึก PDF'; }
-      if (q.status === 'draft') q.status = 'sent';
       const ver = (q.history || []).filter(h => /^เวอร์ชัน/.test(h.t)).length + 1;
       App.touch(q, `เวอร์ชัน ${ver} · ${note}`);
       setTimeout(() => App.render(), 50);
@@ -995,9 +1001,43 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     }
   };
   /* ---------- the admin approves the quotation (อนุมัติใบเสนอราคา) ---------- */
+  // ร่าง → ส่งขออนุมัติ (รออนุมัติ) → ผู้ดูแลระบบอนุมัติ (จองชั่วคราว · รอลูกค้ายืนยัน) → ลูกค้ายืนยัน → ใบฟังก์ชัน
+  function apprStep(q) {
+    if (q.status === 'pending') return `<div class="note" style="margin-bottom:12px;background:var(--yellow-soft);color:var(--yellow-d)"><b>รออนุมัติจากผู้ดูแลระบบ</b>
+      <div class="xs" style="margin-top:2px">${q.askOk ? 'ส่งขออนุมัติโดย ' + H(q.askOk.byName || '-') + ' · ' + H((q.askOk.at || '').slice(0, 16).replace('T', ' ')) : ''}</div>
+      <div class="xs" style="margin-top:2px">พิมพ์ใบเสนอราคาให้ผู้ดูแลระบบเซ็น แล้วรอผู้ดูแลระบบกด “อนุมัติใบเสนอราคา”</div>
+      <div class="row" style="gap:12px;margin-top:6px"><a class="link small" href="#/doc/${qid(q.id)}" style="font-weight:700">พิมพ์ใบเสนอราคา</a><button class="link small" data-act="qAskUndo">ดึงกลับมาแก้ไข</button></div></div>`;
+    if (q.status === 'draft' && q.okBack) return `<div class="note red" style="margin-bottom:12px"><b>ผู้ดูแลระบบตีกลับ</b><div class="xs" style="margin-top:2px">${H(q.okBack.byName || '-')} · ${H((q.okBack.at || '').slice(0, 16).replace('T', ' '))}${q.okBack.why ? ' · ' + H(q.okBack.why) : ''}</div></div>`;
+    if (q.status === 'draft') return `<div class="xs muted" style="margin-bottom:10px">ร่างเสร็จแล้วกด “ส่งขออนุมัติ” แล้วพิมพ์ใบเสนอราคาให้ผู้ดูแลระบบเซ็น</div>`;
+    return '';
+  }
+  Object.assign(App.ACT, {
+    qAskOk() {
+      const q = cur(), me = App.me(); if (q.status !== 'draft') return;
+      App.confirm('ส่งใบเสนอราคา ' + q.id + ' ให้ผู้ดูแลระบบอนุมัติ?', () => {
+        q.status = 'pending'; q.askOk = { by: me.id, byName: me.name, at: U.nowTH() }; delete q.okBack;
+        App.touch(q, 'ส่งขออนุมัติใบเสนอราคา'); App.render(); App.toast('ส่งขออนุมัติแล้ว · พิมพ์ใบเสนอราคาให้ผู้ดูแลระบบเซ็น');
+      }, 'ส่งขออนุมัติ');
+    },
+    qAskUndo() {
+      const q = cur(); if (q.status !== 'pending') return;
+      q.status = 'draft'; delete q.askOk; App.touch(q, 'ดึงใบเสนอราคากลับมาแก้ไข'); App.render();
+    },
+    qOkBack() {
+      const q = cur(), me = App.me(); if (me.role !== 'admin' || q.status !== 'pending') return;
+      App.modal(`<h2>ตีกลับใบเสนอราคา ${H(q.id)}</h2><label class="f">เหตุผล (ไม่บังคับ)</label><textarea class="input" rows="3" id="okBackWhy"></textarea>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" data-act="qOkBackGo">ตีกลับ</button></div>`);
+    },
+    qOkBackGo() {
+      const q = cur(), me = App.me(); if (me.role !== 'admin' || q.status !== 'pending') return;
+      const why = ((document.getElementById('okBackWhy') || {}).value || '').trim().slice(0, 500);
+      q.status = 'draft'; delete q.askOk; q.okBack = { by: me.id, byName: me.name, at: U.nowTH(), why };
+      App.touch(q, 'ผู้ดูแลระบบตีกลับใบเสนอราคา' + (why ? ' · ' + why : '')); App.closeModal(); App.render(); App.toast('ตีกลับแล้ว');
+    }
+  });
   function bookOkBox(q) {
     const ok = q.bookOk, admin = App.me().role === 'admin', net = Math.round(App.calc(q).net * 100) / 100;
-    if (!ok) return admin && q.status !== 'cancelled' ? `<button class="btn teal sm" style="width:100%;margin-top:12px" data-act="qBookOk">อนุมัติใบเสนอราคา</button>` : '';
+    if (!ok) return admin && q.status !== 'cancelled' ? `<div class="row" style="gap:8px;margin-top:12px"><button class="btn teal sm" style="flex:1" data-act="qBookOk">อนุมัติใบเสนอราคา</button>${q.status === 'pending' ? '<button class="btn ghost sm" style="color:var(--red)" data-act="qOkBack">ตีกลับ</button>' : ''}</div>` : '';
     // yellow while waiting for the customer; green once sales marks ลูกค้ายืนยันการจอง
     const moved = Math.abs((Number(ok.net) || 0) - net) > 0.005, done = q.status === 'confirmed' && !moved;
     return `<div class="note" style="margin-top:12px;background:${done ? 'var(--teal-soft)' : 'var(--yellow-soft)'};color:${done ? 'var(--teal-d)' : 'var(--yellow-d)'}">
@@ -1011,20 +1051,20 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     qBookOk() {
       const q = cur(), me = App.me(); if (me.role !== 'admin') return;
       App.confirm('อนุมัติใบเสนอราคา ' + q.id + ' · ' + q.client + '?', () => {
-        q.bookOk = { by: me.id, byName: me.name, at: U.nowTH(), net: Math.round(App.calc(q).net * 100) / 100 };
+        q.bookOk = { by: me.id, byName: me.name, at: U.nowTH(), net: Math.round(App.calc(q).net * 100) / 100 }; delete q.okBack;
         App.touch(q, 'อนุมัติใบเสนอราคา');
         // approved before the customer confirms → hold it (จองชั่วคราว), unless its rooms overlap another booking without approval
         let held = false;
-        if (q.status === 'draft' || q.status === 'sent') {
+        if (q.status === 'draft' || q.status === 'pending') {
           if (App.overlapOk(q)) { q.status = 'tentative'; if (!q.holdUntil) q.holdUntil = U.addDays(U.today(), 10); App.touch(q, 'เปลี่ยนสถานะเป็น ' + D.STATUS.tentative); held = true; }
           else App.toast('ห้องประชุมทับเวลากับการจองอื่น — ยังไม่เปลี่ยนเป็นจองชั่วคราว');
         }
-        App.render(); if (held || q.status !== 'draft' && q.status !== 'sent') App.toast(held ? 'อนุมัติแล้ว · เปลี่ยนสถานะเป็นจองชั่วคราว' : 'อนุมัติใบเสนอราคาแล้ว');
+        App.render(); if (held || q.status !== 'draft' && q.status !== 'pending') App.toast(held ? 'อนุมัติแล้ว · เปลี่ยนสถานะเป็นจองชั่วคราว' : 'อนุมัติใบเสนอราคาแล้ว');
       }, 'อนุมัติใบเสนอราคา');
     },
     qBookUndo() {
       const q = cur(); if (App.me().role !== 'admin') return;
-      App.confirm('ยกเลิกการอนุมัติใบเสนอราคา ' + q.id + '?', () => { delete q.bookOk; App.touch(q, 'ยกเลิกการอนุมัติใบเสนอราคา'); App.render(); }, 'ยกเลิกการอนุมัติ');
+      App.confirm('ยกเลิกการอนุมัติใบเสนอราคา ' + q.id + '?', () => { delete q.bookOk; if (q.status === 'tentative') { q.status = 'pending'; q.holdUntil = ''; } App.touch(q, 'ยกเลิกการอนุมัติใบเสนอราคา'); App.render(); }, 'ยกเลิกการอนุมัติ');
     }
   });
   /* ---------- meeting rooms booked over each other ---------- */

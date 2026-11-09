@@ -253,7 +253,7 @@
     admin: PERMS.map(p => p.id)
   };
   const STATUS = {
-    draft: 'ร่าง', sent: 'ส่งแล้ว', tentative: 'จองชั่วคราว', confirmed: 'ยืนยันแล้ว', cancelled: 'ยกเลิก'
+    draft: 'ร่าง', pending: 'รออนุมัติ', tentative: 'จองชั่วคราว', confirmed: 'ยืนยันแล้ว', cancelled: 'ยกเลิก'
   };
 
   /* ---------------- catalog helpers (menus can be edited in the app) ---------------- */
@@ -308,7 +308,7 @@
     const sch = (day, start, end, place) => ({ day, start, end, place: place || '' });
     return [
       mk({ id: 'QT-2611-042', title: 'สัมมนาประจำปี 2026', client: 'บจก. สยามเทค', clientFull: 'บริษัท สยามเทค จำกัด', contact: 'คุณวรวุฒิ ศรีสุข', phone: '081-234-5678',
-        email: 'worawut@siamtech.co.th', cc: ['hr@siamtech.co.th'], address: '', taxId: '', start: '2026-11-12', end: '2026-11-13', pax: 80, status: 'sent',
+        email: 'worawut@siamtech.co.th', cc: ['hr@siamtech.co.th'], address: '', taxId: '', start: '2026-11-12', end: '2026-11-13', pax: 80, status: 'pending',
         validUntil: '2026-10-20', holdUntil: '2026-10-15', createdAt: '2026-10-02T09:12:00', updatedAt: '2026-10-05T10:42:00', views: 3, room: 'thikhampon',
         discount: { type: 'pct', value: 5 }, dietary: [{ k: 'ฮาลาล', n: 6 }, { k: 'มังสวิรัติ', n: 4 }, { k: 'แพ้อาหารทะเล', n: 2 }],
         history: [{ at: '2026-10-05T10:42:00', t: 'เวอร์ชัน 2 · ปรับส่วนลดเป็น 5%' }, { at: '2026-10-02T15:00:00', t: 'เวอร์ชัน 1 · ลูกค้าเปิดอ่าน 3 ครั้ง' }],
@@ -353,10 +353,10 @@
       mk({ id: 'QT-2610-024', title: 'งานแต่ง คุณเมย์', client: 'คุณเมย์ & คุณบอส', contact: 'คุณเมย์ สุดสวย', phone: '080-111-2222', email: 'may.wedding@gmail.com', start: '2026-11-06', end: '2026-11-06', pax: 250, status: 'confirmed',
         validUntil: '2026-09-30', createdAt: '2026-08-20T10:00:00', updatedAt: '2026-09-15T10:00:00', room: 'kinnaree',
         items: [meetItem('kinnaree', 1, 'banquet', { pax: 250, sched: [sch(1, '17:00', '22:00', 'Kinnaree')] }), foodItem('wd-chinese', 25, null, 'โต๊ะจีน 25 โต๊ะ'), svcItem('stage', 1), roomItem('Grand Deluxe', 15, 1, 1290, '', 'gdx')] }),
-      mk({ id: 'QT-2611-033', title: 'สัมมนา SCG', client: 'SCG ภาคเหนือ', contact: 'คุณอรุณ ศักดิ์ดี', phone: '081-777-8899', email: 'arun@scg.com', start: '2026-11-10', end: '2026-11-10', pax: 180, status: 'sent',
+      mk({ id: 'QT-2611-033', title: 'สัมมนา SCG', client: 'SCG ภาคเหนือ', contact: 'คุณอรุณ ศักดิ์ดี', phone: '081-777-8899', email: 'arun@scg.com', start: '2026-11-10', end: '2026-11-10', pax: 180, status: 'pending',
         validUntil: '2026-10-25', createdAt: '2026-10-01T10:00:00', updatedAt: '2026-10-03T10:00:00', room: 'kinnaree',
         items: [meetItem('kinnaree', 1, 'classroom', { pax: 180, sched: [sch(1, '08:30', '17:00', 'Kinnaree')] }), svcItem('av', 1), foodItem('cb-morning', 180, 2), foodItem('ln-buffet', 180, 1)] }),
-      mk({ id: 'QT-2611-040', title: 'Gala dinner', client: 'บจก. นอร์ทเทิร์น ทราเวล', contact: 'คุณปวีณา', phone: '083-222-1100', email: 'paweena@northtravel.co.th', start: '2026-11-12', end: '2026-11-12', pax: 120, status: 'sent',
+      mk({ id: 'QT-2611-040', title: 'Gala dinner', client: 'บจก. นอร์ทเทิร์น ทราเวล', contact: 'คุณปวีณา', phone: '083-222-1100', email: 'paweena@northtravel.co.th', start: '2026-11-12', end: '2026-11-12', pax: 120, status: 'pending',
         validUntil: '2026-10-25', createdAt: '2026-10-03T10:00:00', updatedAt: '2026-10-03T10:00:00', room: 'pool',
         items: [meetItem('pool', 1, 'banquet', { pax: 120, desc: 'Terrace ริมสระ 18:00–22:00', half: true, sched: [sch(1, '18:00', '22:00', 'ลานสระว่ายน้ำ')] }), foodItem('gd-bbq', 120, 1)] }),
       mk({ id: 'QT-2611-041', title: 'สัมมนาตัวแทนจำหน่าย', client: 'บจก. ล้านนาฟาร์ม', contact: 'คุณสมศักดิ์', phone: '084-555-6677', email: 'somsak@lannafarm.co.th', start: '2026-11-13', end: '2026-11-13', pax: 200, status: 'tentative',
@@ -525,6 +525,8 @@
 
   /* ---------------- store ---------------- */
   const KEY = 'lsSales.v1';
+  // "ส่งแล้ว" (sent) was dropped: a quote saved with it reads as รออนุมัติ, or จองชั่วคราว when the admin already approved it
+  function fixQuote(q) { if (q && q.status === 'sent') q.status = q.bookOk ? 'tentative' : 'pending'; return q; }
   const Store = {
     db: null,
     KEY,
@@ -532,7 +534,7 @@
       try { const raw = localStorage.getItem(this.KEY); if (raw) { const d = JSON.parse(raw); if (d && d.v === 1) { this.db = d; this.loaded(); return this.db; } } } catch (e) { /* ignore */ }
       this.db = seed(); this.write(); this.loaded(); return this.db;
     },
-    loaded() { if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; if (this.db && !Array.isArray(this.db.rosters)) this.db.rosters = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyMeetRooms(this.db && this.db.settings && this.db.settings.meetRooms); applyDepts(this.db && this.db.settings && this.db.settings.depts); applyFoodCats(this.db && this.db.settings && this.db.settings.foodCats); if (g.API) g.API.rememberBeos(); },
+    loaded() { if (this.db) (this.db.quotes || []).forEach(fixQuote); if (this.db && !Array.isArray(this.db.tasks)) this.db.tasks = []; if (this.db && !Array.isArray(this.db.leaves)) this.db.leaves = []; if (this.db && !Array.isArray(this.db.rosters)) this.db.rosters = []; applyCatalog(this.db && this.db.catalog && this.db.catalog.food); applyRoomRates(this.db && this.db.settings && this.db.settings.roomRates); applyMeetRooms(this.db && this.db.settings && this.db.settings.meetRooms); applyDepts(this.db && this.db.settings && this.db.settings.depts); applyFoodCats(this.db && this.db.settings && this.db.settings.foodCats); if (g.API) g.API.rememberBeos(); },
     write() { try { localStorage.setItem(this.KEY, JSON.stringify(this.db)); } catch (e) { console.warn('save failed', e); } },
     save() { this.write(); },
     reset() { this.db = seed(); this.write(); this.loaded(); },
@@ -557,7 +559,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { fixQuote, FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;

@@ -267,7 +267,7 @@
       const db = Store.db;
       let id = App.state.ctx || (function () { try { return sessionStorage.getItem('lsSales.ctx'); } catch (e) { return null; } })();
       let q = id && db.quotes.find(x => x.id === id && x.status !== 'cancelled' && App.inSite(x));
-      if (!q) q = App.siteQuotes().filter(x => x.status === 'draft' || x.status === 'sent' || x.status === 'tentative').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
+      if (!q) q = App.siteQuotes().filter(x => x.status === 'draft' || x.status === 'pending' || x.status === 'tentative').sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''))[0];
       return q || null;
     },
     setCtx(id) { App.state.ctx = id; try { sessionStorage.setItem('lsSales.ctx', id); } catch (e) { /* ignore */ } },
@@ -577,7 +577,11 @@
       }
       for (const q of App.V.home.salesHome(me) ? App.siteQuotes() : []) {
         const open = `<a class="link" href="#/quote/${encodeURIComponent(q.id)}">`;
-        if (q.status === 'sent' && q.views > 0)
+        if (q.status === 'pending' && me && me.role === 'admin')
+          out.push({ p: 0, color: 'var(--yellow)', title: `ใบเสนอราคา ${q.id} รออนุมัติ`, sub: `${q.client} · ส่งโดย ${(q.askOk && q.askOk.byName) || '-'}`, action: open + 'ตรวจ</a>' });
+        if (q.status === 'draft' && q.okBack)
+          out.push({ p: 0, color: 'var(--red)', title: `ใบเสนอราคา ${q.id} ถูกตีกลับ`, sub: q.okBack.why || q.client, action: open + 'แก้ไข</a>' });
+        if (q.status === 'tentative' && q.views > 0)
           out.push({ p: 1, color: 'var(--red)', title: `${q.client} เปิดอ่านใบเสนอ ${q.views} ครั้ง`, sub: 'ยังไม่ตอบ' + (q.holdUntil ? ' · ห้องกันไว้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''), action: q.phone ? `<a class="link" href="${App.tel(q.phone)}">โทร</a>` : open + 'เปิด</a>' });
         if (q.followUp && q.status !== 'confirmed' && q.status !== 'cancelled')
           out.push({ p: 2, color: 'var(--yellow)', title: `${q.client}`, sub: q.followUp, action: open + 'แก้ใบเสนอ</a>' });
