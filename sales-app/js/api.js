@@ -184,10 +184,18 @@
         for (const d of docs) {
           try {
             if (d.del) { await this.req('DELETE', 'doc/' + d.kind + '/' + encodeURIComponent(d.id)); delete this.snap[d.key]; delete this.ver[d.key]; continue; }
+            const sent = JSON.stringify(d.data);
             const j = await this.req('PUT', 'doc/' + d.kind + '/' + encodeURIComponent(d.id), { data: d.data, version: this.ver[d.key] || 0 });
-            const before = JSON.stringify(d.data);
-            this.applyDoc(j.doc);
-            if (JSON.stringify(j.doc.data) !== before) rerender = true;
+            if (JSON.stringify(d.data) !== sent) {
+              // edited again while this save was on its way (e.g. a second table moved on the floor plan):
+              // keep the newer local copy, take only the server's version, and send the rest next
+              this.ver[d.key] = j.doc.version; this.snap[d.key] = JSON.stringify(j.doc.data);
+              if (d.kind === 'beo') this.beoPrev[d.id] = JSON.stringify(d.data);
+              this.again = true;
+            } else {
+              this.applyDoc(j.doc);
+              if (JSON.stringify(j.doc.data) !== sent) rerender = true;
+            }
           } catch (e) {
             if (e.network || e.status === 401) throw e;
             rerender = true;
