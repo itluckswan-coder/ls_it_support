@@ -348,11 +348,12 @@
       const days = U.daysOf(q.start, q.end), day = Math.min(dayOf(), days.length), rooms = meetRooms(q), rp = roomParam();
       // several meeting rooms: choose which room's plan to work on first
       if (rooms.length > 1 && !rooms.some(r => r.id === rp)) return App.V.plan.pick(b, q, days, day, rooms);
-      const p = planOf(b, day), edit = canEdit(), rq = rp ? '/' + encodeURIComponent(rp) : '';
+      refreshWork(); // nothing unsaved: follow what is saved (others' changes included)
+      const p = P(), edit = canEdit(), rq = rp ? '/' + encodeURIComponent(rp) : '';
       histSync();
       const head = `<div class="page-hd"><div><div class="small"><a class="link" href="#/beo/${encodeURIComponent(b.id)}">← ใบฟังก์ชัน ${H(b.id)}</a></div><h1>ออกแบบผังงาน</h1><div class="small muted">${H(q.title)} · ${H(q.client)} · ${U.fmtRange(q.start, q.end)} · ${U.n(q.pax)} ท่าน</div></div>
         <div class="row wrap">${days.length > 1 ? `<div class="seg white">${days.map((d, i) => `<a class="${day === i + 1 ? 'on' : ''}" href="#/plan/${encodeURIComponent(b.id)}/${i + 1}${rq}">วันที่ ${i + 1}</a>`).join('')}</div>` : ''}${rooms.length > 1 ? `<a class="btn ghost" href="#/plan/${encodeURIComponent(b.id)}/${day}">← เลือกห้อง</a>` : ''}
-        ${edit && (p || hist.stack.length) ? undoBtn() : ''}${isAdmin() ? `<a class="btn ghost" href="#/plansetup${p && p.room ? '/' + encodeURIComponent(p.room) : ''}">แก้ไขปรับปรุง</a>` : ''}${p ? '<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button>' : ''}</div></div>`;
+        ${edit && (p || isDirty()) ? saveBar() : ''}${edit && (p || hist.stack.length) ? undoBtn() : ''}${isAdmin() ? `<a class="btn ghost" href="#/plansetup${p && p.room ? '/' + encodeURIComponent(p.room) : ''}">แก้ไขปรับปรุง</a>` : ''}${p ? '<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button>' : ''}</div></div>`;
       if (!p) {
         const rf = roomFor(q, day), lay = (D.LAYOUTS.find(l => l.id === rf.layout) || {}).name || '';
         return head + `<div class="card pad" style="text-align:center;max-width:620px;margin:20px auto">
@@ -391,7 +392,7 @@
   </aside>
   <div class="fp-main">
     <div class="fp-paper"><svg id="fpSvg" viewBox="0 0 10 10" font-family="IBM Plex Sans Thai, Tahoma, sans-serif"></svg></div>
-    <div class="small muted" style="margin-top:8px">รวมที่นั่ง <b id="fpTot">${seats}</b> ที่ · ใบฟังก์ชัน ${U.n(pax)} ท่าน${edit ? ' · คลิกเพื่อเลือก · ลากคลุมบนพื้นที่ว่างเพื่อเลือกหลายชิ้น · ลากเพื่อย้าย · Delete ลบ · R หมุน' : ''}</div>
+    <div class="small muted" style="margin-top:8px">รวมที่นั่ง <b id="fpTot">${seats}</b> ที่ · ใบฟังก์ชัน ${U.n(pax)} ท่าน${edit ? ' · คลิกเพื่อเลือก · ลากคลุมบนพื้นที่ว่างเพื่อเลือกหลายชิ้น · ลากเพื่อย้าย · Delete ลบ · R หมุน · กด “บันทึกผังงาน” (Ctrl+S) เพื่อบันทึก' : ''}</div>
     <div id="fpWarn">${warn(p, pax)}</div>
   </div>
 </div>`;
@@ -400,13 +401,10 @@
   };
   /* ---------- แก้ไขปรับปรุง: room sizes, locked fixtures, standard item sizes (admins) ---------- */
   const setupRoom = () => { const id = App.state.params[0]; return D.MEETING_ROOMS.some(r => r.id === id) ? id : D.MEETING_ROOMS[0].id; };
-  function setupDoc() {
-    const ui = App.state.ui, id = setupRoom();
-    if (!ui.fpSetup || ui.fpSetup.room !== id) { const [w, h] = roomDim(id); ui.fpSetup = { room: id, title: 'ห้อง' + roomName(id).replace(/^ห้อง/, '') + ' · ของที่ห้ามย้าย', W: w, H: h, items: JSON.parse(JSON.stringify(fixedOf(id))) }; }
-    return ui.fpSetup;
-  }
-  function saveSetup() {
-    const d = App.state.ui.fpSetup, st = Store.db.settings, f = st.floor = Object.assign({ rooms: {}, sizes: {} }, st.floor);
+  function setupBuild(id) { const [w, h] = roomDim(id); return { room: id, title: 'ห้อง' + roomName(id).replace(/^ห้อง/, '') + ' · ของที่ห้ามย้าย', W: w, H: h, items: JSON.parse(JSON.stringify(fixedOf(id))) }; }
+  function setupDoc() { return work().data; }
+  function saveSetup(d) {
+    const st = Store.db.settings, f = st.floor = Object.assign({ rooms: {}, sizes: {} }, st.floor);
     f.rooms = Object.assign({}, f.rooms, { [d.room]: { W: d.W, H: d.H, fixed: d.items.map(i => Object.assign({}, i)) } });
     Store.save();
   }
@@ -414,11 +412,11 @@
     title: 'แก้ไขปรับปรุง', nav: 'beo',
     render() {
       if (!isAdmin()) return '<div class="card pad" style="max-width:520px;margin:40px auto;text-align:center"><h2>เฉพาะผู้ดูแลระบบ</h2><p class="muted">หน้าแก้ไขปรับปรุงผังห้องเปิดได้เฉพาะผู้ดูแลระบบ</p><a class="btn ghost" href="#/beo">กลับ</a></div>';
-      App.state.ui.fpSetup = null; // rebuild from the shared settings on every render
+      refreshWork(); // nothing unsaved: follow the shared settings
       const d = setupDoc(), id = d.room, sizes = floor().sizes || {};
       histSync();
       return `<div class="page-hd"><div><div class="small"><a class="link" href="#/beo">← ใบฟังก์ชัน</a></div><h1>แก้ไขปรับปรุง</h1><div class="small muted">ขนาดห้อง ของในห้องที่ห้ามย้าย และขนาดมาตรฐานของสิ่งของ — ใช้กับทุกผังงานของห้องนั้น</div></div>
-        <div class="row wrap">${undoBtn()}<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button></div></div>
+        <div class="row wrap">${saveBar()}${undoBtn()}<button class="btn ghost" data-act="fpPng">ดาวน์โหลด PNG</button></div></div>
 <div class="row wrap" style="margin-bottom:14px">${D.MEETING_ROOMS.map(r => `<a class="chip ${r.id === id ? 'on' : ''}" href="#/plansetup/${r.id}">${H(r.th || r.name)}</a>`).join('')}</div>
 <div class="fp">
   <aside class="fp-side">
@@ -431,7 +429,7 @@
   </aside>
   <div class="fp-main">
     <div class="fp-paper"><svg id="fpSvg" viewBox="0 0 10 10" font-family="IBM Plex Sans Thai, Tahoma, sans-serif"></svg></div>
-    <div class="small muted" style="margin-top:8px">ของที่ห้ามย้าย ${d.items.length} ชิ้น · คลิกเพื่อเลือก · ลากคลุมบนพื้นที่ว่างเพื่อเลือกหลายชิ้น · ลากเพื่อย้าย · Delete ลบ · R หมุน · บันทึกอัตโนมัติ</div>
+    <div class="small muted" style="margin-top:8px">ของที่ห้ามย้าย ${d.items.length} ชิ้น · คลิกเพื่อเลือก · ลากคลุมบนพื้นที่ว่างเพื่อเลือกหลายชิ้น · ลากเพื่อย้าย · Delete ลบ · R หมุน · กด “บันทึกผังงาน” (Ctrl+S) เพื่อบันทึก</div>
     <section class="card" style="margin-top:16px;overflow:hidden">
       <div class="card-hd"><div><h2>ขนาดมาตรฐานของสิ่งของ</h2><div class="small muted">ใช้กับของที่ไม่ได้ตั้งขนาดเฉพาะชิ้น ในทุกห้อง (เมตร) · โต๊ะยาว แถวเก้าอี้ และโต๊ะห้องเรียน ยาวตามจำนวนที่นั่ง</div></div></div>
       <div style="overflow-x:auto"><table class="tbl"><thead><tr><th>สิ่งของ</th><th>กว้าง</th><th>ลึก</th><th class="r"></th></tr></thead><tbody>
@@ -451,8 +449,8 @@
   const saveSoon = U.debounce(save, 600);
   App.INP.fpText = el => { const p = P(), list = p ? picked(p) : []; if (!list.length) return; list.forEach(it => { if (it.type === 'text') it.label = el.value.slice(0, 80); }); drawSvg(); saveSoon(); };
   Object.assign(App.CHG, {
-    fsW(el) { const d = setupDoc(); d.W = Math.max(4, Math.min(80, Number(el.value) || d.W)); saveSetup(); record(); App.render(); },
-    fsH(el) { const d = setupDoc(); d.H = Math.max(4, Math.min(80, Number(el.value) || d.H)); saveSetup(); record(); App.render(); },
+    fsW(el) { const d = setupDoc(); d.W = Math.max(4, Math.min(80, Number(el.value) || d.W)); touchWork(); record(); App.render(); },
+    fsH(el) { const d = setupDoc(); d.H = Math.max(4, Math.min(80, Number(el.value) || d.H)); touchWork(); record(); App.render(); },
     fsSize(el) { const t = el.dataset.t, k = Number(el.dataset.k), v = Math.max(0.1, Math.min(40, Number(el.value) || 0.1)); setSizes(z => { const cur = sizeOf(t).slice(); cur[k] = v; if (t === 'round') cur[1] = v; z[t] = cur; }); }
   });
   App.ACT.fsReset = el => setSizes(z => { delete z[el.dataset.t]; });
@@ -515,7 +513,61 @@
       ${actions}${tip}`;
   }
   const setupMode = () => App.state.route === 'plansetup';
-  const P = () => setupMode() ? setupDoc() : planOf(curBeo(), dayOf());
+  /* ---------- working copy: edits stay on this device until “บันทึกผังงาน” ---------- */
+  // W = { key, data, base (JSON of what was saved when editing began), restored }; a draft is also kept in this
+  // browser's storage, so closing the app by mistake does not lose the work
+  let W = null;
+  const DKEY = 'lsSales.fpDraft:';
+  const draftGet = k => { try { return JSON.parse(localStorage.getItem(DKEY + k)); } catch (e) { return null; } };
+  const draftPut = (k, v) => { try { localStorage.setItem(DKEY + k, JSON.stringify(v)); } catch (e) { /* storage full: the copy in memory still holds */ } };
+  const draftDel = k => { try { localStorage.removeItem(DKEY + k); } catch (e) { /* ignore */ } };
+  const storedNow = () => setupMode() ? setupBuild(setupRoom()) : (planOf(curBeo(), dayOf()) || null);
+  function work() {
+    const k = histKey();
+    if (!W || W.key !== k) {
+      const base = JSON.stringify(storedNow()), d = draftGet(k), useD = !!(d && typeof d.base === 'string' && JSON.stringify(d.data) !== d.base);
+      W = { key: k, base: useD ? d.base : base, data: useD ? d.data : JSON.parse(base), restored: useD ? d.at || '' : null };
+      if (d && !useD) draftDel(k);
+    }
+    return W;
+  }
+  const isDirty = () => !!W && (App.state.route === 'plan' || setupMode()) && W.key === histKey() && JSON.stringify(W.data) !== W.base;
+  function refreshWork() { if (W && W.key === histKey() && !isDirty()) W = null; }
+  function saveBarIn() {
+    const d = isDirty();
+    return (d ? `<span class="small red" style="font-weight:600">มีการแก้ไขที่ยังไม่บันทึก${W.restored != null ? ' (กู้คืนจากครั้งก่อน)' : ''}</span><button class="btn ghost" data-act="fpDiscard">ยกเลิกการแก้ไข</button>` : '<span class="small muted">บันทึกแล้ว</span>')
+      + `<button class="btn red" data-act="fpSave" ${d ? '' : 'disabled'} title="บันทึกผังงาน (Ctrl+S)">บันทึกผังงาน</button>`;
+  }
+  const saveBar = () => `<span id="fpSaveBar" class="row wrap" style="gap:8px">${saveBarIn()}</span>`;
+  function touchWork() {
+    const w = work();
+    if (isDirty()) draftPut(w.key, { data: w.data, base: w.base, at: U.nowTH() }); else draftDel(w.key);
+    const bar = document.getElementById('fpSaveBar'); if (bar) bar.innerHTML = saveBarIn();
+  }
+  function discardWork() { if (W) draftDel(W.key); W = null; hist = { key: null, stack: [], last: null }; sel = []; }
+  Object.assign(App.ACT, {
+    fpSave() {
+      if (!isDirty() || !(setupMode() ? isAdmin() : canEdit())) return;
+      const w = W, go = () => {
+        const data = JSON.parse(JSON.stringify(w.data));
+        if (setupMode()) saveSetup(data);
+        else { const b = curBeo(), k = pkey(dayOf(), roomParam()); b.plans = b.plans || {}; if (data) b.plans[k] = data; else delete b.plans[k]; Store.save(); }
+        draftDel(w.key); W = null; App.render(); App.toast('บันทึกผังงานแล้ว');
+      };
+      // someone else saved this plan while it was being edited here
+      if (JSON.stringify(storedNow()) !== w.base) App.confirm('มีผู้อื่นบันทึกผังนี้ระหว่างที่คุณแก้ไข · บันทึกผังของคุณทับไหม?', go, 'บันทึกทับ'); else go();
+    },
+    fpDiscard() { if (isDirty()) App.confirm('ทิ้งการแก้ไขที่ยังไม่บันทึก แล้วกลับไปใช้ผังที่บันทึกไว้?', () => { discardWork(); App.render(); App.toast('กลับไปใช้ผังที่บันทึกไว้แล้ว'); }, 'ทิ้งการแก้ไข'); }
+  });
+  // leaving the page (another page, another day or room) with unsaved changes: ask first
+  App.leaveGuard = (to, from) => {
+    if (!isDirty()) return true;
+    history.replaceState(null, '', from);
+    App.confirm('ผังงานยังไม่ได้บันทึก · ออกจากหน้านี้และทิ้งการแก้ไข?', () => { discardWork(); location.hash = to; }, 'ทิ้งการแก้ไข');
+    return false;
+  };
+  window.addEventListener('beforeunload', e => { if (isDirty()) { e.preventDefault(); e.returnValue = ''; } });
+  const P = () => work().data;
   function drawSvg() {
     const p = P(), s = document.getElementById('fpSvg'); if (!p || !s) return;
     const b = build(p, sel, setupMode()); s.setAttribute('viewBox', `0 0 ${b.vw} ${b.vh}`);
@@ -527,7 +579,7 @@
     if (el) el.innerHTML = selPanel(p);
     if (w && !setupMode()) w.innerHTML = warn(p, Number(Store.quote(curBeo().quoteId).pax) || 0);
   }
-  function save() { const p = P(); if (p) delete p.missing; if (setupMode()) saveSetup(); else Store.save(); record(); }
+  function save() { const p = P(); if (p) delete p.missing; touchWork(); record(); }
   function bindSvg() {
     const s = document.getElementById('fpSvg'); if (!s || !(setupMode() ? isAdmin() : canEdit()) || (!setupMode() && picOnly(P()))) return;
     const pos = e => { const pt = s.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const q = pt.matrixTransform(s.getScreenCTM().inverse()); return [(q.x - S) / S, (q.y - 2 * S) / S]; };
@@ -584,6 +636,7 @@
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || !P() || (!setupMode() && picOnly(P()))) return;
     if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) { e.preventDefault(); App.ACT.fpAll(); return; }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) { e.preventDefault(); App.ACT.fpUndo(); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); App.ACT.fpSave(); return; }
     if (!sel.length) return;
     if (e.key === 'Escape') App.ACT.fpNone();
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); App.ACT.fpDel(); }
@@ -618,9 +671,9 @@
   function setPlan(p) {
     const b = curBeo(); b.plans = b.plans || {};
     // a new layout keeps the uploaded picture, as the background under it (the drawn plan is what is wanted now)
-    const old = planOf(b, dayOf()), bgi = bgOf(old);
+    const old = P(), bgi = bgOf(old);
     if (bgi && !p.bg) { p.bg = Object.assign({}, bgi); delete p.bg.only; }
-    b.plans[pkey(dayOf(), roomParam())] = p; sel = []; Store.save(); record(); App.render();
+    work().data = p; sel = []; touchWork(); record(); App.render();
     if (p.missing) App.toast(`วางไม่พอ ${p.missing} โต๊ะ — ปรับผังเพิ่มเติมได้`);
   }
   // apply a change to every selected item
@@ -649,8 +702,9 @@
     fpUndo() {
       histSync(); if (!hist.stack.length) return;
       const prev = hist.stack.pop(), data = JSON.parse(prev);
-      if (setupMode()) { const d = setupDoc(); Object.assign(d, { W: data.W, H: data.H, items: data.items }); saveSetup(); }
-      else { const b = curBeo(), k = pkey(dayOf(), roomParam()); b.plans = b.plans || {}; if (data) b.plans[k] = data; else delete b.plans[k]; Store.save(); }
+      if (setupMode()) Object.assign(setupDoc(), { W: data.W, H: data.H, items: data.items });
+      else work().data = data;
+      touchWork();
       hist.last = prev; sel = []; App.render(); App.toast('ย้อนกลับแล้ว');
     },
     fpTplNew() {
