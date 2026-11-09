@@ -94,6 +94,8 @@
       return { route: route || 'home', params };
     },
     render() {
+      // a page with unsaved work (the floor plan) may stop the move to another page
+      if (App.leaveGuard && App.state._sameRoute && location.hash !== App.state._sameRoute && App.leaveGuard(location.hash, App.state._sameRoute) === false) return;
       const { route, params } = App.parse();
       const cloud = g.API && g.API.online;
       if (cloud && g.API.setup && route !== 'setup') { location.replace('#/setup'); return; }
