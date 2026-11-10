@@ -28,8 +28,10 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await go('#/food'); await shot('food'); await click('[data-act=fcEdit]:not([data-v])'); await shot('food-cats'); await close(); await click('[data-act=foodEdit]'); await shot('food-edit'); await close();
     await go('#/quotes'); await shot('quotes');
     await go('#/quote/QT-2611-042'); await shot('quote-edit');
-    // admin approves the quotation → tentative, yellow box
-    await p.evaluate(() => { const q = Store.quote('QT-2611-042'); delete q.bookOk; q.status = 'sent'; App.render(); }); await click('[data-act=qBookOk]'); await click('.modal-bg .acts .btn:last-child');
+    // sales sends it for approval (รออนุมัติ) → the admin approves it → tentative, yellow box
+    await p.evaluate(() => { const q = Store.quote('QT-2611-042'); delete q.bookOk; delete q.okBack; q.status = 'draft'; App.render(); }); await click('[data-act=qAskOk]'); await click('.modal-bg .acts .btn:last-child');
+    await p.evaluate(() => document.querySelector('section.card:has([data-act=qBookOk])').scrollIntoView({ block: 'center' })); await shot('quote-ask');
+    await click('[data-act=qBookOk]'); await click('.modal-bg .acts .btn:last-child');
     await p.evaluate(() => document.querySelector('section.card:has([data-act=qStatus])').scrollIntoView({ block: 'center' })); await shot('quote-approve');
     await go('#/doc/QT-2611-042'); await shot('quote-doc'); await click('[data-act=docVer][data-v="1"]'); await shot('quote-doc-full'); await click('[data-act=qdTab][data-v=edit]'); await shot('quote-doc-edit');
     await click('[data-act=qdCancel]'); await click('[data-act=docVer][data-v="0"]');
@@ -40,11 +42,11 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     for (let i = 2; i <= 5; i++) { await click('[data-act=wizNext]'); await W(300); const e = await p.$('[data-act=wizSel]'); if (e && await e.isVisible()) { await e.click().catch(() => {}); await W(250); await close(); } await shot('wiz' + i); }
     await go('#/beo'); await shot('beo-list');
     await go('#/beo/FS-2611-018'); await shot('beo'); await click('[data-act=btFold][data-k=guests]'); await click('[data-act=btFold][data-k=kinds]'); await click('[data-act=btPick][data-k=guests][data-v=g4]'); await click('[data-act=btPick][data-k=kinds][data-v=k6]'); await p.evaluate(() => document.querySelector('.bt-grid').scrollIntoView({ block: 'center' })); await shot('beo-tags');
-    await go('#/plan/FS-2611-018/1'); await click('[data-act=fpAuto]'); await shot('plan');
+    await go('#/plan/FS-2611-018/1'); await click('[data-act=fpAuto]'); await shot('plan'); await click('[data-act=fpSave]');
     // a text box, selected: rotate handle and the 15 / 45 / 90 / 180 buttons
     await click('[data-act=fpAdd][data-v=text]'); await p.keyboard.type({ th: 'ทางเข้า VIP', en: 'VIP entrance', my: 'VIP ဝင်ပေါက်' }[L]); await W(700); await click('[data-act=fpRot][data-v="45"]');
     await p.setViewportSize({ width: 1280, height: 1820 }); await p.evaluate(() => window.scrollTo(0, 0)); await shot('plan-tools'); await p.setViewportSize({ width: 1280, height: 820 });
-    await click('[data-act=fpDel]');
+    await click('[data-act=fpDel]'); await click('[data-act=fpSave]');
     // a floor-plan picture used as the plan (drawn here on a canvas; in real use it is an uploaded .jpg)
     await p.evaluate(() => {
       const c = document.createElement('canvas'); c.width = 1200; c.height = 900; const x = c.getContext('2d');
@@ -56,7 +58,8 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     }); await W(500); await p.evaluate(() => window.scrollTo(0, 0)); await shot('plan-image');
     await p.evaluate(() => { const b = Store.db.beos.find(z => z.id === 'FS-2611-018'), pl = b.plans['1'] || Object.values(b.plans)[0]; delete pl.bg; Store.save(); App.render(); });
     await go('#/plansetup'); await shot('plansetup');
-    await go('#/fn/FS-2611-018'); await shot('fn'); await click('[data-act=fnSave]'); await shot('fn-save'); await close();
+    await go('#/fn/FS-2611-018'); await shot('fn');
+    await p.evaluate(() => { const r = document.querySelector('.fnf-t th.st'); if (r) { const tr = r.closest('tr'); (tr.previousElementSibling || tr).scrollIntoView({ block: 'start' }); window.scrollBy(0, -20); } }); await shot('fn-front'); await click('[data-act=fnSave]'); await shot('fn-save'); await close();
     await go('#/ss/FS-2611-018'); await click('[data-act=ssTab][data-v=form]'); await shot('ss');
     await go('#/cal'); await click('[data-act=calNav][data-v="1"]'); await shot('cal-month'); await click('[data-act=calView][data-v=week]'); await shot('cal-week'); await click('[data-act=calView][data-v=pipe]'); await shot('cal-pipe');
     await go('#/staff'); await click('[data-act=stTab][data-v=shifts]'); await shot('staff-shifts'); await click('[data-act=stAssign]'); await shot('staff-assign'); await close();

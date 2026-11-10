@@ -134,7 +134,7 @@ main{padding:28px 32px 48px;max-width:1440px;margin:0 auto}
 .seg button.on{background:var(--ink);color:#fff}
 .badge{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .st-draft{background:var(--gray-soft);color:var(--ink2)}
-.st-sent{background:var(--yellow-soft);color:#7a5c00}
+.st-sent,.st-pending{background:var(--yellow-soft);color:#7a5c00}
 .st-tentative{background:var(--red-soft);color:var(--red-d)}
 .st-hold{background:#FFE08A;color:#6B4E00}
 .st-confirmed{background:var(--teal-soft);color:var(--teal-d)}
