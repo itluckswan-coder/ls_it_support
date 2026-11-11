@@ -618,11 +618,40 @@
   };
   App.ACT.openQuote = el => App.go('#/quote/' + encodeURIComponent(el.dataset.id));
 
+  /* ---------- the live site cannot reach its server ---------- */
+  function downScreen(root) {
+    const T = s => (g.I18N && g.I18N.t ? g.I18N.t(s) : s);
+    let wait = 10, left = wait, timer = null;
+    const draw = () => {
+      if (!root) return;
+      root.innerHTML = `<div class="down-wrap" role="alert"><div class="down-card card pad">
+        <div class="down-ico">!</div>
+        <h1>${H(T('เชื่อมต่อระบบไม่ได้'))}</h1>
+        <p class="muted">${H(T('ตอนนี้ระบบงานขายติดต่อเซิร์ฟเวอร์ไม่ได้ จึงยังเปิดข้อมูลไม่ได้ — ข้อมูลในระบบไม่ได้หาย'))}</p>
+        <div class="note red" style="text-align:left">${H(T('สาเหตุ'))}: ${H(T(g.API.down || '-'))}</div>
+        <p class="small muted" style="margin-top:12px">${H(T('ระบบจะลองเชื่อมต่อใหม่เองและเปิดให้อัตโนมัติเมื่อกลับมาปกติ'))} · <span id="downLeft">${left}</span> ${H(T('วินาที'))}</p>
+        <button class="btn red" id="downRetry" style="margin-top:6px">${H(T('ลองใหม่ตอนนี้'))}</button>
+        <p class="xs muted" style="margin-top:14px">${H(T('ถ้าเป็นนานเกิน 30 นาที แจ้งทีม IT · ถ้าเกิดช่วงเช้า อาจเป็นโควตาฐานข้อมูลรายวันเต็ม ซึ่งจะกลับมาเองหลัง 07:00 น.'))}</p>
+      </div></div>`;
+      const b = document.getElementById('downRetry'); if (b) b.onclick = () => tryNow();
+    };
+    const tick = () => { left--; const s = document.getElementById('downLeft'); if (s) s.textContent = Math.max(0, left); if (left <= 0) tryNow(); else timer = setTimeout(tick, 1000); };
+    const tryNow = async () => {
+      clearTimeout(timer);
+      const b = document.getElementById('downRetry'); if (b) { b.disabled = true; b.textContent = T('กำลังเชื่อมต่อ…'); }
+      if (await g.API.detect()) { location.reload(); return; }
+      wait = Math.min(wait * 2, 120); left = wait; draw(); timer = setTimeout(tick, 1000);
+    };
+    draw(); timer = setTimeout(tick, 1000);
+  }
+
   /* ---------- boot ---------- */
   async function boot() {
     const root = document.getElementById('app');
     if (root) root.innerHTML = '<div class="empty" style="padding-top:30vh">กำลังโหลด…</div>';
     const cloud = g.API ? await g.API.detect() : false;
+    // the live site could not reach its server: say so and keep trying, never show this device's own (sample) data
+    if (!cloud && g.API && g.API.down) { downScreen(root); return; }
     if (cloud) {
       try { const raw = localStorage.getItem(Store.KEY); Store.db = raw ? JSON.parse(raw) : null; } catch (e) { Store.db = null; }
       if (!Store.db) Store.db = { v: 1, settings: Store.seedData().settings, users: [], quotes: [], beos: [], employees: [], staff: {}, tasks: [], seq: {} };
