@@ -21,6 +21,10 @@
     other: { name: 'รายรับอื่นๆ', cols: ['ราคา', 'จำนวน', 'ครั้ง/วัน'], cats: [['other', 'อื่นๆ', 'Other']] }
   };
   const total = r => Math.round(num(r.price) * num(r.a) * (r.b === '' || r.b == null ? 1 : num(r.b)) * 100) / 100;
+  // อภินันทนาการ (complimentary) rows are shown for reference only and never added to the totals
+  const counted = r => r.cat !== 'comp';
+  const ncNote = '<div class="ssf-ncl">ไม่นำมาคิดรวม</div>';
+  const totalCell = r => counted(r) ? money(total(r)) : `<span class="ssf-nc">${money(total(r))}</span>${ncNote}`;
 
   /* ---------- rows from the quote (prices including discount, service charge and VAT) ---------- */
   function autoRows(q) {
@@ -45,7 +49,7 @@
   function data(b, q) {
     const s = b.ss || {}, auto = autoRows(q);
     const rows = Array.isArray(s.rows) ? s.rows : auto;
-    const sum = rows.reduce((a, r) => a + total(r), 0), ov = num(s.ov);
+    const sum = rows.filter(counted).reduce((a, r) => a + total(r), 0), ov = num(s.ov);
     const owner = Store.db.users.find(u => u.id === q.owner);
     return { s, rows, custom: Array.isArray(s.rows), sum, ov, received: sum + ov, no: (App.fnNo && App.fnNo(b)) || b.id, sales: owner ? owner.name : '-', inv: s.inv || [], invSum: (s.inv || []).reduce((a, x) => a + num(x.amt), 0) };
   }
@@ -57,7 +61,7 @@
         return `<tr class="ssf-cat"><td class="l" rowspan="${Math.max(1, rs.length)}"><b>${th}</b><br><small>(${en})</small></td>${rs.length ? row1(rs[0]) : '<td></td><td></td><td></td><td></td>'}</tr>${rs.slice(1).map(r => `<tr>${row1(r)}</tr>`).join('')}`; }).join('')}
       ${k === 'other' ? `<tr><td class="l"><b>OV</b></td><td colspan="2" class="r">${d.ov ? money(d.ov) + ' บาท' : 'บาท'}</td><td class="r">${H(d.s.ovPct || '')} %</td><td></td></tr>` : ''}
       </tbody></table>`; };
-    const row1 = r => `<td class="r"><div class="ssf-lbl">${H(r.label || '')}</div>${r.price === '' ? '' : money(r.price)}</td><td class="r">${H(String(r.a == null ? '' : r.a))}</td><td class="r">${H(String(r.b == null ? '' : r.b))}</td><td class="r b">${money(total(r))}</td>`;
+    const row1 = r => `<td class="r"><div class="ssf-lbl">${H(r.label || '')}</div>${r.price === '' ? '' : money(r.price)}</td><td class="r">${H(String(r.a == null ? '' : r.a))}</td><td class="r">${H(String(r.b == null ? '' : r.b))}</td><td class="r b">${totalCell(r)}</td>`;
     return `<div class="ssf-paper" id="ssPaper">
   <h2>ใบสรุปรายละเอียดงานฟังก์ชั่น</h2>
   <div class="ssf-kv"><b>ฟังก์ชั่น เลขที่ :</b> <span>${H(d.no)}</span></div>
@@ -92,7 +96,7 @@
         <td><input class="input r" inputmode="decimal" value="${r.price === '' ? '' : Math.round(num(r.price) * 100) / 100}" data-change="ssRow" data-i="${i}" data-k="price" aria-label="ราคา"></td>
         <td><input class="input r" inputmode="decimal" value="${H(String(r.a == null ? '' : r.a))}" data-change="ssRow" data-i="${i}" data-k="a" aria-label="จำนวน"></td>
         <td><input class="input r" inputmode="decimal" value="${H(String(r.b == null ? '' : r.b))}" data-change="ssRow" data-i="${i}" data-k="b" aria-label="จำนวน"></td>
-        <td class="r b num">${money(total(r))}</td><td><button class="icon-btn us-edit emp-del" data-act="ssDel" data-i="${i}" aria-label="ลบแถว">×</button></td></tr>`;
+        <td class="r b num">${totalCell(r)}</td><td><button class="icon-btn us-edit emp-del" data-act="ssDel" data-i="${i}" aria-label="ลบแถว">×</button></td></tr>`;
       const secEd = k => { const S = SEC[k]; return `<section class="card" style="overflow:hidden;margin-bottom:14px"><div class="card-hd"><h2>${S.name}</h2></div><div style="overflow-x:auto"><table class="tbl ss-ed">
         <thead><tr><th>รายการ</th><th class="r">${S.cols[0]}</th><th class="r">${S.cols[1]}</th><th class="r">${S.cols[2]}</th><th class="r">รวม</th><th></th></tr></thead><tbody>
         ${S.cats.map(([cat, th, en]) => `<tr class="ss-cat"><td colspan="6"><b>${th}</b> <span class="xs muted">${en}</span> <button class="link xs" data-act="ssAdd" data-s="${k}" data-c="${cat}">+ เพิ่มแถว</button></td></tr>` +
