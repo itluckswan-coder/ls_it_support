@@ -1088,3 +1088,6 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .down-card{max-width:520px;width:100%;text-align:center}
 .down-card h1{margin:10px 0 6px}
 .down-ico{width:56px;height:56px;border-radius:50%;margin:0 auto;background:var(--red);color:#fff;font-size:32px;font-weight:800;line-height:56px}
+/* sales summary: อภินันทนาการ rows are not added to the totals */
+.ssf-nc{color:#888;font-weight:400}
+.ssf-ncl{font-size:10px;font-weight:400;color:#888;white-space:nowrap}
