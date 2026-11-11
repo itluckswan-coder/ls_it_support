@@ -50,17 +50,26 @@
   const userView = u => JSON.stringify({ name: u.name, email: u.email, role: u.role, roleId: u.roleId || '', dept: u.dept, phone: u.phone || '', status: u.status, twoFA: !!u.twoFA, perms: u.perms || {}, sites: u.sites || [] });
 
   const API = {
-    online: false, setup: false, token: null, serverTime: null, offline: false,
+    online: false, setup: false, token: null, serverTime: null, offline: false, serverErr: false, down: null,
+    // the live site (any address but a local test one or GitHub Pages) never falls back to this device's own data
+    isReal() {
+      const h = location.hostname;
+      return /^https?:/.test(location.protocol) && !/\.github\.io$/.test(h) && !/^(localhost|127\.|10\.|192\.168\.|0\.0\.0\.0|\[?::1\]?$)/.test(h);
+    },
     ver: {}, snap: {}, userSnap: {}, beoPrev: {}, pushing: false, again: false, timer: null, poller: null,
 
     async detect() {
       if (!/^https?:/.test(location.protocol) || /\.github\.io$/.test(location.hostname)) return false;
+      this.down = null;
       try {
         const r = await fetch('api/health', { cache: 'no-store' });
-        if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) return false;
+        if (!r.ok || !/json/.test(r.headers.get('content-type') || '')) {
+          if (this.isReal()) { let m = ''; try { const j = await r.json(); m = j.message || j.error || ''; } catch (e) { /* not JSON */ } this.down = 'เซิร์ฟเวอร์ตอบกลับผิดปกติ (' + r.status + ')' + (m ? ' · ' + String(m).slice(0, 160) : ''); }
+          return false;
+        }
         const j = await r.json();
         this.online = !!j.ok; this.setup = !!j.setup;
-      } catch (e) { this.online = false; }
+      } catch (e) { this.online = false; if (this.isReal()) this.down = 'ติดต่อเซิร์ฟเวอร์ไม่ได้ (อินเทอร์เน็ตหรือเซิร์ฟเวอร์ขัดข้อง)'; }
       if (this.online) {
         Store.KEY = 'lsSales.cloud';
         try { this.token = localStorage.getItem(TOKEN) || sessionStorage.getItem(TOKEN); } catch (e) { /* ignore */ }
@@ -74,6 +83,7 @@
       try { r = await fetch('api/' + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); }
       catch (e) { this.setOffline(true); const err = new Error('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้'); err.network = true; throw err; }
       this.setOffline(false);
+      this.setServerErr(r.status >= 500);
       const j = await r.json().catch(() => ({}));
       if (r.status === 401 && path !== 'login') { this.expired(j.error); const err = new Error(j.error || 'กรุณาเข้าสู่ระบบ'); err.status = 401; throw err; }
       if (!r.ok) { const err = new Error(j.message || j.error || 'เกิดข้อผิดพลาด (' + r.status + ')'); err.status = r.status; err.body = j; throw err; }
@@ -84,6 +94,23 @@
       this.offline = v;
       if (g.App) g.App.toast(v ? 'ออฟไลน์ — การแก้ไขจะถูกส่งเมื่อกลับมาออนไลน์' : 'กลับมาออนไลน์แล้ว');
       if (!v) this.queuePush();
+      this.netBar();
+    },
+    // the server answers with an error (e.g. the database's daily limit): saving does not work until it recovers
+    setServerErr(v) {
+      if (this.serverErr === v) return;
+      this.serverErr = v;
+      if (!v && g.App) g.App.toast('เซิร์ฟเวอร์กลับมาปกติแล้ว');
+      this.netBar();
+    },
+    // a red bar on top while the server cannot be reached or keeps failing; it stays until things work again
+    netBar() {
+      let el = document.getElementById('netBar');
+      const msg = this.serverErr ? 'เซิร์ฟเวอร์ขัดข้อง — ตอนนี้บันทึกงานไม่ได้ กรุณาหยุดแก้ไขก่อน ระบบจะลองเชื่อมต่อใหม่เอง'
+        : this.offline ? 'ออฟไลน์ — การแก้ไขเก็บไว้ในเครื่องนี้ และจะส่งเมื่อกลับมาออนไลน์ อย่าเพิ่งออกจากระบบ' : '';
+      if (!msg) { if (el) el.remove(); return; }
+      if (!el) { el = document.createElement('div'); el.id = 'netBar'; el.className = 'net-bar'; el.setAttribute('role', 'alert'); document.body.appendChild(el); }
+      el.textContent = g.I18N && g.I18N.t ? g.I18N.t(msg) : msg;
     },
     saveToken(token, remember) {
       this.token = token;
