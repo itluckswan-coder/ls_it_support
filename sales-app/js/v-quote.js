@@ -785,7 +785,9 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const typeOf = it => D.ROOM_TYPES.find(r => r.id === it.ref) || (it.ref ? null : D.ROOM_TYPES.filter(t => t.img && lc(it.name).includes(lc(famOf(t)))).sort((a, b) => famOf(b).length - famOf(a).length)[0]);
       const meetOf = it => D.MEETING_ROOMS.find(r => r.id === it.ref) || (it.ref ? null : D.MEETING_ROOMS.find(r => [r.th, String(r.th || '').replace(/^ห้อง/, ''), r.name].filter(x => x && x.length > 2).some(x => lc(it.name).includes(lc(x)))));
       const rKey = it => { if (it.sec === 'meet') { const m = meetOf(it); return m ? 'm.' + m.id : ik(it); } const t = typeOf(it); return t ? 'r.' + t.id : it.ref && it.ref !== 'late' ? 'r.' + it.ref : ik(it); };
-      const rSys = it => { if (it.sec === 'meet') { const m = meetOf(it); return m && m.img ? [m.img] : []; } const t = typeOf(it); return t && t.img ? [t.img] : []; };
+      // a room's photos: the ones set on the rooms page (✏️), else the built-in one; boutique rooms by their own ref
+      const rSys = it => { if (it.sec === 'meet') { const m = meetOf(it); return m && m.img ? [m.img] : []; } const t = typeOf(it); if (t) return App.roomPhotosFor ? App.roomPhotosFor(t.id) : t.img ? [t.img] : [];
+        const own = it.ref && App.roomPhotosFor ? App.roomPhotosFor(it.ref) : null; return own || []; };
       const roomPics = (it, i, all) => {
         if (it.ref === 'late' || it.free || all.findIndex(x => rKey(x) === rKey(it)) !== i) return '';
         // in the meeting section only room lines get a photo slot (not e.g. an LED screen)

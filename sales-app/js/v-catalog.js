@@ -282,6 +282,67 @@
     draw();
   }
 
+  /* ---------- guest-room photos (settings.roomPhotos[key] = list of photos; a missing key = the built-in photo) ----------
+   * keys: 'rf:<first type id>' a resort room family (all its bed types) · 'bq:<id>' a boutique base room ·
+   * 'bqn:<name · bed>' a boutique room of the price periods, by name, so every period with that room shares its photos */
+  const lcKey = x => String(x || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const RPH_DEF = {};
+  App.roomImgs = (key, def) => { const o = (((Store.db && Store.db.settings) || {}).roomPhotos || {})[key]; return Array.isArray(o) ? o : (def || []); };
+  App.famPhotoKey = fam => { const t = D.ROOM_TYPES.find(x => x.fam === fam); return 'rf:' + (t ? t.id : lcKey(fam)); };
+  // the photos for a quotation's room line (by its ref): a resort type → its family's, a boutique room → its own; null = none known
+  App.roomPhotosFor = ref => {
+    const t = D.ROOM_TYPES.find(x => x.id === ref);
+    if (t) { const list = D.ROOM_TYPES.filter(x => x.fam === t.fam), img = list.map(x => x.img).find(Boolean); return App.roomImgs(App.famPhotoKey(t.fam), img ? [img] : []); }
+    if (D.BOUTIQUE.rooms.some(r => r.id === ref)) return App.roomImgs('bq:' + ref, []);
+    for (const p of D.BOUTIQUE.periods || []) { const r = p.rooms.find(x => x.id === ref); if (r) return App.roomImgs('bqn:' + lcKey(r.name + ' · ' + r.bed), []); }
+    return null;
+  };
+  // the photo area of a room card: swipeable photos, the zone label, and ✏️ for price editors
+  function roomPhotoBox(key, def, label, name) {
+    RPH_DEF[key] = def;
+    const imgs = App.roomImgs(key, def);
+    return `<div class="rph">${imgs.length ? gallery({ id: key, name, imgs }, 'ph') : '<div class="ph"></div>'}<span class="zone rph-zone">${H(label)}</span>
+      ${imgs.length ? '' : `<span class="xs mono muted rph-none">รูปห้อง: ${H(name)}</span>`}
+      ${App.can('edit_prices') ? `<button type="button" class="mroom-edit rph-edit" data-act="rphEdit" data-k="${H(key)}" data-n="${H(name)}" title="แก้ไขรูปห้อง" aria-label="แก้ไขรูปห้อง ${H(name)}">${ICON.pen}</button>` : ''}</div>`;
+  }
+  function roomPhotoEditor(key, name) {
+    const def = RPH_DEF[key] || [], own = (((Store.db.settings || {}).roomPhotos || {})[key]);
+    const draft = (Array.isArray(own) ? own : def).slice();
+    let busy = 0, err = '';
+    const bg = App.modal('<div id="rphBody"></div>'), modal = bg.querySelector('.modal');
+    modal.style.maxWidth = '720px';
+    const draw = () => {
+      modal.querySelector('#rphBody').innerHTML = `<h2>รูปห้อง ${H(name)}</h2>
+        <div class="ce-photos">${draft.map((p, i) => `<div class="ce-ph"><img src="${H(p)}" alt="">${i ? '' : '<span class="me-cover">รูปหน้าปก</span>'}<button type="button" class="ce-ph-btn" data-rp="ph" data-i="${i}" aria-label="เปลี่ยนรูป"></button><button type="button" class="ce-x" data-rp="del" data-i="${i}" aria-label="ลบรูป">${ICON.x}</button>${i ? `<button type="button" class="me-left" data-rp="left" data-i="${i}" aria-label="เลื่อนไปซ้าย">‹</button>` : ''}</div>`).join('')}
+          <button type="button" class="ce-add-ph" data-rp="add">+ อัปโหลดรูป<small>เลือกได้หลายรูป</small></button></div>
+        <div class="xs muted" style="margin-top:6px">เลือกได้หลายรูป (.jpg .png) · รูปแรกเป็นรูปหน้าปก · กด ‹ เพื่อเลื่อนลำดับ · กดที่รูปเพื่อเปลี่ยน · ระบบย่อรูปให้อัตโนมัติ</div>
+        <div class="small red" style="min-height:20px;margin-top:8px" role="alert">${H(err)}</div>
+        ${busy ? `<div class="small teal">กำลังอัปโหลดรูป ${busy} รูป…</div>` : ''}
+        <div class="acts" style="flex-wrap:wrap">${Array.isArray(own) ? `<button type="button" class="btn ghost" data-rp="reset" style="margin-right:auto">ใช้รูปเดิม${def.length ? '' : ' (ไม่มีรูป)'}</button>` : ''}<button type="button" class="btn ghost" data-act="closeModal">ยกเลิก</button><button type="button" class="btn red" data-rp="save" ${busy ? 'disabled' : ''}>บันทึก</button></div>`;
+    };
+    async function upload(files, put) {
+      if (!files.length) return;
+      busy += files.length; err = ''; draw();
+      for (const f of files) { try { put(await g.CatalogImages.storeImage(f)); } catch (e) { err = e.message || 'อัปโหลดรูปไม่สำเร็จ'; } busy--; draw(); }
+    }
+    const save = list => {
+      const st = Store.db.settings || (Store.db.settings = {}), all = Object.assign({}, st.roomPhotos);
+      if (list) all[key] = list.slice(0, 12); else delete all[key];
+      st.roomPhotos = all; Store.save(); App.closeModal(); App.render();
+    };
+    modal.addEventListener('click', async e => {
+      const b = e.target.closest('[data-rp]'); if (!b) return;
+      const i = Number(b.dataset.i), act = b.dataset.rp;
+      if (act === 'add') upload(await g.CatalogImages.pickFiles(true), url => draft.push(url));
+      if (act === 'ph') upload(await g.CatalogImages.pickFiles(false), url => { draft[i] = url; });
+      if (act === 'del') { draft.splice(i, 1); draw(); }
+      if (act === 'left') { [draft[i - 1], draft[i]] = [draft[i], draft[i - 1]]; draw(); }
+      if (act === 'reset') { save(null); App.toast('กลับไปใช้รูปเดิมของ ' + name + ' แล้ว'); }
+      if (act === 'save') { if (busy) return; save(draft); App.toast('บันทึกรูปห้อง ' + name + ' แล้ว'); }
+    });
+    draw();
+  }
+
   /* swipeable photo gallery of a meeting room (scroll-snap; arrows and dots on a computer) */
   const EMPTY_PH = 'repeating-linear-gradient(135deg,#dff3ef 0 10px,#cfeee8 10px 20px)';
   function gallery(room, cls) {
@@ -373,7 +434,10 @@
     meetSel(el) { App.state.ui.meet.sel = el.dataset.v; App.render(); if (window.innerWidth <= 1100) document.querySelector('aside.card')?.scrollIntoView({ behavior: 'smooth' }); },
     meetHalf(el) { App.state.ui.meet.half = el.dataset.v === '1'; App.render(); },
     // the photo on show, full screen
-    meetZoom(el) { const mg = el.closest('.mg'), room = D.MEETING_ROOMS.find(r => r.id === mg.dataset.room), tr = mg.querySelector('.mg-track'); if (room) App.lightbox(room.imgs || [], Math.round(tr.scrollLeft / (tr.clientWidth || 1)), room.th || room.name); },
+    meetZoom(el) { const mg = el.closest('.mg'), room = D.MEETING_ROOMS.find(r => r.id === mg.dataset.room), tr = mg.querySelector('.mg-track'), at = Math.round(tr.scrollLeft / (tr.clientWidth || 1));
+      if (room) App.lightbox(room.imgs || [], at, room.th || room.name);
+      else App.lightbox(App.roomImgs(mg.dataset.room, RPH_DEF[mg.dataset.room]), at, ''); },
+    rphEdit(el) { if (App.can('edit_prices')) roomPhotoEditor(el.dataset.k, el.dataset.n); },
     meetGal(el) { const tr = el.closest('.mg').querySelector('.mg-track'), n = tr.children.length, i = Math.round(tr.scrollLeft / tr.clientWidth) + Number(el.dataset.d); tr.scrollTo({ left: ((i + n) % n) * tr.clientWidth, behavior: 'smooth' }); },
     meetEdit(el) { if (App.can('edit_prices')) meetEditor(el.dataset.v); },
     meetAdd() {
@@ -476,7 +540,7 @@
       const card = fam => {
         const list = D.ROOM_TYPES.filter(t => t.fam === fam), t = list[0], on = list.some(x => ui.counts[x.id] > 0);
         return `<article class="card rcard ${on ? 'on' : ''}">
-      <div class="ph" style="${t.img ? `background-image:url(${t.img})` : ''}"><span class="zone">${H(t.zone)}</span>${t.img ? '' : `<span class="xs mono muted" style="position:absolute;left:12px;bottom:10px">รูปห้อง: ${H(fam)}</span>`}</div>
+      ${roomPhotoBox(App.famPhotoKey(fam), (img => img ? [img] : [])(list.map(x => x.img).find(Boolean)), t.zone, fam)}
       <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(fam)}</h3>${list.length > 1 ? '' : `<span class="badge">${H(t.bed)}</span>`}</div>
         ${t.desc && list.length === 1 ? `<div class="small" style="margin-top:4px">${H(t.desc)}</div>` : ''}
         <div class="small muted" style="margin:4px 0 6px">${list.length > 1 ? list.length + ' แบบเตียง · ' + list.reduce((a, x) => a + x.total, 0) + ' ห้อง' : 'มี ' + t.total + ' ห้อง · ราคาสำหรับ ' + t.pax + ' ท่าน'} · ${ui.abf ? 'รวมอาหารเช้า' : 'ไม่รวมอาหารเช้า'}</div>
@@ -511,10 +575,10 @@ ${sitePick}
    * in one, else the three base rooms with congee, coffee and crackers for 2 */
   function bqRooms(ui) {
     const B = D.BOUTIQUE, per = D.bqPeriod(ui.ci);
-    if (!per) return { per: null, rooms: B.rooms.map(r => Object.assign({ pax: 2, incl: 'รวม' + B.incl }, r)), tier: 0, tot: B.rooms.reduce((a, r) => a + (ui.bq[r.id] || 0), 0) };
+    if (!per) return { per: null, rooms: B.rooms.map(r => Object.assign({ pax: 2, incl: 'รวม' + B.incl, pkey: 'bq:' + r.id }, r)), tier: 0, tot: B.rooms.reduce((a, r) => a + (ui.bq[r.id] || 0), 0) };
     const tot = per.rooms.reduce((a, r) => a + (ui.bq[r.id] || 0), 0), tier = D.bqTier(per, Math.max(1, tot));
     const incl = per.basis === 'RB' ? 'รวมอาหารเช้า' : 'Room Only (ไม่รวมอาหารเช้า)';
-    return { per, tier, tot, rooms: per.rooms.map(r => ({ id: r.id, name: r.name + (r.bed ? ' · ' + r.bed : ''), pax: r.pax, price: r.prices[tier] || 0, incl })) };
+    return { per, tier, tot, rooms: per.rooms.map(r => ({ id: r.id, name: r.name + (r.bed ? ' · ' + r.bed : ''), pkey: 'bqn:' + lcKey(r.name + ' · ' + r.bed), pax: r.pax, price: r.prices[tier] || 0, incl })) };
   }
   const tierLabel = (p, i) => (i ? p.tiers[i - 1] + 1 : 1) + '–' + p.tiers[i];
   /* the boutique: rooms (see bqRooms); breakfast and a dinner party per person on top */
@@ -526,7 +590,7 @@ ${sitePick}
     const bf = meal('bf', 'อาหารเช้า (ซื้อเพิ่ม)', B.breakfast, 'มื้อ'), dn = meal('dn', 'อาหารเย็นงานเลี้ยง', B.dinner, 'มื้อ');
     const total = roomsAmt + bf.amt + dn.amt;
     const step = (act, k, v, label) => `<span class="stepper"><button class="minus" data-act="${act}" data-k="${k}" data-v="-1" aria-label="ลด ${H(label)}">−</button><input inputmode="numeric" value="${v}" data-change="${act}Set" data-k="${k}" aria-label="${H(label)}"><button class="plus" data-act="${act}" data-k="${k}" data-v="1" aria-label="เพิ่ม ${H(label)}">+</button></span>`;
-    const card = r => `<article class="card rcard ${cnt(r) ? 'on' : ''}"><div class="ph"><span class="zone">บูติก</span></div>
+    const card = r => `<article class="card rcard ${cnt(r) ? 'on' : ''}">${roomPhotoBox(r.pkey, [], 'บูติก', r.name)}
       <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(r.name)}</h3><span class="badge">${r.pax} ท่าน</span></div>
         <div class="small muted" style="margin:4px 0 6px">${H(r.incl)}</div>
         <div class="between" style="margin-top:6px"><div><span class="pr num">${U.n(r.price)} ฿</span><span class="small muted"> / ห้อง / คืน</span></div>${step('bqStep', r.id, cnt(r), 'จำนวนห้อง ' + r.name)}</div></div></article>`;
