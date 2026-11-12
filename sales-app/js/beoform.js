@@ -98,6 +98,7 @@
     v.sty = f.sty || {}; // text style per field (size, colour, weight…) from the edit toolbar
     v.more = f.more || {}; // lines added inside a cell with its corner "+": { field: [{ t: 'h'|'d', text }] }
     v.appr = a.appr; v.apprTitle = a.apprTitle; // always the real sign-off
+    v.stageImgs = Array.isArray(f.stageImgs) ? f.stageImgs : []; // pictures of the stage sign / banner, under its text
     // room blocks: a sheet whose room boxes were typed over before the split keeps one block, as it was typed
     if (legacyStays(f)) { for (const k of STAY_KEYS) v[k] = f[k] != null ? f[k] : a._legacy[k]; v.stays = 1; }
     else v.stays = Math.max(1, ...Array.from({ length: STAY_MAX }, (_, i) => STAY_KEYS.some(k => a[stayKey(k, i)] != null || f[stayKey(k, i)] != null) ? i + 1 : 0));
@@ -186,6 +187,12 @@
   /* ---------- the paper form ----------
    * ed = the system values while editing: every value cell becomes a box you type into, right on the sheet */
   function paper(v, extra = [], ed = null) {
+    // pictures of the stage sign / banner (ป้ายข้อความบนเวที), under the text; added and removed in the edit tab
+    const stagePics = () => {
+      const l = v.stageImgs || []; if (!l.length && !ed) return '';
+      return `<div class="fnf-imgs">${l.map((u, i) => `<span class="fnf-img"><img src="${H(u)}" alt="ป้ายบนเวที ${i + 1}">${ed ? `<button type="button" class="fnf-rv red fnf-imgx no-print" data-act="fnStageImgDel" data-i="${i}" title="ลบรูป" aria-label="ลบรูป">✕</button>` : ''}</span>`).join('')}
+        ${ed && l.length < 4 ? '<button type="button" class="fnf-add no-print" data-act="fnStageImg">+ ใส่รูปป้าย</button>' : ''}</div>`;
+    };
     // lines added inside a cell (heading or detail) + the cell's corner "+" that adds them
     const more = (key, list = []) => ed
       ? list.map((it, j) => `<div class="fnf-ed fnf-more${it.t === 'h' ? ' fnf-hbar' : ''}"><button class="fnf-rv red" data-act="fnDCDel" data-key="${key}" data-j="${j}" title="ลบบรรทัดนี้">✕</button>${ce(`data-input="fnDC" data-key="${key}" data-j="${j}"`, it.text, it.rich, it.t === 'h' ? 'หัวข้อ' : 'รายละเอียดข้อมูล', it.t === 'h' ? 'b' : '', it.sty)}</div>`).join('')
@@ -252,7 +259,7 @@
   <table class="fnf-t">
     <tr><th colspan="2" class="sec">แผนกจัดเลี้ยง / ห้องอาหาร</th><th colspan="${mc}" class="sec">เมนูอาหาร${ed ? ' <button class="link xs" data-act="fnDMAdd">+ เพิ่มช่วงเวลา</button>' : ''}</th></tr>
     <tr><th>รูปแบบการจัดห้อง :</th>${tdc('layout', '', T('layout', '', 'รูปแบบการจัดห้อง') + (v.fyi || ed ? `<div class="fnf-fyi"><b>FYI</b><br>${T('fyi', '', 'กำหนดการ / หมายเหตุ')}</div>` : ''))}${menuCols}</tr>
-    <tr><th>ข้อความบนเวที :${v.vinyl || ed ? `<div class="fnf-small">${T('vinyl', '', 'ไวนิล / ป้าย')}</div>` : ''}</th>${tdc('stage', 'c', T('stage', '-', 'ข้อความบนเวที'))}${tdc('kitchen', 'fnf-small', v.kitchen || ed ? '<b>ครัว:</b> ' + T('kitchen', '', 'หมายเหตุครัว') : '', mc)}</tr>
+    <tr><th>ข้อความบนเวที :${v.vinyl || ed ? `<div class="fnf-small">${T('vinyl', '', 'ไวนิล / ป้าย')}</div>` : ''}</th>${tdc('stage', 'c', T('stage', (v.stageImgs || []).length ? '' : '-', 'ข้อความบนเวที') + stagePics())}${tdc('kitchen', 'fnf-small', v.kitchen || ed ? '<b>ครัว:</b> ' + T('kitchen', '', 'หมายเหตุครัว') : '', mc)}</tr>
     ${xs('banquet').map(x => `<tr>${xth(x)}${xtd(x, 1 + mc)}</tr>`).join('')}
     ${addRow('banquet', 2 + mc)}
   </table>
@@ -319,7 +326,7 @@
     const ui = fnUi();
     // an untouched copy is rebuilt every time, so changes made meanwhile (a department card, the quotation) show up
     if (!ui.draft || ui.draft.bid !== b.id || !ui.dirty) {
-      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []), more: clone(v.more), sty: clone(v.sty), rich: clone(v.rich), split: clone(v.split) };
+      const { v } = values(b, Store.quote(b.quoteId)), d = { bid: b.id, v: {}, stageImgs: clone(v.stageImgs), menu: clone(v.menu), extra: clone((b.fn && b.fn.extra) || []), more: clone(v.more), sty: clone(v.sty), rich: clone(v.rich), split: clone(v.split) };
       for (const k of EDIT_KEYS) d.v[k] = v[k] == null ? '' : String(v[k]);
       d.base = Object.assign({}, d.v); // what each box showed when editing began
       ui.draft = d; ui.dirty = false;
@@ -342,7 +349,7 @@
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button><button class="btn ghost" data-act="fnSave">บันทึก</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
-      const d = draft(b), dv = Object.assign({}, d.v, { menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, stays: v.stays, appr: v.appr, apprTitle: v.apprTitle });
+      const d = draft(b), dv = Object.assign({}, d.v, { stageImgs: d.stageImgs, menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, stays: v.stays, appr: v.appr, apprTitle: v.apprTitle });
       const tdMode = ui.td ? ' tdraw-' + ui.td : '';
       return head + `<div class="fnf-bar no-print"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ<div id="fnDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
         <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div>${tools()}</div>
@@ -571,12 +578,22 @@
         f.sty = Object.keys(sy).length ? sy : undefined;
         const ex = d.extra.filter(x => (x.label || '').trim() || (x.text || '').trim() || keep(x.more).length || x.split).map(x => { const o = Object.assign({}, x), l = keep(x.more); if (l.length) o.more = l; else delete o.more; return o; });
         f.extra = ex.length ? ex : undefined;
+        f.stageImgs = d.stageImgs && d.stageImgs.length ? d.stageImgs.slice(0, 4) : undefined;
       });
       dropDraft(); fnUi().td = null; fnUi().tab = 'preview'; App.render(); App.toast('บันทึกแก้ไขข้อมูลแล้ว');
     },
     fnDRv(el) { const b = curB(), d = fnUi().draft; if (!b || !d) return; const a = auto(b, Store.quote(b.quoteId)); d.v[el.dataset.k] = a[el.dataset.k] == null ? '' : String(a[el.dataset.k]); if (d.rich) delete d.rich[el.dataset.k]; fnUi().dirty = true; App.render(); },
     fnDMAdd() { const d = fnUi().draft; if (!d) return; d.menu.push({ time: '', title: '', items: '' }); fnUi().dirty = true; App.render(); },
     fnDMDel(el) { const d = fnUi().draft; if (!d) return; d.menu.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
+    // pictures of the stage sign: picked from the device, shrunk and stored like menu photos, kept in the draft until saved
+    async fnStageImg() {
+      const d = fnUi().draft; if (!d || !g.CatalogImages) return;
+      const files = (await g.CatalogImages.pickFiles(true)).slice(0, 4 - (d.stageImgs || []).length); if (!files.length) return;
+      App.toast('กำลังอัปโหลดรูป…');
+      for (const f of files) { try { (d.stageImgs = d.stageImgs || []).push(await g.CatalogImages.storeImage(f)); } catch (e) { App.toast(e.message || 'อัปโหลดรูปไม่สำเร็จ'); } }
+      fnUi().dirty = true; App.render();
+    },
+    fnStageImgDel(el) { const d = fnUi().draft; if (!d || !d.stageImgs) return; d.stageImgs.splice(Number(el.dataset.i), 1); fnUi().dirty = true; App.render(); },
     fnDXAdd(el) { const d = fnUi().draft; if (!d) return; d.extra.push({ sec: el.dataset.sec, label: '', text: '' }); fnUi().dirty = true; fnUi().focusX = d.extra.length - 1; App.render(); },
     // a cell's corner "+": choose heading or detail, then a new line appears inside that cell
     fnCPlus(el) {
