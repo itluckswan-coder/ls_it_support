@@ -7,7 +7,8 @@
   const { U, App, Store } = g, D = g.DATA, H = U.esc;
 
   const ROLES = ['admin', 'manager', 'sales'];
-  const allowed = () => { const me = App.me(); return !!me && ROLES.includes(me.role); };
+  // the sales side (App.salesRole): sales roles, and anyone given "สร้างและส่งใบเสนอราคา"
+  const allowed = () => { const me = App.me(); return !!me && (ROLES.includes(me.role) || App.salesRole(me)); };
   App.canSalesSum = allowed;
   const curB = () => Store.db.beos.find(b => b.id === App.state.params[0]);
   const num = v => Number(String(v == null ? '' : v).replace(/,/g, '')) || 0;
