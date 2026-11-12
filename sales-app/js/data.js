@@ -70,6 +70,7 @@
     types: Object.fromEntries(ROOM_DEF.map(r => [r[0], { total: r[4], rack: r[5], rates: { s1: r[7], s2: r[8] } }]))
   };
   const ROOM_TYPES = []; // filled by applyRoomRates (pages hold a reference)
+  const ROOM_ZONES = ['Resident', 'Resort'];
   /* the boutique (ลักษวรรณ บูติก): rooms per room per night, each including congee, coffee and crackers for 2; breakfast and
    * a dinner party bought on top, per person, at three price levels. Admins change them on the room-rates page (roomRates.boutique). */
   const BOUTIQUE_DEFAULT = {
@@ -80,7 +81,11 @@
   function applyBoutique(b) {
     b = b && typeof b === 'object' ? b : {};
     const num = (v, d) => (Number(v) >= 0 && v !== '' && v != null ? Math.round(Number(v)) : d);
-    BOUTIQUE.rooms = BOUTIQUE_DEFAULT.rooms.map(r => Object.assign({}, r, { price: num(((b.rooms || []).find(x => x && x.id === r.id) || {}).price, r.price) }));
+    // built-in rooms keep their id (renamed / repriced here); rooms the admin added (bq_c…) follow them
+    const mine = (b.rooms || []).filter(x => x && typeof x.id === 'string');
+    const nm = (v, d) => String(v || '').trim().slice(0, 60) || d;
+    BOUTIQUE.rooms = BOUTIQUE_DEFAULT.rooms.map(r => { const o = mine.find(x => x.id === r.id) || {}; return Object.assign({}, r, { name: nm(o.name, r.name), price: num(o.price, r.price) }); })
+      .concat(mine.filter(x => /^bq_c/.test(x.id)).slice(0, 20).map(x => ({ id: x.id, name: nm(x.name, 'ห้องใหม่'), price: num(x.price, 0), custom: true })));
     BOUTIQUE.incl = String(b.incl || BOUTIQUE_DEFAULT.incl).slice(0, 120);
     for (const k of ['breakfast', 'dinner']) BOUTIQUE[k] = BOUTIQUE_DEFAULT[k].map((d, i) => num((b[k] || [])[i], d));
   }
@@ -93,12 +98,18 @@
     const types = rr.types || {};
     applyBoutique(rr.boutique);
     ROOM_TYPES.length = 0;
-    for (const [id, fam, bed, zone, total, rack, pax, s1, s2, img] of ROOM_DEF) {
-      const o = types[id] || {}, num = (v, d) => (Number(v) >= 0 && v !== '' && v != null ? Number(v) : d);
+    // built-in types (ROOM_DEF) can be renamed and described; types the admin added (custom: true) follow them, in the order added
+    const str = (v, d, n = 80) => String(v == null ? '' : v).trim().slice(0, n) || d;
+    const list = ROOM_DEF.map(r => [r, types[r[0]] || {}])
+      .concat(Object.entries(types).filter(([id, o]) => o && o.custom && !ROOM_DEF.some(r => r[0] === id)).sort((a, b) => (Number(a[1].ord) || 0) - (Number(b[1].ord) || 0)).slice(0, 40)
+        .map(([id, o]) => [[id, 'ห้องใหม่', '', 'Resort', 0, 0, 2, [0, 0], [0, 0], ''], o]));
+    for (const [[id, fam0, bed0, zone0, total, rack, pax0, s1, s2, img], o] of list) {
+      const num = (v, d) => (Number(v) >= 0 && v !== '' && v != null ? Number(v) : d);
+      const fam = str(o.fam, fam0), bed = str(o.bed, bed0, 40), zone = ROOM_ZONES.includes(o.zone) ? o.zone : zone0, pax = Math.max(1, Math.min(10, Math.round(num(o.pax, pax0)))), desc = str(o.desc, '', 300);
       const rates = {};
       for (const se of SEASONS) { const def = se.id === 's2' ? s2 : s1, r = (o.rates || {})[se.id] || def; rates[se.id] = [num(r[0], def[0]), num(r[1], def[1])]; }
-      ROOM_TYPES.push({ id, fam, bed, name: fam.replace(/ ชั้น .*$/, '') + ' · ' + bed, full: fam + ' · ' + bed, zone: 'Zone : ' + zone, zoneId: zone, total: Math.round(num(o.total, total)), rack: num(o.rack, rack), pax, img, rates,
-        beds: bed + ' · ' + pax + ' ท่าน/ห้อง', size: '', get group() { return roomPrice(this, U.today(), true); } });
+      ROOM_TYPES.push({ id, fam, bed, name: fam.replace(/ ชั้น .*$/, '') + (bed ? ' · ' + bed : ''), full: fam + (bed ? ' · ' + bed : ''), zone: 'Zone : ' + zone, zoneId: zone, total: Math.round(num(o.total, total)), rack: num(o.rack, rack), pax, img, rates, desc, custom: !!o.custom, ord: Number(o.ord) || 0,
+        beds: (bed ? bed + ' · ' : '') + pax + ' ท่าน/ห้อง', size: '', get group() { return roomPrice(this, U.today(), true); } });
     }
   }
   // which season a date falls in (by month-day, repeating every year)
@@ -559,7 +570,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { fixQuote, FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { ROOM_ZONES, fixQuote, FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;
