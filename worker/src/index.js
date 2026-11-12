@@ -48,6 +48,8 @@ async function readJson(req) {
   try { return await req.json(); } catch (e) { fail(400, 'ข้อมูลไม่ถูกต้อง'); }
 }
 const can = (u, p) => u.role === 'admin' || !!(u.perms && u.perms[p]);
+// the sales side: admin, sales manager and sales roles, and anyone given "สร้างและส่งใบเสนอราคา" (mirrors App.salesRole)
+const salesSideOf = u => ['admin', 'manager', 'sales'].includes(u.role) || can(u, 'create_quote');
 const publicUser = row => Object.assign(JSON.parse(row.data), { id: row.id, email: row.email });
 
 /* ---------------- auth ---------------- */
@@ -251,7 +253,7 @@ async function applyRules(env, user, kind, id, data, prev) {
       };
     } else data.approval = prevAppr || data.approval || { state: 'approved' };
     // the sales summary (ใบสรุปสำหรับฝ่ายขาย) belongs to admins, sales managers and sales staff
-    if (!['admin', 'manager', 'sales'].includes(user.role)) { if (prev && prev.ss) data.ss = prev.ss; else delete data.ss; }
+    if (!salesSideOf(user)) { if (prev && prev.ss) data.ss = prev.ss; else delete data.ss; }
     // admin sign-off: only admins set it, and any change to the content clears it
     if (user.role !== 'admin') { if (prev && prev.signoff) data.signoff = prev.signoff; else delete data.signoff; }
     if (changed) delete data.signoff;
@@ -325,7 +327,7 @@ async function applyRules(env, user, kind, id, data, prev) {
   if (kind === 'employees' || kind === 'settings') {
     // the function sheet's attendee / event-type choices (settings.beoTags) belong to the sales roles: they save them
     // even without settings rights, and nobody else changes them
-    const salesSide = ['admin', 'manager', 'sales'].includes(user.role);
+    const salesSide = salesSideOf(user);
     if (!can(user, 'edit_prices') && !can(user, 'staff')) {
       if (kind !== 'settings' || !salesSide) fail(403, 'คุณไม่มีสิทธิ์แก้ไขข้อมูลนี้');
       // a sales user without settings rights: only their beoTags is taken, the rest stays as saved
@@ -410,7 +412,7 @@ async function audit(env, user, kind, id, action, note) {
 async function putImage(req, env, user) {
   // menu / room photos (price editors), the meeting-room photo on a quotation (sales), and a floor-plan picture
   // under a plan (whoever may design plans: mirrors App.canPlan — admins, sales, F&B / banquet departments)
-  const plans = ['admin', 'manager', 'sales'].includes(user.role) || /f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen|จัดเลี้ยง|banquet/i.test(String(user.dept || ''));
+  const plans = salesSideOf(user) || /f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen|จัดเลี้ยง|banquet/i.test(String(user.dept || ''));
   if (!can(user, 'edit_prices') && !can(user, 'create_quote') && !plans) fail(403, 'คุณไม่มีสิทธิ์อัปโหลดรูป');
   const { mime, data } = await readJson(req);
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) fail(400, 'รองรับเฉพาะรูป JPG, PNG, WebP');
