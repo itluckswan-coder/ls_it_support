@@ -1121,3 +1121,7 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
   .fnf-img{position:static;break-inside:avoid}
   .fnf-img img{border-radius:0}
 }
+/* signatures: on the users page, and over the "ออกโดย" line of the function details */
+.us-sig{height:34px;max-width:140px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
+.fnf-sig{display:block;height:52px;max-width:230px;object-fit:contain;margin:-24px auto -6px;position:relative}
+.fnf-line.has-sig{margin-top:6px}

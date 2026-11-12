@@ -1254,6 +1254,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     ${D.PERMS.map(p => `<div class="perm"><div><div>${H(p.name)}</div>${p.note ? `<div class="xs muted">${H(p.note)}</div>` : ''}</div>${App.sw(p.name, dr.perms[p.id], `data-change="usPerm" data-p="${p.id}" ${canEdit ? '' : 'disabled'}`)}</div>`).join('')}
     <div style="background:var(--bg);border-radius:12px;padding:12px 14px;margin:14px 0" class="small">
       <div class="between"><span class="muted">เข้าสู่ระบบล่าสุด</span><span>${fmtLast(u.lastLogin)}${u.lastDevice ? ' · ' + H(u.lastDevice) : ''}</span></div>
+      <div class="between" style="margin-top:8px;align-items:center;gap:10px"><span class="muted">ลายเซ็น</span><span class="row" style="gap:10px;align-items:center">${u.sig ? `<img class="us-sig" src="${H(u.sig)}" alt="ลายเซ็น ${H(u.name)}">` : '<span class="xs muted">ยังไม่มี</span>'}${canEdit ? `<button class="link" data-act="usSig">${u.sig ? 'เปลี่ยน' : 'อัปโหลด'}</button>${u.sig ? '<button class="link red" data-act="usSigDel">ลบ</button>' : ''}` : ''}</span></div>
+      ${canEdit && !u.sig ? '<div class="xs muted" style="margin-top:4px">เซ็นบนกระดาษขาวแล้วถ่ายรูป · ระบบทำพื้นหลังโปร่งใสและตัดขอบให้ · ใช้ในช่อง “ออกโดย” ของรายละเอียดฟังก์ชัน</div>' : ''}
       <div class="between" style="margin-top:6px"><span class="muted">ยืนยันตัวตน 2 ขั้นตอน</span>${canEdit ? `<button class="link" data-act="us2fa">${dr.twoFA ? 'เปิดอยู่' : 'ปิดอยู่'}</button>` : `<b class="teal">${dr.twoFA ? 'เปิดอยู่' : 'ปิดอยู่'}</b>`}</div></div>
     ${canEdit ? `<div class="note" style="margin-bottom:14px">การเปลี่ยนบทบาทมีผลทันที ใบเสนอราคาที่ส่งไปแล้วจะไม่เปลี่ยน</div>
     <div class="row"><button class="btn ghost" style="flex:1" data-act="usResetPw">เปลี่ยนรหัสผ่าน</button><button class="btn red" style="flex:1" data-act="usSave">บันทึก</button></div>
@@ -1265,6 +1267,29 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     }
   };
   const UU = () => App.state.ui.users;
+  // a signature photo → PNG with the paper transparent (light pixels fade out), trimmed to the ink with a small margin
+  async function sigPng(file) {
+    if (!/^image\//.test(file.type)) throw new Error('ไฟล์ ' + file.name + ' ไม่ใช่รูปภาพ');
+    const src = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error('เปิดรูป ' + file.name + ' ไม่ได้')); i.src = src; });
+      const k = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight)), W = Math.max(1, Math.round(img.naturalWidth * k)), Hh = Math.max(1, Math.round(img.naturalHeight * k));
+      const c = document.createElement('canvas'); c.width = W; c.height = Hh;
+      const x = c.getContext('2d'); x.drawImage(img, 0, 0, W, Hh);
+      const im = x.getImageData(0, 0, W, Hh), p = im.data;
+      let x0 = W, y0 = Hh, x1 = -1, y1 = -1;
+      for (let i = 0; i < p.length; i += 4) {
+        const lum = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2], a = lum >= 200 ? 0 : Math.min(255, Math.round((200 - lum) * 255 / 90));
+        p[i + 3] = Math.min(p[i + 3], a);
+        if (p[i + 3] > 40) { const n = i / 4, px = n % W, py = (n - px) / W; if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py; }
+      }
+      if (x1 < 0) throw new Error('ไม่พบลายเซ็นในรูป — ลองถ่ายบนกระดาษขาวให้เส้นชัดขึ้น');
+      x.putImageData(im, 0, 0);
+      const m = 6, cx = Math.max(0, x0 - m), cy = Math.max(0, y0 - m), cw = Math.min(W, x1 + m) - cx, ch = Math.min(Hh, y1 + m) - cy;
+      const out = document.createElement('canvas'); out.width = cw; out.height = ch; out.getContext('2d').drawImage(c, cx, cy, cw, ch, 0, 0, cw, ch);
+      return out.toDataURL('image/png');
+    } finally { URL.revokeObjectURL(src); }
+  }
   Object.assign(App.ACT, {
     usRole(el) { UU().role = el.dataset.v; UU().page = 1; App.render(); },
     usPage(el) { UU().page = Number(el.dataset.v); App.render(); },
@@ -1283,6 +1308,21 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const d = UU().draft, u = Store.db.users.find(x => x.id === d.id);
       if (u.id === App.state.uid && !d.perms.users) { App.toast('ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้'); return; }
       Object.assign(u, { role: d.role, dept: d.dept, perms: d.perms, twoFA: d.twoFA }); if (App.me().role === 'admin' && d.sites) u.sites = d.sites; if (d.roleId) u.roleId = d.roleId; else delete u.roleId; Store.save(); UU().draft = null; App.render(); App.toast('บันทึกแล้ว');
+    },
+    // signature: a photo of a signature on white paper → the paper made transparent, trimmed to the ink, stored as a PNG
+    async usSig() {
+      const u = Store.db.users.find(x => x.id === UU().sel); if (!u || !g.CatalogImages) return;
+      const [file] = await g.CatalogImages.pickFiles(false); if (!file) return;
+      try {
+        const png = await sigPng(file), cloud = g.API && g.API.online;
+        let url = png;
+        if (cloud) url = (await g.API.req('POST', 'images', { mime: 'image/png', data: png.slice(png.indexOf(',') + 1) })).url;
+        u.sig = url; Store.save(); App.render(); App.toast('บันทึกลายเซ็นของ ' + u.name + ' แล้ว');
+      } catch (e) { App.toast(e.message || 'อัปโหลดลายเซ็นไม่สำเร็จ'); }
+    },
+    usSigDel() {
+      const u = Store.db.users.find(x => x.id === UU().sel); if (!u || !u.sig) return;
+      App.confirm('ลบลายเซ็นของ ' + u.name + '?', () => { u.sig = ''; Store.save(); App.render(); }, 'ลบ');
     },
     usToggle() {
       const u = Store.db.users.find(x => x.id === UU().sel);

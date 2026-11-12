@@ -75,7 +75,7 @@
       // the earlier one-box version (all rooms in one row), kept for sheets whose room boxes were typed over before the split
       _legacy: { checkin: rooms.length ? U.fmtD(q.start) : '-', checkout: rooms.length ? U.fmtD(U.addDays(q.end, 1)) : '-', roomType: rooms.length ? rooms.map(i => i.name).join('\n') : '-', roomQty: rooms.length ? rooms.map(i => i.q1 + ' ห้อง × ' + (i.q2 || 1) + ' คืน').join('\n') : '-' },
       front: rooms.length ? dept('front').join('\n') : '** ไม่มีห้องพัก **',
-      by: owner ? owner.name : '', byTitle: 'Sales and Marketing',
+      by: owner ? owner.name : '', byTitle: 'Sales and Marketing', bySig: owner && owner.sig ? owner.sig : '',
       appr: b.signoff ? b.signoff.byName : '', apprTitle: b.signoff ? 'อนุมัติ ' + U.fmtD(b.signoff.at.slice(0, 10)) : ''
     };
   }
@@ -284,7 +284,7 @@
   </table>`}
   ${xs('other').length || ed ? `<table class="fnf-t"><tr><th colspan="2" class="sec">รายละเอียดเพิ่มเติม</th></tr>${xs('other').map(x => `<tr>${xth(x)}${xtd(x)}</tr>`).join('')}${addRow('other', 2)}</table>` : ''}
   <div class="fnf-sign">
-    <div><span>ออกโดย :</span><div class="fnf-line"></div><div>${ed ? T('by', '', 'ชื่อผู้ออกเอกสาร') : wrapS(sty.by, `(${rtx(v.by, rich.by, '................................')})`, 'span')}</div><div>${ed ? T('byTitle', '', 'ตำแหน่ง') : wrapS(sty.byTitle, rtx(v.byTitle, rich.byTitle), 'span')}</div></div>
+    <div><span>ออกโดย :</span>${v.bySig ? `<img class="fnf-sig" src="${H(v.bySig)}" alt="ลายเซ็น">` : ''}<div class="fnf-line${v.bySig ? ' has-sig' : ''}"></div><div>${ed ? T('by', '', 'ชื่อผู้ออกเอกสาร') : wrapS(sty.by, `(${rtx(v.by, rich.by, '................................')})`, 'span')}</div><div>${ed ? T('byTitle', '', 'ตำแหน่ง') : wrapS(sty.byTitle, rtx(v.byTitle, rich.byTitle), 'span')}</div></div>
     <div><span>อนุมัติโดย :</span><div class="fnf-line"></div><div>(${H(v.appr || '................................')})</div><div>${H(v.apprTitle || 'ยังไม่อนุมัติ')}</div></div>
   </div>
 </div>`;
@@ -380,7 +380,7 @@
         ${edit ? '<button class="btn ghost fnf-plus" data-act="fnX" title="เพิ่มรายละเอียดลงในใบรายละเอียดฟังก์ชัน">＋ เพิ่มรายละเอียด</button>' : ''}
         <button class="btn red" data-act="fnPrint">พิมพ์ / PDF</button><button class="btn ghost" data-act="fnSave">บันทึก</button></div></div>`;
       if (tab === 'preview') return head + `${!v.no && edit ? '<div class="note no-print" style="margin-bottom:12px">ยังไม่มี Function No. — <button class="link" data-act="fnNo">ออกเลขอัตโนมัติ (' + H(nextNo()) + ')</button> หรือกรอกเองในแท็บ “แก้ไขข้อมูล”</div>' : ''}<div class="fnf-wrap">${paper(v, own.extra || [])}</div>`;
-      const d = draft(b), dv = Object.assign({}, d.v, { stageImgs: d.stageImgs, menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, stays: v.stays, appr: v.appr, apprTitle: v.apprTitle });
+      const d = draft(b), dv = Object.assign({}, d.v, { bySig: v.bySig, stageImgs: d.stageImgs, menu: d.menu, more: d.more, sty: d.sty, rich: d.rich, split: d.split, stays: v.stays, appr: v.appr, apprTitle: v.apprTitle });
       const tdMode = ui.td ? ' tdraw-' + ui.td : '';
       return head + `<div class="fnf-bar no-print"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ<div id="fnDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
         <div class="row"><button class="btn ghost" data-act="fnDCancel">ยกเลิก</button><button class="btn red" data-act="fnDSave">บันทึกแก้ไขข้อมูล</button></div>${tools()}</div>
