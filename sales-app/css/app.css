@@ -1110,3 +1110,14 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .fnf-img img{display:block;max-width:100%;max-height:150px;border-radius:4px;border:1px solid #ddd}
 .fnf-img .fnf-imgx{position:absolute;top:2px;right:2px}
 @media print{.fnf-img img{max-height:120px;border:0}}
+/* function details, printing in Safari (iPad / Mac): table cells with position:relative, and 1px lines once the sheet is
+   scaled down to fit the page, lose their borders; print the cells unpositioned with slightly thicker black lines */
+@media print{
+  .fnf-paper{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .fnf-t th,.fnf-t td{position:static;border-width:1.5px;border-color:#000}
+  .fnf-t .st.st-b{border-bottom-width:1.5px;border-bottom-color:#000}
+  .fnf-sp.h>.fnf-c.hb{border-top-width:1.5px;border-top-color:#000}
+  .fnf-spl.v{border-left-width:1.5px;border-left-color:#000}
+  .fnf-img{position:static;break-inside:avoid}
+  .fnf-img img{border-radius:0}
+}
