@@ -75,7 +75,21 @@
    * a dinner party bought on top, per person, at three price levels. Admins change them on the room-rates page (roomRates.boutique). */
   const BOUTIQUE_DEFAULT = {
     rooms: [{ id: 'bq_std', name: 'Standard', price: 400 }, { id: 'bq_sup', name: 'Superior', price: 500 }, { id: 'bq_dlx', name: 'Deluxe', price: 600 }],
-    incl: 'ข้าวต้ม กาแฟ แครกเกอร์ สำหรับ 2 ท่าน', breakfast: [50, 100, 150], dinner: [350, 399, 450]
+    incl: 'ข้าวต้ม กาแฟ แครกเกอร์ สำหรับ 2 ท่าน', breakfast: [50, 100, 150], dinner: [350, 399, 450],
+    // price periods by date (from the boutique's rate sheets): when a stay's check-in falls in one, its rooms and prices
+    // are used instead of the three rooms above; prices step by the number of rooms booked (tiers = upper limits)
+    periods: [{
+      id: 'bqp_2611', name: 'ราคาห้องพัก 26 พ.ย. 2569 – 27 ก.พ. 2570 (RO)', from: '2026-11-26', to: '2027-02-27', basis: 'RO', tiers: [30, 80, 120],
+      rooms: [
+        { id: 'bq_p1_std', name: 'Standard ชั้น 2', bed: 'Twin 3.5 Ft', pax: 2, prices: [500, 550, 600] },
+        { id: 'bq_p1_supt', name: 'Superior ชั้น 2-3-4', bed: 'Twin 3.5 Ft', pax: 2, prices: [500, 550, 600] },
+        { id: 'bq_p1_supd', name: 'Superior ชั้น 2-3-4', bed: 'Double 6 Ft', pax: 2, prices: [550, 600, 650] },
+        { id: 'bq_p1_suptr', name: 'Superior ชั้น 2-3-4', bed: 'Triple 3.5 Ft', pax: 3, prices: [850, 900, 950] },
+        { id: 'bq_p1_dlxt', name: 'Deluxe ชั้น 5', bed: 'Twin 3.5 Ft', pax: 2, prices: [550, 600, 650] },
+        { id: 'bq_p1_dlxd', name: 'Deluxe ชั้น 5', bed: 'Double 8 Ft', pax: 2, prices: [600, 650, 700] },
+        { id: 'bq_p1_jrs', name: 'Junior Suite', bed: 'Double 8 Ft', pax: 2, prices: [1050, 1100, 1200] }
+      ]
+    }]
   };
   const BOUTIQUE = JSON.parse(JSON.stringify(BOUTIQUE_DEFAULT));
   function applyBoutique(b) {
@@ -88,7 +102,22 @@
       .concat(mine.filter(x => /^bq_c/.test(x.id)).slice(0, 20).map(x => ({ id: x.id, name: nm(x.name, 'ห้องใหม่'), price: num(x.price, 0), custom: true })));
     BOUTIQUE.incl = String(b.incl || BOUTIQUE_DEFAULT.incl).slice(0, 120);
     for (const k of ['breakfast', 'dinner']) BOUTIQUE[k] = BOUTIQUE_DEFAULT[k].map((d, i) => num((b[k] || [])[i], d));
+    // price periods: the saved list when there is one (even empty), else the built-in sheet
+    const ymd = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '') ? v : null;
+    BOUTIQUE.periods = (Array.isArray(b.periods) ? b.periods : BOUTIQUE_DEFAULT.periods).filter(x => x && ymd(x.from) && ymd(x.to)).slice(0, 24).map(x => {
+      const tiers = (Array.isArray(x.tiers) && x.tiers.length ? x.tiers : [999]).slice(0, 5).map(v => Math.max(1, Math.round(Number(v) || 1)));
+      return { id: String(x.id || 'bqp_' + x.from), name: nm(x.name, x.from + ' – ' + x.to), from: x.from, to: x.to < x.from ? x.from : x.to, basis: x.basis === 'RB' ? 'RB' : 'RO', tiers,
+        rooms: (Array.isArray(x.rooms) ? x.rooms : []).filter(r => r && typeof r.id === 'string').slice(0, 30).map(r => ({ id: r.id, name: nm(r.name, 'ห้อง'), bed: String(r.bed || '').trim().slice(0, 40), pax: Math.max(1, Math.min(10, Math.round(Number(r.pax) || 2))),
+          prices: tiers.map((_, i) => num((r.prices || [])[i], 0)) })) };
+    });
   }
+  // the boutique price period a check-in date falls in (the shortest one wins where two overlap), and the price tier for a number of rooms
+  function bqPeriod(date) {
+    const d = String(date || '').slice(0, 10), hits = BOUTIQUE.periods.filter(p => p.from <= d && d <= p.to);
+    const span = p => (Date.parse(p.to) - Date.parse(p.from)) || 0;
+    return hits.sort((a, b) => span(a) - span(b))[0] || null;
+  }
+  const bqTier = (p, rooms) => { const i = p.tiers.findIndex(t => rooms <= t); return i < 0 ? p.tiers.length - 1 : i; };
   let SEASONS = SEASONS_DEFAULT;
   const md = s => /^\d{2}-\d{2}$/.test(s || '') ? s : null;
   function applyRoomRates(rr) {
@@ -570,7 +599,7 @@
     } catch (e) { return 'plain:' + pw; }
   }
 
-  g.DATA = { ROOM_ZONES, fixQuote, FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
+  g.DATA = { bqPeriod, bqTier, ROOM_ZONES, fixQuote, FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
     itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
   g.Store = Store;
   g.hashPw = hash;
