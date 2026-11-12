@@ -413,7 +413,7 @@ async function putImage(req, env, user) {
   // menu / room photos (price editors), the meeting-room photo on a quotation (sales), and a floor-plan picture
   // under a plan (whoever may design plans: mirrors App.canPlan — admins, sales, F&B / banquet departments)
   const plans = salesSideOf(user) || /f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen|จัดเลี้ยง|banquet/i.test(String(user.dept || ''));
-  if (!can(user, 'edit_prices') && !can(user, 'create_quote') && !plans) fail(403, 'คุณไม่มีสิทธิ์อัปโหลดรูป');
+  if (!can(user, 'edit_prices') && !can(user, 'create_quote') && !can(user, 'users') && !plans) fail(403, 'คุณไม่มีสิทธิ์อัปโหลดรูป');
   const { mime, data } = await readJson(req);
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(mime)) fail(400, 'รองรับเฉพาะรูป JPG, PNG, WebP');
   if (typeof data !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(data)) fail(400, 'ข้อมูลรูปไม่ถูกต้อง');
@@ -445,7 +445,9 @@ async function putUser(req, env, user, id) {
   if (id === user.id && !(data.perms && data.perms.users) && user.role !== 'admin') fail(400, 'ไม่สามารถถอดสิทธิ์จัดการผู้ใช้ของตัวเองได้');
   const clean = { name: String(data.name || '').slice(0, 100), role: data.role, roleId: /^r_[a-z0-9]{4,20}$/.test(String(data.roleId || '')) ? data.roleId : '', dept: String(data.dept || '').slice(0, 100), phone: String(data.phone || '').slice(0, 40),
     status: ['active', 'invited', 'disabled'].includes(data.status) ? data.status : 'invited', twoFA: !!data.twoFA,
-    perms: Object.fromEntries(ALL_PERMS.map(p => [p, !!(data.perms && data.perms[p])])), lastLogin: row ? JSON.parse(row.data).lastLogin || null : null, lastDevice: row ? JSON.parse(row.data).lastDevice || '' : '',
+    perms: Object.fromEntries(ALL_PERMS.map(p => [p, !!(data.perms && data.perms[p])])),
+    // signature picture (an uploaded image), shown on the papers this user issues
+    sig: typeof data.sig === 'string' && /^api\/images\/[0-9a-f]{16,64}$/.test(data.sig) ? data.sig : '', lastLogin: row ? JSON.parse(row.data).lastLogin || null : null, lastDevice: row ? JSON.parse(row.data).lastDevice || '' : '',
     // which properties the account may open: set by admins only
     sites: user.role === 'admin' ? SITE_IDS.filter(x => Array.isArray(data.sites) && data.sites.includes(x)) : row ? JSON.parse(row.data).sites || [] : [] };
   if (row) {
