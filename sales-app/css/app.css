@@ -1094,3 +1094,5 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 /* room rates: ✏️ before each room type name */
 .rr-name{display:flex;align-items:flex-start;gap:6px}
 .rr-name .icon-btn{flex:none;margin-top:-4px}
+/* room rates: the boutique's price periods */
+.bq-per{border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:12px}

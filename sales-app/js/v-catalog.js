@@ -507,37 +507,49 @@ ${sitePick}
 </div>`;
     }
   };
-  /* the boutique: three room types with congee, coffee and crackers for 2; breakfast and a dinner party per person on top */
+  /* the boutique's rooms for a check-in date: a price period's rooms (price by the number of rooms booked) when the date falls
+   * in one, else the three base rooms with congee, coffee and crackers for 2 */
+  function bqRooms(ui) {
+    const B = D.BOUTIQUE, per = D.bqPeriod(ui.ci);
+    if (!per) return { per: null, rooms: B.rooms.map(r => Object.assign({ pax: 2, incl: 'รวม' + B.incl }, r)), tier: 0, tot: B.rooms.reduce((a, r) => a + (ui.bq[r.id] || 0), 0) };
+    const tot = per.rooms.reduce((a, r) => a + (ui.bq[r.id] || 0), 0), tier = D.bqTier(per, Math.max(1, tot));
+    const incl = per.basis === 'RB' ? 'รวมอาหารเช้า' : 'Room Only (ไม่รวมอาหารเช้า)';
+    return { per, tier, tot, rooms: per.rooms.map(r => ({ id: r.id, name: r.name + (r.bed ? ' · ' + r.bed : ''), pax: r.pax, price: r.prices[tier] || 0, incl })) };
+  }
+  const tierLabel = (p, i) => (i ? p.tiers[i - 1] + 1 : 1) + '–' + p.tiers[i];
+  /* the boutique: rooms (see bqRooms); breakfast and a dinner party per person on top */
   App.V.rooms.boutique = function (q, ui, sitePick, dateBox) {
-    const B = D.BOUTIQUE, n = ui.nights, cnt = r => ui.bq[r.id] || 0;
-    const sel = B.rooms.filter(r => cnt(r) > 0), tot = sel.reduce((a, r) => a + cnt(r), 0);
+    const B = D.BOUTIQUE, n = ui.nights, cnt = r => ui.bq[r.id] || 0, R = bqRooms(ui);
+    const sel = R.rooms.filter(r => cnt(r) > 0), tot = sel.reduce((a, r) => a + cnt(r), 0);
     const roomsAmt = sel.reduce((a, r) => a + cnt(r) * r.price * n, 0);
     const meal = (k, label, list, unit) => { const m = ui[k], pr = list[m.tier] || list[0]; return { k, label, pr, pax: m.pax, amt: m.pax * pr * n, unit }; };
     const bf = meal('bf', 'อาหารเช้า (ซื้อเพิ่ม)', B.breakfast, 'มื้อ'), dn = meal('dn', 'อาหารเย็นงานเลี้ยง', B.dinner, 'มื้อ');
     const total = roomsAmt + bf.amt + dn.amt;
     const step = (act, k, v, label) => `<span class="stepper"><button class="minus" data-act="${act}" data-k="${k}" data-v="-1" aria-label="ลด ${H(label)}">−</button><input inputmode="numeric" value="${v}" data-change="${act}Set" data-k="${k}" aria-label="${H(label)}"><button class="plus" data-act="${act}" data-k="${k}" data-v="1" aria-label="เพิ่ม ${H(label)}">+</button></span>`;
     const card = r => `<article class="card rcard ${cnt(r) ? 'on' : ''}"><div class="ph"><span class="zone">บูติก</span></div>
-      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(r.name)}</h3><span class="badge">2 ท่าน</span></div>
-        <div class="small muted" style="margin:4px 0 6px">รวม${H(B.incl)}</div>
+      <div class="bd"><div class="between" style="align-items:flex-start"><h3 style="font-size:18px">${H(r.name)}</h3><span class="badge">${r.pax} ท่าน</span></div>
+        <div class="small muted" style="margin:4px 0 6px">${H(r.incl)}</div>
         <div class="between" style="margin-top:6px"><div><span class="pr num">${U.n(r.price)} ฿</span><span class="small muted"> / ห้อง / คืน</span></div>${step('bqStep', r.id, cnt(r), 'จำนวนห้อง ' + r.name)}</div></div></article>`;
     const mealBox = (m, list) => `<div class="bq-meal"><div class="between" style="flex-wrap:wrap;gap:8px"><b>${H(m.label)}</b><span class="xs muted">บาท / ท่าน / ${m.unit}</span></div>
       <div class="row wrap" style="gap:6px;margin:8px 0">${list.map((p, i) => `<button class="chip ${ui[m.k].tier === i ? 'on' : ''}" data-act="bqTier" data-k="${m.k}" data-v="${i}">${U.n(p)} ฿</button>`).join('')}</div>
       <div class="between"><span class="small muted">จำนวนท่าน${q ? ' (ผู้เข้าร่วม ' + U.n(q.pax) + ')' : ''} × ${n} ${m.unit}</span>${step('bqPax', m.k, m.pax, 'จำนวนท่าน ' + m.label)}</div></div>`;
     return `
-<div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">บูติก · ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน รวม${H(B.incl)} · อาหารเช้าและอาหารเย็นงานเลี้ยงซื้อเพิ่มต่อท่าน</div>
+<div class="page-hd"><div><h1>ห้องพัก</h1><div class="small muted">บูติก · ${R.per ? `ราคาต่อห้องต่อคืน ตาม${H(R.per.name)} · ราคาตามจำนวนห้อง` : `ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน รวม${H(B.incl)}`} · อาหารเช้าและอาหารเย็นงานเลี้ยงซื้อเพิ่มต่อท่าน</div>
   <div style="margin-top:8px">${App.ctxBar(q, 'สำหรับ')}</div></div>
   <div class="row wrap" style="gap:10px">${App.can('edit_prices') ? '<a class="btn ghost sm" href="#/roomrates">ตั้งราคาห้องพัก</a>' : ''}
   ${dateBox}</div></div>
 ${sitePick}
 <div class="split">
-  <div><h2 class="rm-zone">ห้องพัก · บูติก</h2><div class="rcards" style="margin-bottom:18px">${B.rooms.map(card).join('')}</div>
+  <div><h2 class="rm-zone">ห้องพัก · บูติก</h2>
+    ${R.per ? `<div class="note" style="margin-bottom:12px"><b>${H(R.per.name)}</b><div class="small" style="margin-top:4px">ราคาตามจำนวนห้อง: ${R.per.tiers.map((t, i) => `<span class="${i === R.tier ? 'b' : 'muted'}">${tierLabel(R.per, i)} ห้อง</span>`).join(' · ')} — ตอนนี้ ${R.tot} ห้อง ใช้ราคาช่วง <b>${tierLabel(R.per, R.tier)}</b> ห้อง</div></div>` : ''}
+    <div class="rcards" style="margin-bottom:18px">${R.rooms.map(card).join('')}</div>
     <h2 class="rm-zone">อาหาร (ซื้อเพิ่ม)</h2><div class="card pad" style="display:flex;flex-direction:column;gap:16px">${mealBox(bf, B.breakfast)}${mealBox(dn, B.dinner)}</div></div>
   <aside class="card pad sticky">
     <h2 style="margin-bottom:12px">Room block · บูติก</h2>
     ${sel.length ? sel.map(r => `<div class="sum-row"><span>${H(r.name)} × ${cnt(r)}</span><span class="num">${U.n(cnt(r) * r.price * n)}</span></div>`).join('') : '<div class="small muted">ยังไม่ได้เลือกห้อง</div>'}
     ${[bf, dn].filter(m => m.pax).map(m => `<div class="sum-row"><span>${H(m.label)} ${U.n(m.pr)} ฿ × ${m.pax} ท่าน × ${n}</span><span class="num">${U.n(m.amt)}</span></div>`).join('')}
     <div class="sum-row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:10px"><b>รวม ${tot} ห้อง × ${n} คืน</b><b class="num">${U.n(total)}</b></div>
-    <div class="small muted">รองรับ ${tot * 2} ท่าน${q ? ' · ผู้เข้าร่วม ' + q.pax + ' ท่าน' : ''}</div>
+    <div class="small muted">รองรับ ${sel.reduce((a, r) => a + cnt(r) * (r.pax || 2), 0)} ท่าน${q ? ' · ผู้เข้าร่วม ' + q.pax + ' ท่าน' : ''}</div>
     <div class="note" style="margin:16px 0">วันปล่อยห้อง (cut-off) ${U.fmtD(U.addDays(ui.ci, -14), { long: true })} — ห้องที่ยังไม่มีรายชื่อจะคืนเข้าระบบอัตโนมัติ</div>
     ${App.canQuote() ? `<button class="btn red block" data-act="bqApply" ${tot || bf.pax || dn.pax ? '' : 'disabled'}>อัปเดตใบเสนอ</button>` : ''}
   </aside>
@@ -571,9 +583,9 @@ ${sitePick}
         const q = Store.quote(id); App.setCtx(id);
         // the boutique stay replaces the rooms on the quote (as a resort room block does), and the boutique meals bought before
         q.items = q.items.filter(i => i.sec !== 'room' && i.ref !== 'late' && i.ref !== 'bq:bf' && i.ref !== 'bq:dn');
-        const n = ui.nights, sel = B.rooms.filter(r => (ui.bq[r.id] || 0) > 0), tot = sel.reduce((a, r) => a + ui.bq[r.id], 0);
-        const desc = `ลักษวรรณ บูติก · เช็กอิน ${U.fmtD(ui.ci, { year: false })} 14:00 → เช็กเอาต์ ${U.fmtD(U.addDays(ui.ci, n), { year: false })} 12:00`;
-        for (const r of sel) q.items.push(D.roomItem('บูติก · ' + r.name + ' รวม' + B.incl, ui.bq[r.id], n, r.price, desc, r.id, { ci: ui.ci }));
+        const R = bqRooms(ui), n = ui.nights, sel = R.rooms.filter(r => (ui.bq[r.id] || 0) > 0), tot = sel.reduce((a, r) => a + ui.bq[r.id], 0);
+        const desc = `ลักษวรรณ บูติก · เช็กอิน ${U.fmtD(ui.ci, { year: false })} 14:00 → เช็กเอาต์ ${U.fmtD(U.addDays(ui.ci, n), { year: false })} 12:00` + (R.per ? ` · ราคาช่วง ${tierLabel(R.per, R.tier)} ห้อง` : '');
+        for (const r of sel) q.items.push(D.roomItem('บูติก · ' + r.name + ' ' + r.incl, ui.bq[r.id], n, r.price, desc, r.id, { ci: ui.ci }));
         const meal = (k, ref, name, list) => { const m = ui[k]; if (!m.pax) return; const pr = list[m.tier] || list[0];
           q.items.push({ id: U.uid('i'), sec: 'food', ref, name: name + ' ' + U.n(pr) + ' บาท/ท่าน', desc: 'ลักษวรรณ บูติก', price: pr, q1: m.pax, u1: 'ท่าน', q2: n, u2: 'มื้อ', tier: m.tier, sched: [] }); };
         meal('bf', 'bq:bf', 'อาหารเช้า บูติก (ซื้อเพิ่ม)', B.breakfast);
@@ -618,6 +630,32 @@ ${sitePick}
     const added = ids.filter(id => !def.includes(id) && d.types[id] && d.types[id].custom).sort((a, b) => (d.types[a].ord || 0) - (d.types[b].ord || 0));
     return def.concat(added).map(id => Object.assign({ id }, d.types[id]));
   };
+  // the boutique's price periods: dates, RO / RB, room-count tiers, and a row per room with a price per tier
+  function bqPeriodsEd(b) {
+    const inp = (attrs, v, w, extra = '') => `<input class="input sm" style="width:${w}" value="${H(String(v))}" ${attrs} ${extra}>`;
+    const per = (p, pi) => {
+      const tl = i => (i ? p.tiers[i - 1] + 1 : 1) + '–' + p.tiers[i];
+      return `<div class="bq-per">
+        <div class="row wrap" style="gap:8px;align-items:center">${inp(`data-change="rrBqP" data-p="${pi}" data-k="name" aria-label="ชื่อช่วงราคา" maxlength="60"`, p.name, '320px')}
+          <span class="small muted">ตั้งแต่</span><input type="date" class="input sm" style="width:auto" value="${p.from}" data-change="rrBqP" data-p="${pi}" data-k="from" aria-label="ตั้งแต่">
+          <span class="small muted">ถึง</span><input type="date" class="input sm" style="width:auto" value="${p.to}" data-change="rrBqP" data-p="${pi}" data-k="to" aria-label="ถึง">
+          <select class="input sm" style="width:auto" data-change="rrBqP" data-p="${pi}" data-k="basis" aria-label="ราคา"><option value="RO" ${p.basis === 'RO' ? 'selected' : ''}>RO · ไม่รวมอาหารเช้า</option><option value="RB" ${p.basis === 'RB' ? 'selected' : ''}>RB · รวมอาหารเช้า</option></select>
+          <button class="btn ghost sm" style="color:var(--red);margin-left:auto" data-act="rrBqPDel" data-p="${pi}">ลบช่วงราคานี้</button></div>
+        <div class="row wrap" style="gap:6px;align-items:center;margin:8px 0"><span class="small muted">ราคาตามจำนวนห้อง ถึง</span>${p.tiers.map((t, i) => inp(`data-change="rrBqP" data-p="${pi}" data-k="tier.${i}" inputmode="numeric" aria-label="ช่วงที่ ${i + 1} ถึงกี่ห้อง"`, t, '70px')).join('<span class="small muted">·</span>')}<span class="small muted">ห้อง</span></div>
+        <div style="overflow-x:auto"><table class="tbl rr-tbl"><thead><tr><th>ห้อง</th><th>เตียง</th><th>ท่าน</th>${p.tiers.map((_, i) => `<th class="r">${tl(i)} ห้อง</th>`).join('')}<th></th></tr></thead><tbody>
+          ${p.rooms.map((r, ri) => `<tr><td>${inp(`data-change="rrBqPR" data-p="${pi}" data-r="${ri}" data-k="name" maxlength="60" aria-label="ชื่อห้อง"`, r.name, '170px')}</td>
+            <td>${inp(`data-change="rrBqPR" data-p="${pi}" data-r="${ri}" data-k="bed" maxlength="40" aria-label="เตียง"`, r.bed, '120px')}</td>
+            <td>${inp(`data-change="rrBqPR" data-p="${pi}" data-r="${ri}" data-k="pax" inputmode="numeric" aria-label="จำนวนท่าน"`, r.pax, '52px')}</td>
+            ${p.tiers.map((_, i) => `<td class="r">${inp(`data-change="rrBqPR" data-p="${pi}" data-r="${ri}" data-k="price.${i}" inputmode="numeric" aria-label="ราคา ${tl(i)} ห้อง" style="width:86px;text-align:right"`, r.prices[i] || 0, '86px')}</td>`).join('')}
+            <td><button class="icon-btn emp-del" data-act="rrBqPRDel" data-p="${pi}" data-r="${ri}" aria-label="ลบห้อง ${H(r.name)}">×</button></td></tr>`).join('')}
+        </tbody></table></div>
+        <button class="btn ghost sm" style="margin-top:8px" data-act="rrBqPRAdd" data-p="${pi}">+ เพิ่มห้องในช่วงนี้</button></div>`;
+    };
+    return `<section class="card pad" style="margin-top:16px"><h3 style="margin-bottom:4px">บูติก · ราคาตามช่วงวันที่</h3>
+      <div class="small muted" style="margin-bottom:12px">ถ้าวันเช็กอินอยู่ในช่วงไหน ระบบใช้ห้องและราคาของช่วงนั้น และเลือกราคาตามจำนวนห้องที่จองรวมกัน · ช่วงที่ทับกัน ใช้ช่วงที่สั้นกว่า</div>
+      ${(b.periods || []).map(per).join('') || '<div class="small muted">ยังไม่มีช่วงราคา</div>'}
+      <button class="btn ghost" style="margin-top:12px" data-act="rrBqPAdd">+ เพิ่มช่วงราคา</button></section>`;
+  }
   // a room type's name, bed, zone, guests and details (new or existing)
   function rrTypeModal(id) {
     const d = rrDraft(), x = id ? d.types[id] : { fam: '', bed: 'Twin', zone: 'Resort', pax: 2, desc: '' };
@@ -672,15 +710,25 @@ ${sitePick}
         return `<section class="card pad" style="margin-top:16px"><h3 style="margin-bottom:4px">บูติก</h3><div class="small muted" style="margin-bottom:12px">ราคาต่อห้องต่อคืน สำหรับ 2 ท่าน รวม${H(b.incl)} · อาหารซื้อเพิ่ม บาทต่อท่านต่อมื้อ (3 ระดับราคา)</div>
           <div class="grid g3" style="gap:14px">
             <div><div class="f">ห้องพัก</div>${b.rooms.map((r, i) => `<div class="between" style="margin-top:6px;gap:8px"><input class="input sm" style="flex:1;min-width:0" maxlength="60" value="${H(r.name)}" data-change="rrBqName" data-i="${i}" aria-label="ชื่อห้อง">${bn('rooms.' + i, r.price)}${r.custom ? `<button class="icon-btn emp-del" data-act="rrBqDel" data-i="${i}" aria-label="ลบห้อง ${H(r.name)}">×</button>` : ''}</div>`).join('')}
-              <button class="btn ghost sm" style="margin-top:8px" data-act="rrBqAdd">+ เพิ่มห้องบูติก</button></div>
+              <button class="btn ghost sm" style="margin-top:8px" data-act="rrBqAdd">+ เพิ่มห้องบูติก</button>
+              <div class="xs muted" style="margin-top:6px">ใช้เมื่อวันเข้าพักไม่อยู่ในช่วงราคาด้านล่าง</div></div>
             <div><div class="f">อาหารเช้า (ซื้อเพิ่ม)</div>${b.breakfast.map((v, i) => `<div class="between" style="margin-top:6px"><span>ระดับ ${i + 1}</span>${bn('breakfast.' + i, v)}</div>`).join('')}</div>
             <div><div class="f">อาหารเย็นงานเลี้ยง</div>${b.dinner.map((v, i) => `<div class="between" style="margin-top:6px"><span>ระดับ ${i + 1}</span>${bn('dinner.' + i, v)}</div>`).join('')}</div>
-          </div></section>`; })()}`;
+          </div></section>${bqPeriodsEd(b)}`; })()}`;
     }
   };
   Object.assign(App.ACT, {
     rrType(el) { rrTypeModal(el.dataset.t); },
     rrTypeNew() { rrTypeModal(null); },
+    rrBqPAdd() {
+      const b = rrDraft().boutique, ps = b.periods = b.periods || [], last = ps[ps.length - 1], from = last ? U.addDays(last.to, 1) : U.today();
+      ps.push({ id: 'bqp_' + U.uid('').slice(-6), name: 'ช่วงราคาใหม่', from, to: U.addDays(from, 30), basis: 'RO', tiers: last ? last.tiers.slice() : [30, 80, 120],
+        rooms: last ? last.rooms.map(r => Object.assign({}, r, { id: 'bq_' + U.uid('').slice(-7), prices: r.prices.map(() => 0) })) : [] });
+      App.state.ui.rrDirty = true; App.render();
+    },
+    rrBqPDel(el) { const ps = rrDraft().boutique.periods || [], p = ps[Number(el.dataset.p)]; if (!p) return; App.confirm('ลบช่วงราคา “' + p.name + '”?', () => { ps.splice(Number(el.dataset.p), 1); App.state.ui.rrDirty = true; App.render(); }, 'ลบ'); },
+    rrBqPRAdd(el) { const p = (rrDraft().boutique.periods || [])[Number(el.dataset.p)]; if (!p || p.rooms.length >= 30) return; p.rooms.push({ id: 'bq_' + U.uid('').slice(-7), name: 'ห้องใหม่', bed: '', pax: 2, prices: p.tiers.map(() => 0) }); App.state.ui.rrDirty = true; App.render(); },
+    rrBqPRDel(el) { const p = (rrDraft().boutique.periods || [])[Number(el.dataset.p)], r = p && p.rooms[Number(el.dataset.r)]; if (!r) return; App.confirm('ลบห้อง “' + r.name + '”?', () => { p.rooms.splice(Number(el.dataset.r), 1); App.state.ui.rrDirty = true; App.render(); }, 'ลบ'); },
     rrBqAdd() { const b = rrDraft().boutique; if (b.rooms.length >= 23) return; b.rooms.push({ id: 'bq_c' + U.uid('').slice(-6), name: 'ห้องใหม่', price: 0, custom: true }); App.state.ui.rrDirty = true; App.render(); },
     rrBqDel(el) { const b = rrDraft().boutique, r = b.rooms[Number(el.dataset.i)]; if (!r || !r.custom) return; App.confirm('ลบห้อง “' + r.name + '”?', () => { b.rooms.splice(Number(el.dataset.i), 1); App.state.ui.rrDirty = true; App.render(); }, 'ลบ'); },
     rrSave() {
@@ -699,6 +747,22 @@ ${sitePick}
       const d = rrDraft(), x = d.types[el.dataset.t], v = Math.max(0, Math.round(Number(String(el.value).replace(/[, ]/g, '')) || 0));
       const [a, b] = el.dataset.p.split('.');
       if (b == null) x[a] = v; else { x.rates[a] = x.rates[a] || [0, 0]; x.rates[a][Number(b)] = v; }
+      App.state.ui.rrDirty = true; App.render();
+    },
+    rrBqP(el) {
+      const p = (rrDraft().boutique.periods || [])[Number(el.dataset.p)], k = el.dataset.k, v = el.value.trim(); if (!p) return;
+      if (k === 'name') p.name = v.slice(0, 60) || p.name;
+      else if (k === 'from' || k === 'to') { if (/^\d{4}-\d{2}-\d{2}$/.test(v)) p[k] = v; if (p.to < p.from) p.to = p.from; }
+      else if (k === 'basis') p.basis = v === 'RB' ? 'RB' : 'RO';
+      else if (k.startsWith('tier.')) { const i = Number(k.slice(5)); p.tiers[i] = Math.max(i ? p.tiers[i - 1] + 1 : 1, Math.round(Number(v.replace(/[, ]/g, '')) || 1)); }
+      App.state.ui.rrDirty = true; App.render();
+    },
+    rrBqPR(el) {
+      const p = (rrDraft().boutique.periods || [])[Number(el.dataset.p)], r = p && p.rooms[Number(el.dataset.r)], k = el.dataset.k, v = el.value.trim(); if (!r) return;
+      if (k === 'name') r.name = v.slice(0, 60) || r.name;
+      else if (k === 'bed') r.bed = v.slice(0, 40);
+      else if (k === 'pax') r.pax = U.clamp(parseInt(v, 10) || 2, 1, 10);
+      else if (k.startsWith('price.')) r.prices[Number(k.slice(6))] = Math.max(0, Math.round(Number(v.replace(/[, ]/g, '')) || 0));
       App.state.ui.rrDirty = true; App.render();
     },
     rrBqName(el) { const r = rrDraft().boutique.rooms[Number(el.dataset.i)]; if (!r) return; r.name = el.value.trim().slice(0, 60) || r.name; App.state.ui.rrDirty = true; App.render(); },
