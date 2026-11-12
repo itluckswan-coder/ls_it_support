@@ -1104,3 +1104,9 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .rcard .rph-edit{right:12px;bottom:auto;top:12px;z-index:3}
 .rcard .rph .mg-zoom{z-index:2}
 .rcard .rph:has(.rph-edit) .mg-n{right:56px}
+/* function details: pictures of the stage sign under its text */
+.fnf-imgs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:6px}
+.fnf-img{position:relative;display:inline-block}
+.fnf-img img{display:block;max-width:100%;max-height:150px;border-radius:4px;border:1px solid #ddd}
+.fnf-img .fnf-imgx{position:absolute;top:2px;right:2px}
+@media print{.fnf-img img{max-height:120px;border:0}}
