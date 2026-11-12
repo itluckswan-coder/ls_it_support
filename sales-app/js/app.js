@@ -38,13 +38,17 @@
     navHidden() {
       const me = App.me(); if (!me || me.role === 'admin' || !App.roleOf) return [];
       const v = ((Store.db.settings && Store.db.settings.roles) || {}).views || {}, l = v[App.roleOf(me).id];
-      return Array.isArray(l) ? l.filter(x => x !== 'home') : [];
+      // "สร้างและส่งใบเสนอราคา" turned on for this user opens the sales sections, whatever the role hides
+      const open = me.perms && me.perms.create_quote ? App.SALES_NAV : [];
+      return Array.isArray(l) ? l.filter(x => x !== 'home' && !open.includes(x)) : [];
     },
     // the built-in admin, sales manager and sales roles (not roles added on those levels)
     // the floor-plan designer is for admins and the F&B and banquet departments (heads and staff — by the user's department)
     // floor plans (ออกแบบผังงาน): admin, sales manager and sales, plus F&B / banquet staff and heads (by their department)
     canPlan(me) { me = me === undefined ? App.me() : me; if (!me) return false; if (me.role === 'admin' || App.salesRole(me)) return true; const ks = (D.DEPTS || []).filter(d => d.id === 'kitchen' || d.id === 'banquet'); const dept = String(me.dept || '').trim().toLowerCase(); return !!dept && (/f\s*&\s*b|ครัว|อาหารและเครื่องดื่ม|kitchen|จัดเลี้ยง|banquet/.test(dept) || ks.some(k => [k.name, k.short].filter(Boolean).some(n => n.toLowerCase() === dept))); },
-    salesRole(me) { me = me === undefined ? App.me() : me; return !!me && ['admin', 'manager', 'sales'].includes(me.role) && !(App.roleOf && App.roleOf(me).custom); },
+    // the sales side: the built-in admin, sales manager and sales roles, and anyone given "สร้างและส่งใบเสนอราคา"
+    salesRole(me) { me = me === undefined ? App.me() : me; return !!me && ((['admin', 'manager', 'sales'].includes(me.role) && !(App.roleOf && App.roleOf(me).custom)) || !!(me.perms && me.perms.create_quote)); },
+    SALES_NAV: ['meet', 'room', 'food', 'quote', 'beo', 'cal'],
     can(p) { const m = App.me(); return !!(m && m.perms && m.perms[p]); },
     firstName(u) { return (u && u.name || '').split(' ')[0]; },
     restoreSession() {
