@@ -710,6 +710,7 @@
     }
   });
   App.fnNo = b => (b.fn && b.fn.no) || '';
+  App.fnNextNo = nextNo;
   // the list of added lines for a cell key: a field name, "menu.<i>" or "x.<i>" (an added row)
   function cellList(key, make) {
     const d = fnUi().draft; if (!d) return null;

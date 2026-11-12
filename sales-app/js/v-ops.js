@@ -40,7 +40,9 @@
     };
     const b = { id: Store.nextId('FS'), quoteId: q.id, rev: 0, status: 'draft', confirmPax: q.pax + ' ท่าน', payment: q.status === 'confirmed' ? 'มัดจำแล้ว' : 'รอมัดจำ', schedule, depts,
       note: (q.dietary || []).length ? 'ข้อจำกัดอาหาร: ' + q.dietary.map(x => x.k + ' ' + x.n).join(' / ') : '' };
-    Store.db.beos.unshift(b); Store.save(); App.toast('สร้างใบฟังก์ชัน ' + b.id); return b;
+    // the Function No. (RS…/yy) is issued as the sheet is made; it can still be typed over on the function details page
+    if (App.fnNextNo) b.fn = { no: App.fnNextNo() };
+    Store.db.beos.unshift(b); Store.save(); App.toast('สร้างใบฟังก์ชัน ' + b.id + (b.fn ? ' · Function No. ' + b.fn.no : '')); return b;
   };
 
   /* ---------- ประเภทผู้เข้าร่วมงาน และ ลักษณะงาน: two branches of choices on the function sheet ---------- */
