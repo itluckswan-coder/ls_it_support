@@ -305,14 +305,45 @@
       const blob = await new Promise(r => canvas.toBlob(r, type, 0.92));
       U.download(base + '.' + kind, blob, type); return;
     }
-    // PDF on A4, turned to match the sheet: the whole sheet on one page, centred; a very long one goes on to more pages
-    const tall = canvas.height >= canvas.width, pdf = new g.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: tall ? 'portrait' : 'landscape' });
-    const PW = tall ? 210 : 297, PH = tall ? 297 : 210, m = 8, img = canvas.toDataURL('image/jpeg', 0.92);
-    const fitW = PW - 2 * m, fitH = PH - 2 * m, ihFull = canvas.height * fitW / canvas.width;
-    if (ihFull <= fitH * 1.35) {
+    // PDF on A4 landscape (as the sheet is printed): full width; a sheet longer than a page goes on to more pages, cut between
+    // table rows (never through a line of text); one that is only a little too long is shrunk onto a single page
+    const pdf = new g.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
+    const PW = 297, PH = 210, m = 8, fitW = PW - 2 * m, fitH = PH - 2 * m;
+    const pagePx = Math.floor(fitH / fitW * canvas.width); // canvas pixels that fill one page at full width
+    if (canvas.height <= pagePx * 1.12) {
       const k = Math.min(fitW / canvas.width, fitH / canvas.height), w = canvas.width * k, h = canvas.height * k;
-      pdf.addImage(img, 'JPEG', (PW - w) / 2, m, w, h);
-    } else for (let y = 0, pg = 0; y < ihFull; y += fitH, pg++) { if (pg) pdf.addPage(); pdf.addImage(img, 'JPEG', m, m - y, fitW, ihFull); }
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (PW - w) / 2, m, w, h);
+    } else {
+      const sc = canvas.width / el.getBoundingClientRect().width, top0 = el.getBoundingClientRect().top;
+      const cuts = [...new Set([...el.querySelectorAll('tr, table, .fnf-sign, .fnf-foot')].map(x => Math.round((x.getBoundingClientRect().bottom - top0) * sc)))].filter(y => y > 0 && y < canvas.height).sort((x, y) => x - y);
+      // every line of text on the sheet (canvas pixels): a page may also end between two lines when no line, in any column, crosses there
+      const lines = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
+      for (let n; (n = tw.nextNode());) { const r = document.createRange(); r.selectNodeContents(n); for (const q of r.getClientRects()) if (q.height) lines.push([(q.top - top0) * sc, (q.bottom - top0) * sc]); }
+      for (const im of el.querySelectorAll('img')) { const q = im.getBoundingClientRect(); lines.push([(q.top - top0) * sc, (q.bottom - top0) * sc]); }
+      const clear = y => !lines.some(([t, b]) => t < y - 1 && b > y + 1);
+      const gaps = [...new Set(lines.map(([, b]) => Math.ceil(b) + 2))].filter(clear).sort((x, y) => x - y);
+      // pages for a page height (in canvas pixels): each ends at the last row that fits; a row taller than a page ends between two lines
+      const paginate = ph => {
+        const out = [];
+        for (let start = 0; start < canvas.height - 2;) {
+          const limit = start + ph; if (canvas.height <= limit) { out.push([start, canvas.height]); break; }
+          const fit = cuts.filter(c => c > start && c <= limit); let end = fit.length ? fit[fit.length - 1] : limit;
+          if (end - start < ph * 0.35) { const g2 = gaps.filter(c => c > start + ph * 0.35 && c <= limit); end = g2.length ? g2[g2.length - 1] : limit; }
+          out.push([start, end]); start = end;
+        }
+        return out;
+      };
+      // full width, or a little smaller (down to 75%) when that saves a page
+      let best = null;
+      for (let k = 1; k >= 0.749; k -= 0.05) { const pages = paginate(pagePx / k); if (!best || pages.length < best.pages.length) best = { k, pages }; }
+      const w = fitW * best.k, x0 = (PW - w) / 2;
+      best.pages.forEach(([start, end], pg) => {
+        const part = document.createElement('canvas'); part.width = canvas.width; part.height = end - start;
+        const cx = part.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, part.width, part.height); cx.drawImage(canvas, 0, start, canvas.width, part.height, 0, 0, canvas.width, part.height);
+        if (pg) pdf.addPage();
+        pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', x0, m, w, part.height * w / canvas.width);
+      });
+    }
     U.download(base + '.pdf', pdf.output('blob'), 'application/pdf');
   }
 
