@@ -1091,3 +1091,6 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 /* sales summary: อภินันทนาการ rows are not added to the totals */
 .ssf-nc{color:#888;font-weight:400}
 .ssf-ncl{font-size:10px;font-weight:400;color:#888;white-space:nowrap}
+/* room rates: ✏️ before each room type name */
+.rr-name{display:flex;align-items:flex-start;gap:6px}
+.rr-name .icon-btn{flex:none;margin-top:-4px}
