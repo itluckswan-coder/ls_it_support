@@ -2,9 +2,10 @@
 // owner, 13 Nov 2026: only the approval steps for now (รออนุมัติ · อนุมัติ · ตีกลับ), for function sheets and quotations
 const SEND = {
   created: false, sent: false, pending: true, approved: true, rejected: true, ack: false,        // ใบฟังก์ชัน
-  quote_pending: true, quote_approved: true, quote_rejected: true                               // ใบเสนอราคา
+  quote_pending: true, quote_approved: true, quote_rejected: true,                              // ใบเสนอราคา
+  test: true                                                                                     // ปุ่ม ทดสอบแจ้งเตือน LINE ใน LUX
 };
-const GROUP_ID = 'Cf995ea5be93892efbcffad9c8cc2b7b2'; // the LINE group (from the "เก็บ Group ID" workflow)
+const GROUP_ID = 'Cdfa4f3ef64472a17e5176618a318a81a'; // the LINE group (from the "เก็บ Group ID" workflow)
 
 const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const d = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${Number(m[3])} ${TH_M[Number(m[2]) - 1]} ${Number(m[1]) + 543}` : ''; };
@@ -14,6 +15,10 @@ for (const item of $input.all()) {
   const e = item.json.body || item.json;
   if (!e || !SEND[e.event]) continue;
   const b = e.beo || {}, q = e.quote || {};
+  if (e.event === 'test') {
+    out.push({ json: { to: GROUP_ID, messages: [{ type: 'text', text: ['🔔 ทดสอบการแจ้งเตือนจาก LUX', e.by ? 'โดย ' + e.by : '', 'ถ้าเห็นข้อความนี้ แปลว่า LUX → n8n → LINE ทำงานครบ'].filter(Boolean).join('\n') }] } });
+    continue;
+  }
   if (e.kind === 'quote') {
     const qn = `ใบเสนอราคา ${q.id}`;
     const qh = { quote_pending: `⏳ ${qn} ส่งขออนุมัติ`, quote_approved: `✅ ${qn} อนุมัติแล้ว`, quote_rejected: `↩️ ${qn} ถูกตีกลับ` }[e.event];
