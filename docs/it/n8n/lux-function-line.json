@@ -1,0 +1,92 @@
+{
+  "name": "LUX แจ้งเตือนใบฟังก์ชัน → LINE",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lux-function",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "name": "รับเหตุการณ์จาก LUX",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "lux-function",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "LUX secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// LUX → LINE: one message per function-sheet event. Turn an event off with false.\n// owner, 13 Nov 2026: only the approval steps for now (รออนุมัติ · อนุมัติ · ตีกลับ)\nconst SEND = { created: false, sent: false, pending: true, approved: true, rejected: true, ack: false };\nconst GROUP_ID = 'Cf995ea5be93892efbcffad9c8cc2b7b2'; // the LINE group (from the \"เก็บ Group ID\" workflow)\n\nconst TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];\nconst d = s => { const m = /^(\\d{4})-(\\d{2})-(\\d{2})/.exec(s || ''); return m ? `${Number(m[3])} ${TH_M[Number(m[2]) - 1]} ${Number(m[1]) + 543}` : ''; };\nconst range = (a, b) => !a ? '' : (!b || a === b ? d(a) : `${d(a)} – ${d(b)}`);\nconst out = [];\nfor (const item of $input.all()) {\n  const e = item.json.body || item.json;\n  if (!e || !SEND[e.event]) continue;\n  const b = e.beo || {}, q = e.quote || {};\n  const name = `ใบฟังก์ชัน ${b.id}${b.no ? ' (' + b.no + ')' : ''}`;\n  const head = {\n    created: `🆕 สร้าง${name}`,\n    sent: b.rev ? `📋 ${name} แก้ไขครั้งที่ ${b.rev} — ส่งให้แผนกแล้ว` : `📋 ${name} — ส่งให้แผนกแล้ว`,\n    pending: `⏳ ${name} มีการแก้ไข รออนุมัติ`,\n    approved: `✅ ${name} อนุมัติแล้ว`,\n    rejected: `↩️ ${name} ถูกตีกลับ`,\n    ack: `👍 ${(e.acked || []).join(', ')} รับทราบ${name}`\n  }[e.event];\n  const lines = [head, [q.title, q.client].filter(Boolean).join(' · '), [range(q.start, q.end), b.pax || (q.pax ? q.pax + ' ท่าน' : '')].filter(Boolean).join(' · ')];\n  if (e.event === 'rejected' && e.reason) lines.push('เหตุผล: ' + e.reason);\n  if ((e.event === 'sent' || e.event === 'ack') && (e.waiting || []).length) lines.push('รอรับทราบ: ' + e.waiting.join(', '));\n  if (e.event === 'ack' && !(e.waiting || []).length) lines.push('ครบทุกแผนกแล้ว');\n  if (e.by) lines.push('โดย ' + e.by);\n  if (e.link) lines.push(e.link);\n  out.push({ json: { to: GROUP_ID, messages: [{ type: 'text', text: lines.filter(Boolean).join('\\n').slice(0, 4900) }] } });\n}\nreturn out;"
+      },
+      "name": "จัดข้อความ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "ส่งเข้ากลุ่ม LINE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "LINE Messaging API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "รับเหตุการณ์จาก LUX": {
+      "main": [
+        [
+          {
+            "node": "จัดข้อความ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "จัดข้อความ": {
+      "main": [
+        [
+          {
+            "node": "ส่งเข้ากลุ่ม LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

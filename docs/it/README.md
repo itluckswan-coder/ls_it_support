@@ -179,4 +179,5 @@ GitHub (โค้ด) ── merge เข้า main ──► Actions "Deploy t
 - ตรวจสถานะเซิร์ฟเวอร์: https://luckswan-sales.it-luckswan.workers.dev/api/health
 - โค้ด: https://github.com/itluckswan-coder/ls_it_support
 - Cloudflare: https://dash.cloudflare.com
+- แจ้งเตือนใบฟังก์ชันเข้า LINE (n8n): `docs/it/n8n/README.md`
 - คู่มือการใช้งาน (ต้นฉบับ): `docs/manual` ใน repo · วิธีติดตั้งระบบใหม่: `worker/DEPLOY.md` · สำรอง/กู้คืน: `docs/backup/RESTORE.md`

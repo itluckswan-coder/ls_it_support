@@ -83,3 +83,17 @@ jobs:
       - name: Deploy worker and web app
         if: steps.secrets.outputs.ready == 'true'
         run: npx wrangler deploy
+
+      # LINE notifications through n8n (optional): the n8n webhook address and the shared secret, from repository
+      # secrets; nothing is printed. Without them the app works as before and sends nothing.
+      - name: Set the n8n notification secrets
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          N8N_WEBHOOK_URL: ${{ secrets.N8N_WEBHOOK_URL }}
+          N8N_SECRET: ${{ secrets.N8N_SECRET }}
+        run: |
+          if [ -z "$N8N_WEBHOOK_URL" ] || [ -z "$N8N_SECRET" ]; then echo "n8n secrets not set: LINE notifications stay off"; exit 0; fi
+          echo "::add-mask::$N8N_WEBHOOK_URL"; echo "::add-mask::$N8N_SECRET"
+          printf '%s' "$N8N_WEBHOOK_URL" | npx wrangler secret put N8N_WEBHOOK_URL > /dev/null
+          printf '%s' "$N8N_SECRET" | npx wrangler secret put N8N_SECRET > /dev/null
+          echo "n8n secrets set"

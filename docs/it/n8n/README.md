@@ -1,0 +1,69 @@
+# แจ้งเตือนใบฟังก์ชันเข้า LINE ผ่าน n8n
+
+LUX ส่งเหตุการณ์ของใบฟังก์ชันไปที่ n8n แล้ว n8n จัดข้อความภาษาไทยส่งเข้ากลุ่ม LINE
+
+```
+LUX (Cloudflare) ──เหตุการณ์ + รหัสลับ──► n8n (luckswanswan.app.n8n.cloud) ──► LINE Messaging API ──► กลุ่ม LINE
+```
+
+## เหตุการณ์ที่ส่ง
+
+| event | เมื่อไหร่ |
+|---|---|
+| `created` | สร้างใบฟังก์ชันใหม่ |
+| `sent` | กด "ส่งให้ … แผนก" (ถ้า `beo.rev` > 0 คือส่งฉบับแก้ไข) |
+| `pending` | มีการแก้ไขที่รออนุมัติ |
+| `approved` / `rejected` | อนุมัติ / ตีกลับ (มีเหตุผลใน `reason`) |
+| `ack` | แผนกกดรับทราบ (`acked` = แผนกที่เพิ่งรับทราบ, `waiting` = แผนกที่ยังไม่รับทราบ) |
+
+ข้อมูลที่ส่ง: เลขใบ, Function No., ฉบับแก้ไข, ชื่องาน, ชื่อลูกค้า (บริษัท), วันงาน, จำนวนคน, รายชื่อแผนก, ผู้ทำรายการ, ลิงก์เปิดใบ
+**ไม่ส่ง** ราคา ยอดเงิน เบอร์โทร หรืออีเมลลูกค้า
+
+ถ้ายังไม่ได้ตั้ง secret ทั้งสองตัว (ข้อ 3) LUX ทำงานตามปกติและไม่ส่งอะไร
+
+ตอนนี้เปิดไว้เฉพาะ `pending` · `approved` · `rejected` (รออนุมัติ · อนุมัติ · ตีกลับ) — เปิดตัวอื่นเพิ่มได้ที่ `SEND` ในกล่อง จัดข้อความ
+
+## ตั้งค่า (ทำครั้งเดียว)
+
+### 1. Credentials ใน n8n
+n8n › **Overview › Credentials › Create credential › Header Auth** สร้าง 2 ตัว
+
+| Credential name | Name | Value |
+|---|---|---|
+| `LINE Messaging API` | `Authorization` | `Bearer ` + Channel access token (จาก developers.line.biz) |
+| `LUX secret` | `X-LUX-Secret` | รหัสลับที่ตั้งเอง (สุ่มยาว 32 ตัวขึ้นไป เช่น จากโปรแกรมสร้างรหัสผ่าน) |
+
+ห้ามส่ง token หรือรหัสลับในแชท อีเมล หรือใส่ในไฟล์ใน repo นี้ (repo เป็นสาธารณะ)
+
+### 2. นำเข้า workflow
+1. n8n › **Create workflow** › เมนู **⋯ › Import from File** › เลือก `docs/it/n8n/lux-function-line.json`
+2. เปิดกล่อง **รับเหตุการณ์จาก LUX** › Credential เลือก `LUX secret`
+3. เปิดกล่อง **ส่งเข้ากลุ่ม LINE** › Credential เลือก `LINE Messaging API`
+4. กล่อง **จัดข้อความ**: บรรทัดบนสุด `SEND` เปิด/ปิดแต่ละเหตุการณ์ (`true` / `false`) · `GROUP_ID` คือกลุ่ม LINE ที่จะส่งเข้า
+5. **Save** แล้ว **Publish / Active**
+6. เปิดกล่อง **รับเหตุการณ์จาก LUX** › แท็บ **Production URL** › คัดลอก (ควรเป็น `https://luckswanswan.app.n8n.cloud/webhook/lux-function`)
+
+### 3. บอก LUX ว่าจะส่งไปที่ไหน (GitHub Secrets)
+GitHub › repo `ls_it_support` › **Settings › Secrets and variables › Actions › New repository secret**
+(ลิงก์ตรง: https://github.com/itluckswan-coder/ls_it_support/settings/secrets/actions/new)
+
+| Name | Secret |
+|---|---|
+| `N8N_WEBHOOK_URL` | Production URL จากข้อ 2.6 |
+| `N8N_SECRET` | รหัสลับเดียวกับ credential `LUX secret` |
+
+จากนั้น Actions › **Deploy to Cloudflare** › **Run workflow** (ระบบจะนำค่าไปตั้งใน Cloudflare ให้ · ดูขั้น "Set the n8n notification secrets" ต้องขึ้น `n8n secrets set`)
+
+### 4. ทดสอบ
+สร้าง / ส่ง / รับทราบใบฟังก์ชันสักใบใน LUX › ข้อความควรเด้งในกลุ่ม LINE ภายในไม่กี่วินาที
+ถ้าไม่เด้ง: n8n › workflow › **Executions** ดูว่ามีรายการเข้ามาไหม
+- ไม่มีรายการ → LUX ยังไม่ส่ง: เช็ค GitHub Secrets ทั้ง 2 ตัว และรัน Deploy ใหม่
+- มีรายการแต่สีแดงที่ "รับเหตุการณ์จาก LUX" → รหัสลับใน `LUX secret` ไม่ตรงกับ `N8N_SECRET`
+- สีแดงที่ "ส่งเข้ากลุ่ม LINE" → 401 = token ผิด (ต้องมี `Bearer ` นำหน้า) · 400 = Group ID ผิดหรือบอทไม่อยู่ในกลุ่ม
+
+## เปลี่ยนแปลงภายหลัง
+- **เลือกเหตุการณ์ที่จะแจ้ง:** แก้ `SEND` ในกล่อง จัดข้อความ
+- **ย้ายไปกลุ่มอื่น:** แก้ `GROUP_ID` (เอา Group ID จาก workflow "เก็บ Group ID")
+- **แยกกลุ่มตามแผนก:** ทำได้ในกล่องจัดข้อความ (ส่ง `to` ตาม `waiting`/`depts`) — ขอให้ผู้พัฒนาช่วยได้
+- **ย้าย n8n ไปเครื่องอื่น (เช่น NAS):** นำเข้าไฟล์เดิม แล้วเปลี่ยน `N8N_WEBHOOK_URL` ใน GitHub Secrets และรัน Deploy ใหม่
+- **ปิดการแจ้งเตือนทั้งหมด:** ปิด workflow ใน n8n หรือลบ `N8N_WEBHOOK_URL` ออกจาก GitHub Secrets แล้วรัน Deploy
