@@ -229,9 +229,12 @@ async function applyRules(env, user, kind, id, data, prev) {
     const pct = d.type === 'amt' ? (sub ? (Number(d.value) || 0) / sub * 100 : 0) : Number(d.value) || 0;
     if (pct > 10.0001 && !can(user, 'discount_over') && !(prev && prev.approval === 'approved' && JSON.stringify(prev.discount) === JSON.stringify(data.discount))) data.approval = 'pending';
     // approval to book a meeting room over another booking's times, and the quotation approval (อนุมัติใบเสนอราคา): only admins give or withdraw them
-    if (user.role !== 'admin') for (const k of ['overlapOk', 'bookOk']) { if (prev && prev[k]) data[k] = prev[k]; else delete data[k]; }
+    // … and the event approval (อนุมัติจัดงาน, after the customer confirmed; owner, 13 Nov 2026)
+    if (user.role !== 'admin') for (const k of ['overlapOk', 'bookOk', 'eventOk']) { if (prev && prev[k]) data[k] = prev[k]; else delete data[k]; }
     // จองชั่วคราว / ยืนยันแล้ว only once the admin approved the quotation; only admins send one back (ตีกลับ)
     if (user.role !== 'admin' && ['tentative', 'confirmed'].includes(data.status) && !data.bookOk && !(prev && prev.status === data.status)) fail(409, 'ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน');
+    // อนุมัติจัดงาน (status confirmed) is the admin's step only
+    if (user.role !== 'admin' && data.status === 'confirmed' && !(prev && prev.status === 'confirmed')) fail(409, 'ต้องให้ผู้ดูแลระบบอนุมัติจัดงาน');
     if (user.role !== 'admin') { if (prev && prev.okBack && data.status !== 'pending') data.okBack = prev.okBack; else if (!prev || !prev.okBack) delete data.okBack; }
   }
   if (kind === 'beo') {
@@ -372,12 +375,16 @@ async function putDoc(req, env, user, kind, id, ctx) {
  * sent (to the departments; rev > 0 = a revised sheet) · pending (a change waits for approval) · approved · rejected ·
  * ack (a department acknowledged). Only what the message needs is sent: no prices, no customer contact details. */
 /* Quotations (owner, 13 Nov 2026): quote_pending (sales sent it for approval, ส่งขออนุมัติ) · quote_approved (an admin
- * approved it, bookOk) · quote_rejected (an admin sent it back, okBack, with the reason). Same rules: no prices, no contacts. */
+ * approved it, bookOk) · quote_rejected (an admin sent it back, okBack, with the reason) · quote_custok (the customer
+ * confirmed, waiting for อนุมัติจัดงาน) · quote_eventok (the admin approved the event, อนุมัติจัดงาน). Same rules: no prices, no contacts. */
 async function notifyQuote(env, user, req, out, prev) {
   const ev = [];
   if (out.status === 'pending' && (!prev || prev.status !== 'pending')) ev.push({ event: 'quote_pending' });
   if (out.bookOk && !(prev && prev.bookOk)) ev.push({ event: 'quote_approved' });
   if (out.okBack && !(prev && prev.okBack && prev.okBack.at === out.okBack.at)) ev.push({ event: 'quote_rejected', reason: out.okBack.why || '' });
+  // the customer confirmed → waiting for the admin's อนุมัติจัดงาน; then the admin approved the event
+  if (out.custOk && !(prev && prev.custOk) && out.status !== 'confirmed') ev.push({ event: 'quote_custok' });
+  if (out.status === 'confirmed' && out.eventOk && !(prev && prev.eventOk)) ev.push({ event: 'quote_eventok' });
   if (!ev.length) return;
   let owner = '';
   if (out.owner) { const r = await env.DB.prepare("SELECT json_extract(data, '$.name') AS name FROM users WHERE id = ?").bind(String(out.owner)).first().catch(() => null); owner = (r && r.name) || ''; }

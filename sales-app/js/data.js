@@ -293,7 +293,9 @@
     admin: PERMS.map(p => p.id)
   };
   const STATUS = {
-    draft: 'ร่าง', pending: 'รออนุมัติ', tentative: 'จองชั่วคราว', confirmed: 'ยืนยันแล้ว', cancelled: 'ยกเลิก'
+    // owner, 13 Nov 2026: ร่าง → รออนุมัติ → รอยืนยันการจอง (admin approved; the room is held) → อนุมัติจัดงาน (the admin approves
+    // again after the customer confirmed) → อนุมัติฟังก์ชั่น (shown, not stored: the function sheet is approved, see App.qSt)
+    draft: 'ร่าง', pending: 'รออนุมัติ', tentative: 'รอยืนยันการจอง', confirmed: 'อนุมัติจัดงาน', cancelled: 'ยกเลิก', fnok: 'อนุมัติฟังก์ชั่น'
   };
 
   /* ---------------- catalog helpers (menus can be edited in the app) ---------------- */

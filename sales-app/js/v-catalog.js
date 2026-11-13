@@ -422,8 +422,8 @@
       <div class="amen">${r.amen.map(a => `<span>${H(a)}</span>`).join('')}</div>
       <div class="card" style="padding:14px 16px;margin:16px 0;display:flex;align-items:center;gap:12px"><div style="flex:1"><b>AV Package</b><div class="small muted">โปรเจกเตอร์คู่ ไมค์ไร้สาย 4 · ช่าง</div></div>${App.sw('AV Package', ui.av, 'data-change="meetAv"')}</div>
       <div class="between"><span class="small muted">${nd} วัน × ${U.n(price)}${ui.av ? ' + AV ' + U.n(8000 * nd) : ''}</span><b style="font:700 22px var(--fh)" class="num">${U.n(total)} ฿</b></div>
-      ${App.canQuote() ? `<div class="row" style="margin-top:14px;gap:8px"><span class="small muted">จองชั่วคราว</span><select class="input sm" style="width:auto" data-change="meetHold">${[0, 3, 7, 10, 14].map(d => `<option value="${d}" ${ui.holdDays === d ? 'selected' : ''}>${d ? d + ' วัน' : 'ไม่จอง'}</option>`).join('')}</select></div>
-      <button class="btn red block" style="margin-top:14px" data-act="meetAdd">${chosen ? 'อัปเดตในใบเสนอ' : 'เพิ่มในใบเสนอ'}${ui.holdDays ? ' + จองชั่วคราว ' + ui.holdDays + ' วัน' : ''}</button>` : ''}
+      ${App.canQuote() ? `<div class="row" style="margin-top:14px;gap:8px"><span class="small muted">กันห้องไว้</span><select class="input sm" style="width:auto" data-change="meetHold">${[0, 3, 7, 10, 14].map(d => `<option value="${d}" ${ui.holdDays === d ? 'selected' : ''}>${d ? d + ' วัน' : 'ไม่จอง'}</option>`).join('')}</select></div>
+      <button class="btn red block" style="margin-top:14px" data-act="meetAdd">${chosen ? 'อัปเดตในใบเสนอ' : 'เพิ่มในใบเสนอ'}${ui.holdDays ? ' + กันห้องไว้ ' + ui.holdDays + ' วัน' : ''}</button>` : ''}
     </div>
   </aside>
 </div>`;
@@ -458,7 +458,7 @@
           let held = false;
           if (ui.holdDays && q.bookOk && (q.status === 'draft' || q.status === 'pending')) { if (App.overlapOk(q)) { q.holdUntil = U.addDays(U.today(), ui.holdDays); q.status = 'tentative'; held = true; } else App.toast('ห้องทับเวลากับการจองอื่น — ยังไม่จองชั่วคราว ต้องให้ผู้ดูแลระบบอนุมัติในหน้าใบเสนอราคา'); }
           else if (ui.holdDays) { q.holdUntil = U.addDays(U.today(), ui.holdDays); held = true; }
-          App.touch(q, `เลือกห้อง ${r.name}${held ? ' + จองชั่วคราวถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''}`);
+          App.touch(q, `เลือกห้อง ${r.name}${held ? ' + กันห้องไว้ถึง ' + U.fmtD(q.holdUntil, { year: false }) : ''}`);
           App.render(); App.toast('อัปเดต ' + q.id + ' แล้ว');
         };
         apply();

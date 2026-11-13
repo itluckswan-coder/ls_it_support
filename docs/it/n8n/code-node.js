@@ -3,6 +3,7 @@
 const SEND = {
   created: false, sent: false, pending: true, approved: true, rejected: true, ack: false,        // ใบฟังก์ชัน
   quote_pending: true, quote_approved: true, quote_rejected: true,                              // ใบเสนอราคา
+  quote_custok: true, quote_eventok: true,                                                      // ลูกค้ายืนยัน → อนุมัติจัดงาน
   test: true                                                                                     // ปุ่ม ทดสอบแจ้งเตือน LINE ใน LUX
 };
 const GROUP_ID = 'Cdfa4f3ef64472a17e5176618a318a81a'; // the LINE group (from the "เก็บ Group ID" workflow)
@@ -21,7 +22,8 @@ for (const item of $input.all()) {
   }
   if (e.kind === 'quote') {
     const qn = `ใบเสนอราคา ${q.id}`;
-    const qh = { quote_pending: `⏳ ${qn} ส่งขออนุมัติ`, quote_approved: `✅ ${qn} อนุมัติแล้ว`, quote_rejected: `↩️ ${qn} ถูกตีกลับ` }[e.event];
+    const qh = { quote_pending: `⏳ ${qn} ส่งขออนุมัติ`, quote_approved: `✅ ${qn} อนุมัติแล้ว`, quote_rejected: `↩️ ${qn} ถูกตีกลับ`,
+      quote_custok: `🤝 ${qn} ลูกค้ายืนยันการจองแล้ว รออนุมัติจัดงาน`, quote_eventok: `🎉 ${qn} อนุมัติจัดงานแล้ว — ออกใบฟังก์ชันได้` }[e.event];
     const ql = [qh, [q.title, q.client].filter(Boolean).join(' · '), [range(q.start, q.end), q.pax ? q.pax + ' ท่าน' : ''].filter(Boolean).join(' · ')];
     if (q.owner) ql.push('พนักงานขาย: ' + q.owner);
     if (e.event === 'quote_rejected' && e.reason) ql.push('เหตุผล: ' + e.reason);
