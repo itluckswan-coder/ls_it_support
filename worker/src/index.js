@@ -229,9 +229,12 @@ async function applyRules(env, user, kind, id, data, prev) {
     const pct = d.type === 'amt' ? (sub ? (Number(d.value) || 0) / sub * 100 : 0) : Number(d.value) || 0;
     if (pct > 10.0001 && !can(user, 'discount_over') && !(prev && prev.approval === 'approved' && JSON.stringify(prev.discount) === JSON.stringify(data.discount))) data.approval = 'pending';
     // approval to book a meeting room over another booking's times, and the quotation approval (อนุมัติใบเสนอราคา): only admins give or withdraw them
-    if (user.role !== 'admin') for (const k of ['overlapOk', 'bookOk']) { if (prev && prev[k]) data[k] = prev[k]; else delete data[k]; }
+    // … and the event approval (อนุมัติจัดงาน, after the customer confirmed; owner, 13 Nov 2026)
+    if (user.role !== 'admin') for (const k of ['overlapOk', 'bookOk', 'eventOk']) { if (prev && prev[k]) data[k] = prev[k]; else delete data[k]; }
     // จองชั่วคราว / ยืนยันแล้ว only once the admin approved the quotation; only admins send one back (ตีกลับ)
     if (user.role !== 'admin' && ['tentative', 'confirmed'].includes(data.status) && !data.bookOk && !(prev && prev.status === data.status)) fail(409, 'ต้องให้ผู้ดูแลระบบอนุมัติใบเสนอราคาก่อน');
+    // อนุมัติจัดงาน (status confirmed) is the admin's step only
+    if (user.role !== 'admin' && data.status === 'confirmed' && !(prev && prev.status === 'confirmed')) fail(409, 'ต้องให้ผู้ดูแลระบบอนุมัติจัดงาน');
     if (user.role !== 'admin') { if (prev && prev.okBack && data.status !== 'pending') data.okBack = prev.okBack; else if (!prev || !prev.okBack) delete data.okBack; }
   }
   if (kind === 'beo') {

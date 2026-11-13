@@ -4,9 +4,9 @@
   const { U, App, Store } = g, D = g.DATA, H = U.esc;
 
   // validated categorical set (CVD-safe, direct-labelled because the amber is low contrast)
-  const C = { teal: '#0E9F8E', red: '#B8333A', blue: '#4A62B8', amber: '#D99A00', gray: '#8D928F', ink: '#17211F', grid: '#EFEDE6', axis: '#D9D6CC', muted: '#6B716E' };
+  const C = { orange: '#E06A1B', teal: '#0E9F8E', red: '#B8333A', blue: '#4A62B8', amber: '#D99A00', gray: '#8D928F', ink: '#17211F', grid: '#EFEDE6', axis: '#D9D6CC', muted: '#6B716E' };
   const SEC = [['meet', 'ห้องประชุม', C.teal], ['food', 'อาหารและเครื่องดื่ม', C.red], ['room', 'ห้องพัก', C.blue], ['other', 'บริการอื่น ๆ', C.amber]];
-  const ST = [['draft', 'ร่าง', C.gray], ['pending', 'รออนุมัติ', C.blue], ['tentative', 'จองชั่วคราว', C.amber], ['confirmed', 'ยืนยันแล้ว', C.teal]];
+  const ST = [['draft', 'ร่าง', C.gray], ['pending', 'รออนุมัติ', C.orange], ['tentative', 'รอยืนยันการจอง', C.amber], ['confirmed', 'อนุมัติจัดงาน', C.teal]];
   const PENDING = ['pending', 'tentative'];
 
   const short = v => { const x = Math.abs(v); return x >= 1e6 ? (v / 1e6).toFixed(x >= 1e7 ? 0 : 1) + 'M' : x >= 1e3 ? Math.round(v / 1e3) + 'K' : String(Math.round(v)); };
@@ -141,14 +141,14 @@
 <div class="grid g4" style="margin-bottom:16px">
   <div class="card kpi" style="background:var(--ink);color:#fff;border-color:var(--ink)"><div class="small" style="color:#C9CFCC">รายรับยืนยันทั้งช่วง</div><div class="v" style="color:var(--yellow)">${baht(total)}</div><div class="small" style="color:#C9CFCC">${cq.length} งาน · ${U.n(pax)} ท่าน</div></div>
   <div class="card kpi"><div class="small muted">เทียบกับ${H(pr.label)}</div><div class="v ${delta == null ? '' : delta >= 0 ? 'teal' : 'red'}">${delta == null ? '—' : (delta >= 0 ? '▲ ' : '▼ ') + Math.abs(delta) + '<small>%</small>'}</div><div class="small muted">${H(pr.label)} ${baht(prevV)}${delta == null ? ' · ไม่มีงานยืนยันให้เทียบ' : ''}</div></div>
-  <div class="card kpi"><div class="small muted">รอยืนยัน (ส่งแล้ว + จองชั่วคราว)</div><div class="v" style="color:var(--yellow-d)">${baht(pipe)}</div><div class="small muted">ถ้าปิดได้ทั้งหมด รวม ${baht(total + pipe)}</div></div>
+  <div class="card kpi"><div class="small muted">รอยืนยัน (รออนุมัติ + รอยืนยันการจอง)</div><div class="v" style="color:var(--yellow-d)">${baht(pipe)}</div><div class="small muted">ถ้าปิดได้ทั้งหมด รวม ${baht(total + pipe)}</div></div>
   <div class="card kpi"><div class="small muted">ปิดการขายได้</div><div class="v">${sent.length ? Math.round(won.length / sent.length * 100) : 0}<small>%</small></div><div class="small muted">ยืนยัน ${won.length} จาก ${sent.length} ใบที่ส่ง · เฉลี่ย ${baht(cq.length ? total / cq.length : 0)}/งาน</div></div>
 </div>
 <section class="card" style="margin-bottom:16px;overflow:hidden">
   <div class="card-hd"><div><h2>รายรับราย${unit} · ${H(rg.label)}</h2><div class="small muted">ชี้หรือแตะที่กราฟเพื่อดูตัวเลข</div></div>
     <div class="row wrap" style="gap:14px"><span class="dash-key"><i style="background:${C.teal}"></i>ยืนยันแล้ว</span><span class="dash-key"><i class="dash" style="border-color:${C.amber}"></i>รอยืนยัน</span><button class="link" data-act="dashTable">${ui.table ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง'}</button></div></div>
   <div class="pad dash-chart">${ui.table ? `<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>${unit}</th><th class="r">ยืนยันแล้ว (฿)</th><th class="r">รอยืนยัน (฿)</th></tr></thead><tbody>${ps.map((p, i) => `<tr${p.cur ? ' style="font-weight:600"' : ''}><td>${H(p.label)}${p.cur ? ' (วันนี้อยู่ในช่วงนี้)' : ''}</td><td class="r num">${U.n(Math.round(conf[i]))}</td><td class="r num">${U.n(Math.round(pend[i]))}</td></tr>`).join('')}</tbody></table></div>`
-      : lineChart(ps, [{ name: 'ยืนยันแล้ว', vals: conf, color: C.teal }, { name: 'รอยืนยัน', vals: pend, color: C.amber, dash: true }])}</div>
+      : lineChart(ps, [{ name: 'อนุมัติจัดงาน', vals: conf, color: C.teal }, { name: 'รอยืนยัน', vals: pend, color: C.amber, dash: true }])}</div>
 </section>
 <div class="split" style="margin-bottom:16px">
   <section class="card" style="overflow:hidden;min-width:0">

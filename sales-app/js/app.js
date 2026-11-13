@@ -205,7 +205,9 @@
       return o;
     },
     // tentative is yellow (st-hold); st-tentative stays the red badge used for urgent / rejected
-    statusBadge(s) { return `<span class="badge st-${s === 'tentative' ? 'hold' : s}">${H(D.STATUS[s] || s)}</span>`; },
+    statusBadge(s) { if (s && typeof s === 'object') s = App.qSt(s); return `<span class="badge st-${s === 'tentative' ? 'hold' : s}">${H(D.STATUS[s] || s)}</span>`; },
+    // the stage a quotation shows: อนุมัติฟังก์ชั่น once the event is approved and its function sheet is approved
+    qSt(q) { return q.status === 'confirmed' && g.Approval && Store.db.beos.some(b => b.quoteId === q.id && g.Approval.state(b) === 'approved') ? 'fnok' : q.status; },
     save() { Store.save(); },
     sw(name, on, attrs = '') { return `<label class="switch"><input type="checkbox" ${on ? 'checked' : ''} ${attrs} aria-label="${H(name)}"><span></span></label>`; },
 
@@ -285,7 +287,7 @@
     pickQuoteModal(title, cb, filter) {
       const qs = App.siteQuotes().filter(filter || (q => q.status !== 'cancelled')).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
       App.modal(`<h2>${H(title)}</h2>
-        <div>${qs.map(q => `<button class="pick" data-id="${H(q.id)}"><span><b>${H(q.client)}</b><br><span class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</span></span>${App.statusBadge(q.status)}</button>`).join('') || '<div class="empty">ไม่มีใบเสนอราคา</div>'}</div>
+        <div>${qs.map(q => `<button class="pick" data-id="${H(q.id)}"><span><b>${H(q.client)}</b><br><span class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</span></span>${App.statusBadge(q)}</button>`).join('') || '<div class="empty">ไม่มีใบเสนอราคา</div>'}</div>
         <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button><a class="btn red" href="#/new" data-act="closeModal">+ ใบเสนอราคาใหม่</a></div>`,
       bg => bg.querySelectorAll('.pick').forEach(b => b.onclick = () => { App.closeModal(); cb(b.dataset.id); }));
     },
@@ -454,7 +456,7 @@
     if (!v) { box.classList.add('hidden'); return; }
     const qs = App.siteQuotes().filter(q => [q.id, q.client, q.title, q.contact, q.email].join(' ').toLowerCase().includes(v)).slice(0, 8);
     const bs = App.siteBeos().filter(b => b.id.toLowerCase().includes(v)).slice(0, 3);
-    box.innerHTML = qs.map(q => `<a href="#/quote/${encodeURIComponent(q.id)}"><b>${H(q.client)}</b> ${App.statusBadge(q.status)}<div class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</div></a>`).join('') +
+    box.innerHTML = qs.map(q => `<a href="#/quote/${encodeURIComponent(q.id)}"><b>${H(q.client)}</b> ${App.statusBadge(q)}<div class="small muted">${H(q.id)} · ${H(q.title)} · ${U.fmtRange(q.start, q.end)}</div></a>`).join('') +
       bs.map(b => `<a href="#/beo/${encodeURIComponent(b.id)}"><b>${H(b.id)}</b><div class="small muted">ใบฟังก์ชัน</div></a>`).join('') || '<div class="empty small">ไม่พบผลลัพธ์</div>';
     box.classList.remove('hidden');
   }, 120);
@@ -578,7 +580,7 @@
       <td><b style="font-weight:500">${H(q.client)}</b><div class="sub">${H(q.title)}<span class="mono" style="display:none"> · ${H(q.id)}</span></div></td>
       <td class="hide-m">${U.fmtRange(q.start, q.end, { year: false })}</td><td class="hide-m num">${U.n(q.pax)}</td>
       <td class="r num b">${U.n(Math.round(App.calc(q).net))}<div class="sub show-m" style="font-weight:400">${U.fmtRange(q.start, q.end, { year: false })}</div></td>
-      <td class="r">${App.statusBadge(q.status)}</td></tr>`).join('')}
+      <td class="r">${App.statusBadge(q)}</td></tr>`).join('')}
     </tbody></table>
   </section>
   <aside class="stack">
@@ -615,7 +617,7 @@
         if (q.followUp && q.status !== 'confirmed' && q.status !== 'cancelled')
           out.push({ p: 2, color: 'var(--yellow)', title: `${q.client}`, sub: q.followUp, action: open + 'แก้ใบเสนอ</a>' });
         if (q.status === 'tentative' && q.holdUntil && U.diffDays(today, q.holdUntil) <= 7 && U.diffDays(today, q.holdUntil) >= 0 && !q.followUp)
-          out.push({ p: 2, color: 'var(--red)', title: `${q.client} จองชั่วคราวใกล้หมดอายุ`, sub: 'หมดอายุ ' + U.fmtD(q.holdUntil), action: open + 'ติดตาม</a>' });
+          out.push({ p: 2, color: 'var(--red)', title: `${q.client} กันห้องไว้ใกล้หมดเวลา (รอยืนยันการจอง)`, sub: 'หมดอายุ ' + U.fmtD(q.holdUntil), action: open + 'ติดตาม</a>' });
         if (q.status === 'draft') {
           const age = U.diffDays((q.updatedAt || today).slice(0, 10), today);
           if (age >= 2) out.push({ p: 3, color: 'var(--muted2)', title: q.client, sub: `ร่างค้างไว้ ${age} วัน`, action: open + 'ทำต่อ</a>' });
