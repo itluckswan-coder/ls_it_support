@@ -846,10 +846,24 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     }
   };
   const DU = () => App.state.ui.doc;
+  // print: a quotation that runs only a little past one A4 page (up to about 25%, e.g. just the signatures spilling over)
+  // is shrunk evenly to fit one page (down to 80%); a longer one prints on several pages as before. Runs for the print button and Ctrl+P.
+  const MM = 96 / 25.4, PG_W = 190, PG_H = 275; // the A4 area inside the 10 mm print margins, with a little room
+  let fitOld = null;
+  const qdUnfit = () => { const p = document.getElementById('qdPaper'); if (p && fitOld != null) { p.setAttribute('style', fitOld); if (!fitOld) p.removeAttribute('style'); } fitOld = null; };
+  const qdFit = () => {
+    const p = document.getElementById('qdPaper'); if (!p) return;
+    qdUnfit(); fitOld = p.getAttribute('style') || '';
+    Object.assign(p.style, { width: PG_W + 'mm', maxWidth: 'none', minWidth: '0', padding: '0', boxShadow: 'none' });
+    const k = PG_H * MM / p.offsetHeight;
+    if (k >= 1 || k < 0.8) return;
+    p.style.zoom = k; p.style.width = (PG_W / k) + 'mm';
+  };
+  window.addEventListener('beforeprint', qdFit); window.addEventListener('afterprint', qdUnfit);
   Object.assign(App.ACT, {
     docCh(el) { DU().ch = el.dataset.v; App.render(); },
     docToDel(el) { DU().to.splice(Number(el.dataset.i), 1); App.render(); },
-    docPrint() { window.print(); },
+    docPrint() { qdFit(); window.print(); },
     // the customer's copy leaves out the service charge / VAT breakdown; the full copy shows it
     docVer(el) { DU().full = el.dataset.v === '1'; App.render(); },
     qdTab(el) {
@@ -913,7 +927,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         const url = location.href.split('#')[0] + '#/doc/' + qid(q.id);
         (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => App.toast('คัดลอกลิงก์แล้ว'), () => App.modal(`<h2>ลิงก์ใบเสนอราคา</h2><input class="input" value="${H(url)}" readonly onclick="this.select()"><div class="acts"><button class="btn dark" data-act="closeModal">ปิด</button></div>`));
         note = 'คัดลอกลิงก์ใบเสนอราคา';
-      } else { window.print(); note = 'พิมพ์ / บันทึก PDF'; }
+      } else { qdFit(); window.print(); note = 'พิมพ์ / บันทึก PDF'; }
       const ver = (q.history || []).filter(h => /^เวอร์ชัน/.test(h.t)).length + 1;
       App.touch(q, `เวอร์ชัน ${ver} · ${note}`);
       setTimeout(() => App.render(), 50);
