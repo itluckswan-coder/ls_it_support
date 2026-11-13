@@ -392,7 +392,7 @@ async function postN8n(env, bodies) {
   const url = String(env.N8N_WEBHOOK_URL || '').trim();
   if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url)) return; // https only (http on this machine, for testing)
   await Promise.all(bodies.map(body => fetch(url, {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': String(env.N8N_SECRET || '') }, body: JSON.stringify(body)
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': String(env.N8N_SECRET || '').trim() }, body: JSON.stringify(body)
   }).catch(err => console.error('n8n', err.message))));
 }
 async function notifyBeo(env, user, req, out, prev) {
@@ -420,7 +420,7 @@ async function notifyBeo(env, user, req, out, prev) {
   const url = String(env.N8N_WEBHOOK_URL || '').trim();
   if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url)) return; // https only (http on this machine, for testing)
   await Promise.all(ev.map(e => fetch(url, {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': String(env.N8N_SECRET || '') },
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': String(env.N8N_SECRET || '').trim() },
     body: JSON.stringify(Object.assign({}, base, e, e.ackedIds ? { acked: e.ackedIds.map(nm), ackedIds: undefined } : {}))
   }).catch(err => console.error('n8n', err.message))));
 }
@@ -635,6 +635,22 @@ async function api(req, env, url, ctx) {
     const { data, users } = await readJson(req);
     if (!data || !Array.isArray(data.quotes)) fail(400, 'ไฟล์สำรองไม่ถูกต้อง');
     return json({ ok: true, rows: await importData(env, user, data, { users: !!users }) });
+  }
+  // admin: send one test event to n8n and report n8n's answer, so a missing LINE message can be traced without the dashboards
+  // (n8n answers 403 for a wrong secret and 404 for an unknown or unpublished webhook, and records no execution for either)
+  if (path === '/api/n8n-test' && m === 'POST') {
+    if (user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบ');
+    const raw = String(env.N8N_WEBHOOK_URL || ''), rawSec = String(env.N8N_SECRET || ''), sec = rawSec.trim(), u = raw.trim();
+    const info = { urlSet: !!u, secretSet: !!sec, urlSpaces: raw !== u, secretSpaces: rawSec !== sec, secretLen: sec.length };
+    let p = null; try { p = new URL(u); } catch (e) { /* not a URL */ }
+    if (!p) return json(Object.assign(info, { ok: false, why: u ? 'bad_url' : 'no_url' }));
+    Object.assign(info, { host: p.host, path: p.pathname, https: p.protocol === 'https:' });
+    try {
+      const r = await fetch(u, { method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': sec },
+        body: JSON.stringify({ kind: 'test', event: 'test', by: user.name || '', at: now(), link: new URL(req.url).origin }) });
+      const t = (await r.text().catch(() => '')).slice(0, 300);
+      return json(Object.assign(info, { ok: r.ok, status: r.status, body: t }));
+    } catch (e) { return json(Object.assign(info, { ok: false, why: 'network', error: String(e.message || e).slice(0, 200) })); }
   }
   if (path === '/api/audit' && m === 'GET') {
     const kind = url.searchParams.get('kind'), id = url.searchParams.get('id');

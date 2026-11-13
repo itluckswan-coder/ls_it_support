@@ -2,7 +2,8 @@
 // owner, 13 Nov 2026: only the approval steps for now (รออนุมัติ · อนุมัติ · ตีกลับ), for function sheets and quotations
 const SEND = {
   created: false, sent: false, pending: true, approved: true, rejected: true, ack: false,        // ใบฟังก์ชัน
-  quote_pending: true, quote_approved: true, quote_rejected: true                               // ใบเสนอราคา
+  quote_pending: true, quote_approved: true, quote_rejected: true,                              // ใบเสนอราคา
+  test: true                                                                                     // ปุ่ม ทดสอบแจ้งเตือน LINE ใน LUX
 };
 const GROUP_ID = 'Cf995ea5be93892efbcffad9c8cc2b7b2'; // the LINE group (from the "เก็บ Group ID" workflow)
 
@@ -14,6 +15,10 @@ for (const item of $input.all()) {
   const e = item.json.body || item.json;
   if (!e || !SEND[e.event]) continue;
   const b = e.beo || {}, q = e.quote || {};
+  if (e.event === 'test') {
+    out.push({ json: { to: GROUP_ID, messages: [{ type: 'text', text: ['🔔 ทดสอบการแจ้งเตือนจาก LUX', e.by ? 'โดย ' + e.by : '', 'ถ้าเห็นข้อความนี้ แปลว่า LUX → n8n → LINE ทำงานครบ'].filter(Boolean).join('\n') }] } });
+    continue;
+  }
   if (e.kind === 'quote') {
     const qn = `ใบเสนอราคา ${q.id}`;
     const qh = { quote_pending: `⏳ ${qn} ส่งขออนุมัติ`, quote_approved: `✅ ${qn} อนุมัติแล้ว`, quote_rejected: `↩️ ${qn} ถูกตีกลับ` }[e.event];

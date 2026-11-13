@@ -360,6 +360,7 @@
         <button data-act="exportData">สำรองข้อมูล (ดาวน์โหลด)</button>
         ${!cloud || me.role === 'admin' ? `<button data-act="importData">${cloud ? 'นำเข้าข้อมูลสำรองขึ้นคลาวด์' : 'นำเข้าข้อมูลสำรอง'}</button>` : ''}
         ${me.role === 'admin' && !cloud ? '<button data-act="resetData">รีเซ็ตเป็นข้อมูลตัวอย่าง</button>' : ''}
+        ${me.role === 'admin' && cloud ? '<button data-act="n8nTest">ทดสอบแจ้งเตือน LINE</button>' : ''}
         <button data-act="logout" style="color:var(--red)">ออกจากระบบ</button>`;
       document.body.appendChild(p);
     },
@@ -374,6 +375,28 @@
           <div><b>คอมพิวเตอร์ (Chrome / Edge)</b><div class="muted">คลิกไอคอนติดตั้ง <b>⊕</b> ที่แถบที่อยู่ หรือเมนู → “ติดตั้ง Luck Swan Sales”</div></div>
           <div class="note">${g.API && g.API.online ? 'ข้อมูลเก็บในฐานข้อมูลกลาง ทุกเครื่องเห็นข้อมูลเดียวกัน — ถ้าออฟไลน์จะดูข้อมูลล่าสุดได้ และส่งการแก้ไขเมื่อกลับมาออนไลน์' : 'ใช้งานแบบออฟไลน์ได้หลังเปิดครั้งแรก ข้อมูลถูกเก็บในเครื่องนี้ — ใช้ “สำรองข้อมูล” เพื่อย้ายไปเครื่องอื่น'}</div>
         </div><div class="acts"><button class="btn dark" data-act="closeModal">เข้าใจแล้ว</button></div>`);
+    },
+    // send one test event through n8n to the LINE group and explain n8n's answer in plain words
+    async n8nTest() {
+      document.querySelector('.pop')?.remove();
+      App.modal('<h2>ทดสอบแจ้งเตือน LINE</h2><div class="muted">กำลังส่งข้อความทดสอบไปที่ n8n…</div>');
+      let r; try { r = await g.API.req('POST', 'n8n-test', {}); } catch (e) { r = { ok: false, why: 'lux', error: e.message }; }
+      const st = r.status, warn = [];
+      if (r.urlSpaces) warn.push('ลิงก์ N8N_WEBHOOK_URL มีช่องว่างหรือขึ้นบรรทัดใหม่ติดมา — ระบบตัดออกให้แล้ว แต่ควรแก้ใน GitHub Secrets');
+      if (r.secretSpaces) warn.push('รหัส N8N_SECRET มีช่องว่างหรือขึ้นบรรทัดใหม่ติดมาหน้า/หลัง — ระบบตัดออกให้แล้ว ถ้า n8n ยังปฏิเสธ ให้เช็คว่า Value ใน n8n ไม่มีช่องว่างติดมาเช่นกัน');
+      const msg = r.why === 'no_url' ? 'ระบบยังไม่ได้ตั้ง N8N_WEBHOOK_URL — ตั้งใน GitHub Secrets แล้ว deploy ใหม่'
+        : r.why === 'bad_url' ? 'N8N_WEBHOOK_URL ไม่ใช่ลิงก์ที่ถูกต้อง — แก้ใน GitHub Secrets แล้ว deploy ใหม่'
+        : r.why === 'network' ? 'ส่งไปที่ n8n ไม่ได้ (' + (r.error || '') + ') — เช็คว่าชื่อเว็บใน N8N_WEBHOOK_URL ถูกต้อง'
+        : r.why === 'lux' ? 'เรียกระบบ LUX ไม่สำเร็จ: ' + (r.error || '')
+        : r.ok ? '✅ n8n รับข้อความแล้ว (' + st + ') — ดูในกลุ่ม LINE ว่ามีข้อความ 🔔 ทดสอบ ถ้าไม่มี ให้ดูแท็บ Executions ใน n8n ว่ากล่องไหนเป็นสีแดง'
+        : st === 403 || st === 401 ? '❌ n8n ปฏิเสธ (' + st + '): รหัสลับไม่ตรงกัน — Value ของ credential “LUX secret” ใน n8n ต้องตรงกับ N8N_SECRET ใน GitHub ทุกตัวอักษร และช่อง Name ต้องเป็น X-LUX-Secret'
+        : st === 404 ? '❌ n8n ไม่พบ webhook นี้ (404): workflow ยังไม่ได้กด Publish หรือลิงก์ไม่ตรงกับ Production URL'
+        : '❌ n8n ตอบกลับ ' + st;
+      App.modal(`<h2>ทดสอบแจ้งเตือน LINE</h2><div class="note ${r.ok ? '' : 'red'}" style="margin-bottom:10px">${H(msg)}</div>
+        ${warn.map(w => `<div class="note red" style="margin-bottom:8px">${H(w)}</div>`).join('')}
+        <div class="small muted" style="line-height:1.7">ส่งไปที่: ${H((r.host || '-') + (r.path || ''))}${r.https === false ? ' (ไม่ใช่ https)' : ''}<br>
+        รหัสลับในระบบ: ${r.secretSet ? 'ตั้งแล้ว (' + r.secretLen + ' ตัวอักษร)' : 'ยังไม่ได้ตั้ง'}${r.body ? '<br>n8n ตอบ: ' + H(r.body) : ''}</div>
+        <div class="acts"><button class="btn dark" data-act="closeModal">ปิด</button></div>`);
     },
     exportData() { document.querySelector('.pop')?.remove(); U.download('luckswan-sales-backup-' + U.today() + '.json', Store.exportJSON()); App.toast('ดาวน์โหลดไฟล์สำรองแล้ว'); },
     importData() {
