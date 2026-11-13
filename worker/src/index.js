@@ -344,7 +344,7 @@ async function applyRules(env, user, kind, id, data, prev) {
   return data;
 }
 
-async function putDoc(req, env, user, kind, id) {
+async function putDoc(req, env, user, kind, id, ctx) {
   if (!KINDS.includes(kind)) fail(404, 'ไม่รู้จักประเภทข้อมูล');
   if (!id || id.length > 80) fail(400, 'รหัสไม่ถูกต้อง');
   const { data, version } = await readJson(req);
@@ -360,8 +360,44 @@ async function putDoc(req, env, user, kind, id) {
   const v = (row ? row.version : 0) + 1, at = now();
   await env.DB.prepare('INSERT INTO docs (kind, id, data, version, updated_at, updated_by, deleted) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data, version = excluded.version, updated_at = excluded.updated_at, updated_by = excluded.updated_by, deleted = 0')
     .bind(kind, id, JSON.stringify(out), v, at, user.id).run();
+  if (kind === 'beo' && env.N8N_WEBHOOK_URL) { const p = notifyBeo(env, user, req, out, prev).catch(e => console.error('n8n', e.message)); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
   if (kind === 'beo' || kind === 'quote' || kind === 'task' || kind === 'leave') await audit(env, user, kind, id, prev ? 'update' : 'create', kind === 'beo' ? out.approval && out.approval.state : kind === 'task' || kind === 'leave' ? out.status : '');
   return json({ doc: { kind, id, version: v, data: out } });
+}
+
+/* ---------------- notifications to n8n (→ LINE) ----------------
+ * When the secret N8N_WEBHOOK_URL is set, every change worth telling about on a function sheet is posted there, one
+ * request per event, with the header X-LUX-Secret: N8N_SECRET so n8n can check it came from here. Events: created ·
+ * sent (to the departments; rev > 0 = a revised sheet) · pending (a change waits for approval) · approved · rejected ·
+ * ack (a department acknowledged). Only what the message needs is sent: no prices, no customer contact details. */
+async function notifyBeo(env, user, req, out, prev) {
+  const ev = [], st = b => (b && b.approval && b.approval.state) || 'approved';
+  if (!prev) ev.push({ event: 'created' });
+  if (out.status === 'sent' && (!prev || prev.status !== 'sent' || (out.rev || 0) > (prev.rev || 0))) ev.push({ event: 'sent' });
+  if (prev && st(prev) !== st(out) && ['pending', 'approved', 'rejected'].includes(st(out))) ev.push({ event: st(out), reason: out.approval.comment || '' });
+  else if (!prev && st(out) === 'pending') ev.push({ event: 'pending', reason: '' });
+  const acked = Object.keys(out.depts || {}).filter(k => out.depts[k] && out.depts[k].ack && !(prev && prev.depts && prev.depts[k] && prev.depts[k].ack));
+  if (prev && acked.length) ev.push({ event: 'ack', ackedIds: acked });
+  if (!ev.length) return;
+  // the quotation (title, client, dates) and the department names (settings.depts, else the built-in list)
+  const qr = await env.DB.prepare("SELECT data FROM docs WHERE kind = 'quote' AND id = ? AND deleted = 0").bind(String(out.quoteId || '')).first();
+  const q = qr ? JSON.parse(qr.data) : {};
+  const sr = await env.DB.prepare("SELECT json_extract(data, '$.depts') AS d FROM docs WHERE kind = 'settings' AND id = 'main' AND deleted = 0").first();
+  let names = { kitchen: 'ครัว/F&B', banquet: 'จัดเลี้ยง', av: 'ช่าง/AV', front: 'ส่วนหน้า', hk: 'แม่บ้าน', acc: 'บัญชี' };
+  try { const list = sr && sr.d ? JSON.parse(sr.d) : null; if (Array.isArray(list)) for (const d of list) if (d && d.id) names[d.id] = d.short || d.name || d.id; } catch (e) { /* keep the built-in names */ }
+  const ids = Object.keys(out.depts || {}), nm = k => names[k] || k;
+  const base = {
+    beo: { id: out.id, no: (out.fn && out.fn.no) || '', rev: out.rev || 0, status: out.status, pax: out.confirmPax || '' },
+    quote: { id: q.id || out.quoteId || '', title: q.title || '', client: q.client || '', start: q.start || '', end: q.end || '', pax: q.pax || '' },
+    by: user.name || '', at: now(), link: new URL(req.url).origin + '/#/beo/' + encodeURIComponent(out.id),
+    depts: ids.map(nm), waiting: ids.filter(k => !(out.depts[k] && out.depts[k].ack)).map(nm)
+  };
+  const url = String(env.N8N_WEBHOOK_URL || '').trim();
+  if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url)) return; // https only (http on this machine, for testing)
+  await Promise.all(ev.map(e => fetch(url, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': String(env.N8N_SECRET || '') },
+    body: JSON.stringify(Object.assign({}, base, e, e.ackedIds ? { acked: e.ackedIds.map(nm), ackedIds: undefined } : {}))
+  }).catch(err => console.error('n8n', err.message))));
 }
 
 async function deleteDoc(env, user, kind, id) {
@@ -385,7 +421,7 @@ async function deleteDoc(env, user, kind, id) {
   return json({ ok: true });
 }
 
-async function decideBeo(req, env, user, id, decision) {
+async function decideBeo(req, env, user, id, decision, ctx) {
   const { comment } = await readJson(req);
   const row = await env.DB.prepare("SELECT * FROM docs WHERE kind = 'beo' AND id = ? AND deleted = 0").bind(id).first();
   if (!row) fail(404, 'ไม่พบใบฟังก์ชัน');
@@ -401,6 +437,7 @@ async function decideBeo(req, env, user, id, decision) {
   const v = row.version + 1;
   await env.DB.prepare("UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE kind = 'beo' AND id = ?").bind(JSON.stringify(b), v, now(), user.id, id).run();
   await audit(env, user, 'beo', id, decision, comment || '');
+  if (env.N8N_WEBHOOK_URL) { const p = notifyBeo(env, user, req, b, JSON.parse(row.data)).catch(e => console.error('n8n', e.message)); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
   return json({ doc: { kind: 'beo', id, version: v, data: b } });
 }
 
@@ -511,7 +548,7 @@ async function setup(req, env) {
 }
 
 /* ---------------- router ---------------- */
-async function api(req, env, url) {
+async function api(req, env, url, ctx) {
   const path = url.pathname.replace(/\/+$/, '');
   const m = req.method;
   if (path === '/api/health') return json({ ok: true, setup: (await userCount(env)) === 0, serverTime: now() });
@@ -530,10 +567,10 @@ async function api(req, env, url) {
   let r;
   if ((r = /^\/api\/doc\/([a-z]+)\/(.+)$/.exec(path))) {
     const id = decodeURIComponent(r[2]);
-    if (m === 'PUT') return putDoc(req, env, user, r[1], id);
+    if (m === 'PUT') return putDoc(req, env, user, r[1], id, ctx);
     if (m === 'DELETE') return deleteDoc(env, user, r[1], id);
   }
-  if ((r = /^\/api\/beo\/(.+)\/(approve|reject)$/.exec(path)) && m === 'POST') return decideBeo(req, env, user, decodeURIComponent(r[1]), r[2]);
+  if ((r = /^\/api\/beo\/(.+)\/(approve|reject)$/.exec(path)) && m === 'POST') return decideBeo(req, env, user, decodeURIComponent(r[1]), r[2], ctx);
   if ((r = /^\/api\/users\/([^/]+)$/.exec(path)) && m === 'PUT') return putUser(req, env, user, decodeURIComponent(r[1]));
   if ((r = /^\/api\/users\/([^/]+)$/.exec(path)) && m === 'DELETE') {
     if (user.role !== 'admin') fail(403, 'เฉพาะผู้ดูแลระบบที่ลบบัญชีผู้ใช้ได้');
@@ -583,10 +620,10 @@ async function api(req, env, url) {
 }
 
 export default {
-  async fetch(req, env) {
+  async fetch(req, env, ctx) {
     const url = new URL(req.url);
     if (url.pathname.startsWith('/api/')) {
-      try { return await api(req, env, url); }
+      try { return await api(req, env, url, ctx); }
       catch (e) {
         if (e instanceof HttpError) return json({ error: e.message }, e.status);
         console.error(e);
