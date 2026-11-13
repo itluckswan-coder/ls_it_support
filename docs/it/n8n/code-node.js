@@ -5,7 +5,7 @@ const SEND = {
   quote_pending: true, quote_approved: true, quote_rejected: true,                              // ใบเสนอราคา
   test: true                                                                                     // ปุ่ม ทดสอบแจ้งเตือน LINE ใน LUX
 };
-const GROUP_ID = 'Cf995ea5be93892efbcffad9c8cc2b7b2'; // the LINE group (from the "เก็บ Group ID" workflow)
+const GROUP_ID = 'Cdfa4f3ef64472a17e5176618a318a81a'; // the LINE group (from the "เก็บ Group ID" workflow)
 
 const TH_M = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 const d = s => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); return m ? `${Number(m[3])} ${TH_M[Number(m[2]) - 1]} ${Number(m[1]) + 543}` : ''; };
