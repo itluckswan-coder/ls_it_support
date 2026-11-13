@@ -361,6 +361,7 @@ async function putDoc(req, env, user, kind, id, ctx) {
   await env.DB.prepare('INSERT INTO docs (kind, id, data, version, updated_at, updated_by, deleted) VALUES (?, ?, ?, ?, ?, ?, 0) ON CONFLICT(kind, id) DO UPDATE SET data = excluded.data, version = excluded.version, updated_at = excluded.updated_at, updated_by = excluded.updated_by, deleted = 0')
     .bind(kind, id, JSON.stringify(out), v, at, user.id).run();
   if (kind === 'beo' && env.N8N_WEBHOOK_URL) { const p = notifyBeo(env, user, req, out, prev).catch(e => console.error('n8n', e.message)); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
+  if (kind === 'quote' && env.N8N_WEBHOOK_URL) { const p = notifyQuote(env, user, req, out, prev).catch(e => console.error('n8n', e.message)); if (ctx && ctx.waitUntil) ctx.waitUntil(p); }
   if (kind === 'beo' || kind === 'quote' || kind === 'task' || kind === 'leave') await audit(env, user, kind, id, prev ? 'update' : 'create', kind === 'beo' ? out.approval && out.approval.state : kind === 'task' || kind === 'leave' ? out.status : '');
   return json({ doc: { kind, id, version: v, data: out } });
 }
@@ -370,6 +371,30 @@ async function putDoc(req, env, user, kind, id, ctx) {
  * request per event, with the header X-LUX-Secret: N8N_SECRET so n8n can check it came from here. Events: created ·
  * sent (to the departments; rev > 0 = a revised sheet) · pending (a change waits for approval) · approved · rejected ·
  * ack (a department acknowledged). Only what the message needs is sent: no prices, no customer contact details. */
+/* Quotations (owner, 13 Nov 2026): quote_pending (sales sent it for approval, ส่งขออนุมัติ) · quote_approved (an admin
+ * approved it, bookOk) · quote_rejected (an admin sent it back, okBack, with the reason). Same rules: no prices, no contacts. */
+async function notifyQuote(env, user, req, out, prev) {
+  const ev = [];
+  if (out.status === 'pending' && (!prev || prev.status !== 'pending')) ev.push({ event: 'quote_pending' });
+  if (out.bookOk && !(prev && prev.bookOk)) ev.push({ event: 'quote_approved' });
+  if (out.okBack && !(prev && prev.okBack && prev.okBack.at === out.okBack.at)) ev.push({ event: 'quote_rejected', reason: out.okBack.why || '' });
+  if (!ev.length) return;
+  let owner = '';
+  if (out.owner) { const r = await env.DB.prepare("SELECT json_extract(data, '$.name') AS name FROM users WHERE id = ?").bind(String(out.owner)).first().catch(() => null); owner = (r && r.name) || ''; }
+  const base = {
+    kind: 'quote',
+    quote: { id: out.id || '', title: out.title || '', client: out.client || '', start: out.start || '', end: out.end || '', pax: out.pax || '', owner },
+    by: user.name || '', at: now(), link: new URL(req.url).origin + '/#/quote/' + encodeURIComponent(out.id || '')
+  };
+  await postN8n(env, ev.map(e => Object.assign({}, base, e)));
+}
+async function postN8n(env, bodies) {
+  const url = String(env.N8N_WEBHOOK_URL || '').trim();
+  if (!/^https:\/\//.test(url) && !/^http:\/\/(localhost|127\.0\.0\.1)[:/]/.test(url)) return; // https only (http on this machine, for testing)
+  await Promise.all(bodies.map(body => fetch(url, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-lux-secret': String(env.N8N_SECRET || '') }, body: JSON.stringify(body)
+  }).catch(err => console.error('n8n', err.message))));
+}
 async function notifyBeo(env, user, req, out, prev) {
   const ev = [], st = b => (b && b.approval && b.approval.state) || 'approved';
   if (!prev) ev.push({ event: 'created' });
