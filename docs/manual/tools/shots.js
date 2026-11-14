@@ -32,7 +32,10 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await p.evaluate(() => { const q = Store.quote('QT-2611-042'); delete q.bookOk; delete q.okBack; q.status = 'draft'; App.render(); }); await click('[data-act=qAskOk]'); await click('.modal-bg .acts .btn:last-child');
     await p.evaluate(() => document.querySelector('section.card:has([data-act=qBookOk])').scrollIntoView({ block: 'center' })); await shot('quote-ask');
     await click('[data-act=qBookOk]'); await click('.modal-bg .acts .btn:last-child');
-    await p.evaluate(() => document.querySelector('section.card:has([data-act=qStatus])').scrollIntoView({ block: 'center' })); await shot('quote-approve');
+    await p.evaluate(() => document.querySelector('section.card:has([data-act=qCustOk])').scrollIntoView({ block: 'center' })); await shot('quote-approve');
+    // sales mark the customer's confirmation → the admin's อนุมัติจัดงาน box (orange)
+    await click('[data-act=qCustOk]'); await click('.modal-bg .acts .btn:last-child');
+    await p.evaluate(() => document.querySelector('section.card:has([data-act=qEventOk])').scrollIntoView({ block: 'center' })); await shot('quote-event');
     await go('#/doc/QT-2611-042'); await shot('quote-doc'); await click('[data-act=docVer][data-v="1"]'); await shot('quote-doc-full'); await click('[data-act=qdTab][data-v=edit]'); await shot('quote-doc-edit');
     await click('[data-act=qdCancel]'); await click('[data-act=docVer][data-v="0"]');
     await go('#/doc/QT-2611-044'); await p.evaluate(() => { const r = document.querySelector('.qd-rimgs'); if (r) r.scrollIntoView({ block: 'center' }); }); await shot('quote-doc-rooms');
