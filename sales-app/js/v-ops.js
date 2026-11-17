@@ -511,20 +511,73 @@
   const PENCIL = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   const TRASH = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
   const EMP = id => Store.db.employees.find(e => e.id === id);
-  // staffing rules by guest count: { dept: [{ upTo: 50, n: 1 }, …, { upTo: null, n: 4 }] } — n people per shift
-  const DEFAULT_RULES = { kitchen: [{ upTo: 50, n: 1 }, { upTo: 100, n: 2 }, { upTo: 150, n: 3 }, { upTo: null, n: 4 }] };
-  const staffRules = () => (Store.db.settings && Store.db.settings.staffRules) || DEFAULT_RULES;
-  const ruleNeed = (dp, pax) => {
-    const tiers = staffRules()[dp]; if (!tiers || !tiers.length) return null;
-    const t = tiers.find(x => x.upTo == null || pax <= x.upTo) || tiers[tiers.length - 1];
-    return Math.max(0, Number(t.n) || 0);
+  // staffing rules: { dept: [{ upTo: 50, n: 1 }, …, { upTo: null, n: 4 }] } — n people per shift by guests per event;
+  // housekeeping (hk) counts guest rooms instead, and the banquet has a second table for parties ('banquet:party')
+  // the owner's manpower plan (แผนงานกรอบ อัตรากำลังคน, 17 Nov 2026): ห้องอาหาร → kitchen/F&B, จัดเลี้ยง ประชุม / งานเลี้ยงสังสรรค์,
+  // แม่บ้าน by rooms. Settings saved before it (staffRulesV < 2) read with these four tables; saving the rules page stores them.
+  const OWNER_RULES = {
+    kitchen: [{ upTo: 30, n: 1 }, { upTo: 50, n: 2 }, { upTo: 100, n: 3 }, { upTo: 150, n: 4 }, { upTo: null, n: 5 }],
+    banquet: [{ upTo: 50, n: 1 }, { upTo: 100, n: 2 }, { upTo: 150, n: 3 }, { upTo: null, n: 4 }],
+    'banquet:party': [{ upTo: 50, n: 2 }, { upTo: 100, n: 3 }, { upTo: 150, n: 4 }, { upTo: null, n: 5 }],
+    hk: [{ upTo: 16, n: 1 }, { upTo: 36, n: 2 }, { upTo: 53, n: 3 }, { upTo: 70, n: 4 }, { upTo: null, n: 5 }]
+  };
+  const RULES_V = 2;
+  const staffRules = () => {
+    const st = Store.db.settings || {}, r = st.staffRules;
+    return r && st.staffRulesV === RULES_V ? r : Object.assign({}, r || {}, JSON.parse(JSON.stringify(OWNER_RULES)));
+  };
+  const BY_ROOMS = dp => dp === 'hk';
+  const PARTY_CATS = ['gala', 'cocktail', 'wedding'];
+  // guest rooms in the quotation (the organiser's free rooms too; not the late check-out line)
+  const roomsOf = q => (q.items || []).filter(i => i.sec === 'room' && i.ref !== 'late').reduce((a, i) => a + (Number(i.q1) || 0), 0);
+  // a party day: a gala / cocktail / wedding menu served that day
+  const partyDay = (q, idx) => (q.items || []).some(i => i.sec === 'food' && PARTY_CATS.includes((D.FOOD.find(f => f.id === i.ref) || {}).cat) && (!(i.sched || []).length || i.sched.some(x => x.day === idx)));
+  const tierN = (tiers, v) => { const t = tiers.find(x => x.upTo == null || v <= x.upTo) || tiers[tiers.length - 1]; return Math.max(0, Number(t.n) || 0); };
+  // people per shift for a department on day idx of the event (1, 2, …); null = no rule for it
+  const ruleNeed = (dp, q, idx) => {
+    const R = staffRules(), tiers = R[dp]; if (!tiers || !tiers.length) return null;
+    if (BY_ROOMS(dp)) return tierN(tiers, roomsOf(q));
+    const party = dp === 'banquet' && partyDay(q, idx) && (R['banquet:party'] || []).length;
+    return tierN(party ? R['banquet:party'] : tiers, Number(q.pax) || 0);
   };
   // only the departments with rules switched on get shifts, each sized by its rule; the others are added by hand
   function genPlan(q) {
     const plan = genPlanBase(q);
-    for (const day of Object.values(plan.days)) for (const [dp, shifts] of Object.entries(day)) { const n = ruleNeed(dp, q.pax); if (n == null) delete day[dp]; else shifts.forEach(s => { s.need = n; }); }
+    Object.keys(plan.days).sort().forEach((d, i) => { const day = plan.days[d];
+      for (const [dp, shifts] of Object.entries(day)) { const n = ruleNeed(dp, q, i + 1); if (!n) delete day[dp]; else shifts.forEach(s => { s.need = n; }); } });
     return plan;
   }
+  /* ---- automatic staffing (owner, 17 Nov 2026): fill each shift up to what it needs with that department's people of
+     the event's own property — not anyone off that day in the work roster (DAY OFF · EXTRA · VC · WOP · CDO), already on a
+     shift that day (this event or another), or over 48 h a week; the fewest hours first. People already chosen stay. ---- */
+  const OFF = c => ['OFF', 'EX', 'VC', 'WOP'].includes(c) || /^CDO/.test(c || '');
+  const rosterKey = iso => { const d = U.d(iso); let y = d.getFullYear(), m = d.getMonth() + 1; if (d.getDate() >= 26) { m++; if (m > 12) { m = 1; y++; } } return y + '-' + String(m).padStart(2, '0'); };
+  const rosterCode = (site, dp, id, date) => {
+    const r = (Store.db.rosters || []).find(x => x.id === site + ':' + dp + ':' + rosterKey(date)), row = r && (r.rows || []).find(x => x.emp === id);
+    return (row && row.cells && row.cells[date]) || '';
+  };
+  const shiftH = s => Math.max(0, U.hm(s.end) - U.hm(s.start));
+  const onDay = (date, id, except) => Object.values(Store.db.staff || {}).some(p => p && p.days && Object.values(p.days[date] || {}).flat().some(x => x !== except && x.staff.includes(id)));
+  const planHours = (plan, id) => Object.values(plan.days).flatMap(d => Object.values(d).flat()).filter(x => x.staff.includes(id)).reduce((a, x) => a + shiftH(x), 0);
+  // who could take shift s of department dp on date (best first)
+  function pickFor(q, plan, date, dp, s) {
+    const site = App.siteOfQ(q), load = e => (Number(e.hours) || 0) + otHours(e.id, plan) + planHours(plan, e.id);
+    return Store.db.employees.filter(e => e.dept === dp && siteOf(e) === site && !s.staff.includes(e.id) && !onDay(date, e.id, s)
+      && !OFF(rosterCode(site, dp, e.id, date)) && load(e) + shiftH(s) <= 48)
+      .sort((a, b) => load(a) - load(b) || String(a.name).localeCompare(String(b.name), 'th'));
+  }
+  function autoFill(q, plan) {
+    let added = 0, short = 0;
+    for (const date of Object.keys(plan.days).sort()) for (const [dp, shifts] of Object.entries(plan.days[date])) for (const s of shifts) {
+      while (s.staff.length < s.need) { const p = pickFor(q, plan, date, dp, s)[0]; if (!p) break; s.staff.push(p.id); added++; }
+      short += Math.max(0, s.need - s.staff.length);
+    }
+    return { added, short };
+  }
+  const autoResult = (r, q) => App.modal(`<h2>${r.added ? 'จัดพนักงานแล้ว' : 'ไม่มีพนักงานที่จัดได้'}</h2>
+    <p>${r.added ? `ลงรอบให้ ${r.added} คน` : 'ไม่มีพนักงานของแผนกนั้นที่ว่างในวันงาน'} · เฉพาะพนักงานของ${H(siteName(App.siteOfQ(q)))}</p>
+    ${r.short ? `<div class="note red">ยังขาด ${r.short} คน — กดที่รอบสีแดงเพื่อเลือกเพิ่ม หรือ “+ ขอกำลังพล”</div>` : '<div class="note" style="background:var(--teal-soft);color:var(--teal-d)">ครบทุกรอบแล้ว</div>'}
+    <div class="acts"><button class="btn dark" data-act="closeModal">ตกลง</button></div>`);
   const ruleDepts = () => D.DEPTS.filter(d => { const t = staffRules()[d.id]; return t && t.length; });
   function genPlanBase(q) {
     const days = {}, pax = q.pax;
@@ -556,15 +609,22 @@
       const canEdit = App.can('staff'), ui = App.state.ui;
       if (!ui.rulesDraft) ui.rulesDraft = JSON.parse(JSON.stringify(staffRules()));
       const R = ui.rulesDraft, dis = canEdit ? '' : 'disabled';
+      // one table of tiers for a rule key ('banquet', 'banquet:party', …); housekeeping counts rooms, the others guests
+      const table = (key, title) => {
+        const tiers = R[key], rooms = BY_ROOMS(key), unit = rooms ? 'ห้อง' : 'คน';
+        return `${title ? `<div class="small b" style="margin-top:12px">${H(title)}</div>` : ''}
+          <table class="tbl" style="margin-top:8px"><thead><tr><th>${rooms ? 'จำนวนห้องพักของงาน' : 'จำนวนลูกค้าต่องาน'}</th><th class="r">พนักงานต่อรอบ</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>
+          ${tiers.map((t, i) => { const from = i ? (Number(tiers[i - 1].upTo) || 0) + 1 : 1, last = i === tiers.length - 1; return `<tr>
+            <td><div class="row" style="gap:6px;flex-wrap:nowrap">${last ? `<span>${from} ${unit}ขึ้นไป</span>` : `<span style="white-space:nowrap">${from} –</span><input class="input" style="width:76px;height:36px" type="number" min="${from}" value="${t.upTo}" data-change="ruleUp" data-d="${key}" data-i="${i}" ${dis} aria-label="ถึงจำนวน${unit}"><span>${unit}</span>`}</div></td>
+            <td class="r"><span class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input class="input" style="width:70px;height:36px" type="number" min="0" value="${t.n}" data-change="ruleN" data-d="${key}" data-i="${i}" ${dis} aria-label="จำนวนพนักงาน"><span>คน</span></span></td>
+            ${canEdit ? `<td class="r">${tiers.length > 1 ? `<button class="icon-btn us-edit emp-del" data-act="ruleDel" data-d="${key}" data-i="${i}" title="ลบช่วงนี้" aria-label="ลบช่วงนี้">${TRASH}</button>` : ''}</td>` : ''}</tr>`; }).join('')}
+          </tbody></table>${canEdit ? `<button class="link" style="margin-top:8px" data-act="ruleAdd" data-d="${key}">+ เพิ่มช่วงจำนวน${rooms ? 'ห้องพัก' : 'ลูกค้า'}</button>` : ''}`;
+      };
       const card = dp => {
         const tiers = R[dp.id];
-        const body = !tiers ? '<p class="small muted" style="margin:6px 0 0">ไม่จัดรอบให้แผนกนี้ตอนสร้างแผน — เปิด “ใช้เงื่อนไข” เพื่อให้สร้างรอบตามจำนวนลูกค้า หรือเพิ่มรอบเองภายหลัง</p>' : `
-          <table class="tbl" style="margin-top:8px"><thead><tr><th>จำนวนลูกค้าต่องาน</th><th class="r">พนักงานต่อรอบ</th>${canEdit ? '<th></th>' : ''}</tr></thead><tbody>
-          ${tiers.map((t, i) => { const from = i ? (Number(tiers[i - 1].upTo) || 0) + 1 : 1, last = i === tiers.length - 1; return `<tr>
-            <td><div class="row" style="gap:6px;flex-wrap:nowrap">${last ? `<span>${from} คนขึ้นไป</span>` : `<span style="white-space:nowrap">${from} –</span><input class="input" style="width:76px;height:36px" type="number" min="${from}" value="${t.upTo}" data-change="ruleUp" data-d="${dp.id}" data-i="${i}" ${dis} aria-label="ถึงจำนวนลูกค้า"><span>คน</span>`}</div></td>
-            <td class="r"><span class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><input class="input" style="width:70px;height:36px" type="number" min="0" value="${t.n}" data-change="ruleN" data-d="${dp.id}" data-i="${i}" ${dis} aria-label="จำนวนพนักงาน"><span>คน</span></span></td>
-            ${canEdit ? `<td class="r">${tiers.length > 1 ? `<button class="icon-btn us-edit emp-del" data-act="ruleDel" data-d="${dp.id}" data-i="${i}" title="ลบช่วงนี้" aria-label="ลบช่วงนี้">${TRASH}</button>` : ''}</td>` : ''}</tr>`; }).join('')}
-          </tbody></table>${canEdit ? `<button class="link" style="margin-top:8px" data-act="ruleAdd" data-d="${dp.id}">+ เพิ่มช่วงจำนวนลูกค้า</button>` : ''}`;
+        const body = !tiers ? '<p class="small muted" style="margin:6px 0 0">ไม่จัดรอบให้แผนกนี้ตอนสร้างแผน — เปิด “ใช้เงื่อนไข” เพื่อให้สร้างรอบตามจำนวนลูกค้า หรือเพิ่มรอบเองภายหลัง</p>'
+          : dp.id === 'banquet' ? table('banquet', 'งานประชุม (เบรก / เบรกและอาหารกลางวัน)') + (R['banquet:party'] ? table('banquet:party', 'งานเลี้ยงสังสรรค์ (ดื่มสังสรรค์พร้อมทานอาหาร) — วันที่มี Gala dinner · Cocktail · งานแต่งงาน') : '')
+          : (BY_ROOMS(dp.id) ? '<div class="xs muted" style="margin-top:6px">คิดจากจำนวนห้องพักในใบเสนอราคา (เฉลี่ย 16 ห้องต่อคนต่อวัน)</div>' : '') + table(dp.id);
         return `<section class="card pad"><div class="between"><div class="row" style="gap:8px"><i class="dot" style="background:${dp.color};border-radius:3px"></i><h3>${H(dp.name)}</h3></div>
           <label class="row small" style="gap:8px;cursor:pointer">ใช้เงื่อนไข${App.sw('ใช้เงื่อนไขของ ' + dp.short, !!tiers, `data-change="ruleOn" data-d="${dp.id}" ${dis}`)}</label></div>${body}</section>`;
       };
@@ -617,7 +677,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       App.state.ui.staffQ = q.id;
       const plan = db.staff[q.id];
       const head = (extra) => `<div class="page-hd"><div><h1>รอบพนักงาน</h1><div class="small muted"><button class="link" data-act="stPickQ">${H(q.id)} · ${H(q.title)} · ${H(q.client)} · ${q.pax} ท่าน ▾</button></div></div>${extra || ''}</div>`;
-      if (!plan) return head() + `<div class="card pad" style="text-align:center"><p class="muted">ยังไม่มีแผนรอบพนักงานสำหรับงานนี้</p>${(rd => rd.length ? `<p class="small muted" style="margin:-4px 0 14px">จัดรอบตามเงื่อนไขจำนวนพนักงาน (${U.n(q.pax)} ท่าน) · ${rd.map(d => `${H(d.short)} ${ruleNeed(d.id, q.pax)} คน/รอบ`).join(' · ')}</p>` : '<p class="small muted" style="margin:-4px 0 14px">ยังไม่ได้ตั้งเงื่อนไขจำนวนพนักงานของแผนกใด — ตั้งได้ที่แท็บ “เงื่อนไขจำนวนพนักงาน”</p>')(ruleDepts())}<button class="btn red" data-act="stGen">สร้างแผนจากใบเสนอราคา</button></div>`;
+      if (!plan) return head() + `<div class="card pad" style="text-align:center"><p class="muted">ยังไม่มีแผนรอบพนักงานสำหรับงานนี้</p>${(rd => rd.length ? `<p class="small muted" style="margin:-4px 0 14px">จัดรอบตามเงื่อนไขจำนวนพนักงาน (${U.n(q.pax)} ท่าน) · ${rd.map(d => `${H(d.short)} ${ruleNeed(d.id, q, 1)} คน/รอบ${BY_ROOMS(d.id) ? ' (' + roomsOf(q) + ' ห้อง)' : ''}`).join(' · ')}</p>` : '<p class="small muted" style="margin:-4px 0 14px">ยังไม่ได้ตั้งเงื่อนไขจำนวนพนักงานของแผนกใด — ตั้งได้ที่แท็บ “เงื่อนไขจำนวนพนักงาน”</p>')(ruleDepts())}<button class="btn red" data-act="stGen">สร้างแผนจากใบเสนอราคา</button></div>`;
       const dates = Object.keys(plan.days).sort();
       const ui = App.state.ui.staff && App.state.ui.staff.q === q.id ? App.state.ui.staff : (App.state.ui.staff = { q: q.id, date: dates[0], ot: null });
       if (!plan.days[ui.date]) ui.date = dates[0];
@@ -654,13 +714,13 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       // todos
       const todos = [];
       for (const [dp, shifts] of Object.entries(day)) for (const s of shifts) if (s.staff.length < s.need) {
-        const free = Store.db.employees.filter(e => e.dept === dp && !Object.values(day).flat().some(x => x.staff.includes(e.id)));
+        const free = pickFor(q, plan, date, dp, s);
         todos.push({ c: 'var(--red)', t: `${dept(dp).short} ขาด ${s.need - s.staff.length} คน · ${s.label} ${s.start}–${s.end}`, s: free.length ? `มีพนักงานว่าง ${free.length} คน — แนะนำ: ${free[0].name}` : 'ไม่มีพนักงานว่างในแผนก', a: `<button class="btn dark sm" data-act="stAssign" data-dept="${dp}" data-s="${s.id}">มอบหมาย</button>` });
       }
       for (const o of plan.ot.filter(o => o.status === 'pending')) todos.push({ c: 'var(--yellow)', t: `ต่อรอบ ${dept(o.dept).short} รออนุมัติ · ${o.staff.length} คน`, s: `${U.fmtD(o.date, { year: false })} · +${o.hours} ชม. · ${o.reason}`, a: App.can('staff') ? `<button class="btn ghost sm" data-act="stOtApprove" data-id="${o.id}">อนุมัติ</button>` : '<span class="small muted">รอผู้จัดการ</span>' });
       for (const e of Store.db.employees) { const h = e.hours + otHours(e.id, plan); if (h >= 48 && Object.values(day).flat().some(s => s.staff.includes(e.id))) todos.push({ c: 'var(--muted2)', t: `${e.name} ชั่วโมงสะสม ${h} ชม.`, s: 'ครบ 48 ชม./สัปดาห์ ควรจัดวันหยุด', a: `<button class="btn ghost sm" data-act="stOff" data-e="${e.id}">จัดวันหยุด</button>` }); }
       return head(`<div class="row wrap"><div class="seg white">${dates.map((d, i) => `<button class="${d === date ? 'on' : ''}" data-act="stDate" data-v="${d}">${U.DS[U.d(d).getDay()]} ${U.fmtD(d, { year: false })}</button>`).join('')}</div>
-        ${App.can('staff') ? '<button class="btn ghost" data-act="stApplyRules">ใช้เงื่อนไขกับแผนนี้</button>' : ''}<button class="btn ghost" data-act="stShare">ส่งตารางให้หัวหน้าแผนก</button><button class="btn dark" data-act="stShift">+ เพิ่มรอบ</button></div>`) + `
+        ${App.can('staff') ? '<button class="btn ghost" data-act="stApplyRules">ใช้เงื่อนไขกับแผนนี้</button><button class="btn teal" data-act="stAuto">จัดคนอัตโนมัติ</button>' : ''}<button class="btn ghost" data-act="stShare">ส่งตารางให้หัวหน้าแผนก</button><button class="btn dark" data-act="stShift">+ เพิ่มรอบ</button></div>`) + `
 <div class="grid g4" style="margin-bottom:16px">
   <div class="card kpi"><div class="small muted">พนักงานที่ต้องใช้</div><div class="v">${need} <small>คน</small></div><div class="small muted">${Object.keys(day).length} แผนก · วันที่ ${dayIdx} (${U.DS[U.d(date).getDay()]} ${U.fmtD(date, { year: false })})</div></div>
   <div class="card kpi"><div class="small muted">จัดรอบแล้ว</div><div class="v">${have} <small>/ ${need} คน</small></div><div class="bar"><i style="width:${need ? have / need * 100 : 0}%"></i></div><div class="small muted" style="margin-top:6px">${need ? Math.round(have / need * 100) : 0}% ของที่ต้องใช้</div></div>
@@ -696,8 +756,9 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       const cur = ot || d || (App.state.ui.staffOtDraft = { id: null, date, dept: shifts[0].dp, shiftId: shifts[0].s.id, hours: 2, reason: 'เก็บงานเลี้ยง + ล้างครัว', staff: [], status: 'new' });
       const sh = (day[cur.dept] || []).find(s => s.id === cur.shiftId) || shifts[0].s;
       const emps = sh.staff.map(EMP).filter(Boolean);
-      const extra = Store.db.employees.filter(e => e.dept === cur.dept && !sh.staff.includes(e.id) && !cur.staff.includes(e.id));
-      const others = Store.db.employees.filter(e => e.dept !== cur.dept && !cur.staff.includes(e.id));
+      const here = e => siteOf(e) === App.siteOfQ(q);
+      const extra = Store.db.employees.filter(e => here(e) && e.dept === cur.dept && !sh.staff.includes(e.id) && !cur.staff.includes(e.id));
+      const others = Store.db.employees.filter(e => here(e) && e.dept !== cur.dept && !cur.staff.includes(e.id));
       const editable = cur.status === 'new' || cur.status === 'draft';
       const stLabel = { new: 'ใหม่', draft: 'ร่าง · ยังไม่ส่ง', pending: 'รออนุมัติ', approved: 'อนุมัติแล้ว', rejected: 'ไม่อนุมัติ' }[cur.status];
       return `<div class="row" style="margin-bottom:14px"><h2>ต่อรอบ</h2><span class="badge ${cur.status === 'approved' ? 'st-confirmed' : 'st-sent'}">${stLabel}</span>${plan.ot.some(o => o.date === date) ? `<span class="spacer"></span><button class="link" data-act="stOtNew">+ ใหม่</button>` : ''}</div>
@@ -736,7 +797,21 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     stGen() {
       const q = Store.quote(App.state.ui.staffQ);
       if (!ruleDepts().length) { App.toast('ยังไม่ได้ตั้งเงื่อนไขจำนวนพนักงาน — ตั้งที่แท็บ “เงื่อนไขจำนวนพนักงาน” ก่อน'); return; }
-      Store.db.staff[q.id] = genPlan(q); Store.save(); App.render(); App.toast('สร้างแผนแล้ว — กดที่รอบเพื่อมอบหมายพนักงาน'); },
+      const plan = Store.db.staff[q.id] = genPlan(q); Store.save(); App.render();
+      App.modal(`<h2>จัดพนักงานลงรอบอัตโนมัติไหม?</h2>
+        <p>สร้างแผนรอบพนักงานของงาน ${H(q.id)} แล้ว — ให้ระบบเลือกพนักงานของแต่ละแผนก <b>เฉพาะ${H(siteName(App.siteOfQ(q)))}</b> ลงทุกรอบตามจำนวนในเงื่อนไขเลยไหม?</p>
+        <ul class="small muted" style="margin:0 0 6px;padding-left:18px"><li>ไม่เลือกคนที่หยุดวันนั้นในตารางการทำงาน (DAY OFF · EXTRA · VC · WOP · CDO)</li><li>ไม่เลือกคนที่ติดรอบอื่นวันเดียวกัน หรือเกิน 48 ชม./สัปดาห์</li><li>เลือกคนที่ชั่วโมงสะสมน้อยก่อน · แก้รายชื่อทีหลังได้</li></ul>
+        <div class="acts"><button class="btn ghost" data-act="stAutoNo">จัดเอง</button><button class="btn red" data-act="stAutoGo">จัดคนอัตโนมัติ</button></div>`);
+    },
+    stAutoNo() { App.closeModal(); App.toast('กดที่รอบสีแดง หรือ “มอบหมาย” เพื่อเลือกพนักงานของแผนกนั้น'); },
+    stAutoGo() {
+      const q = Store.quote(App.state.ui.staffQ), p = SP(); if (!q || !p || !App.can('staff')) return;
+      const r = autoFill(q, p); Store.save(); App.render(); autoResult(r, q);
+    },
+    stAuto() {
+      const q = Store.quote(App.state.ui.staffQ), p = SP(); if (!q || !p || !App.can('staff')) return;
+      App.confirm(`จัดพนักงานของ${siteName(App.siteOfQ(q))} ลงทุกรอบที่ยังขาดของงาน ${q.id}? (คนที่เลือกไว้แล้วยังอยู่)`, () => { const r = autoFill(q, p); Store.save(); App.render(); autoResult(r, q); }, 'จัดคนอัตโนมัติ');
+    },
     stDate(el) { App.state.ui.staff.date = el.dataset.v; App.state.ui.staff.ot = null; App.render(); },
     stShare() {
       const q = Store.quote(App.state.ui.staffQ), p = SP(), date = App.state.ui.staff.date, day = p.days[date];
@@ -759,7 +834,7 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
     stAssign(el) {
       const p = SP(), date = App.state.ui.staff.date, day = p.days[date], s = day[el.dataset.dept].find(x => x.id === el.dataset.s);
       const busy = new Set(Object.values(day).flat().filter(x => x !== s && !(U.hm(x.end) <= U.hm(s.start) || U.hm(x.start) >= U.hm(s.end))).flatMap(x => x.staff));
-      const emps = Store.db.employees.filter(e => e.dept === el.dataset.dept);
+      const q = Store.quote(App.state.ui.staffQ), site = App.siteOfQ(q), emps = Store.db.employees.filter(e => e.dept === el.dataset.dept && siteOf(e) === site);
       App.modal(`<h2>${H(dept(el.dataset.dept).name)} · ${H(s.label)} ${s.start}–${s.end}</h2>
         <div class="grid g3" style="margin-bottom:12px"><div><label class="f">ต้องใช้ (คน)</label><input class="input" name="need" inputmode="numeric" value="${s.need}"></div><div><label class="f">เริ่ม</label><input class="input" type="time" name="start" value="${s.start}"></div><div><label class="f">สิ้นสุด</label><input class="input" type="time" name="end" value="${s.end}"></div></div>
         <div class="small muted" style="margin-bottom:8px">เลือกพนักงาน</div>
@@ -791,13 +866,13 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
       persistOt(o); App.render();
     },
     stOtMore() {
-      const o = curOt(), p = SP(), emps = Store.db.employees.filter(e => e.dept === o.dept && !o.staff.includes(e.id));
+      const o = curOt(), p = SP(), site = App.siteOfQ(Store.quote(App.state.ui.staffQ)), emps = Store.db.employees.filter(e => e.dept === o.dept && siteOf(e) === site && !o.staff.includes(e.id));
       App.modal(`<h2>เพิ่มพนักงาน</h2>${emps.map(e => `<button class="pick" data-e="${e.id}"><span>${H(e.name)}<br><span class="xs muted">${H(e.role)}</span></span><span class="xs muted">${e.hours + otHours(e.id, p)} / 48</span></button>`).join('')}<div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`,
         bg => bg.querySelectorAll('.pick').forEach(b => b.onclick = () => { o.staff.push(b.dataset.e); persistOt(o); App.closeModal(); App.render(); }));
     },
     stOtOther() {
-      const o = curOt(), p = SP();
-      const groups = D.DEPTS.filter(d => d.id !== o.dept).map(d => ({ d, emps: Store.db.employees.filter(e => e.dept === d.id && !o.staff.includes(e.id)) })).filter(g => g.emps.length);
+      const o = curOt(), p = SP(), site = App.siteOfQ(Store.quote(App.state.ui.staffQ));
+      const groups = D.DEPTS.filter(d => d.id !== o.dept).map(d => ({ d, emps: Store.db.employees.filter(e => e.dept === d.id && siteOf(e) === site && !o.staff.includes(e.id)) })).filter(g => g.emps.length);
       App.modal(`<h2>เพิ่มพนักงานจากแผนกอื่น</h2><p class="small muted" style="margin-top:-8px">มาช่วยต่อรอบ ${H(dept(o.dept).short)} · ${U.fmtD(o.date, { year: false })}</p>
         <input class="input" id="otoQ" placeholder="ค้นหาชื่อ ตำแหน่ง…" style="margin-bottom:10px" aria-label="ค้นหาพนักงาน">
         <div id="otoList">${groups.map(g => `<div class="oto-g"><div class="row small" style="gap:8px;margin:12px 0 6px"><i class="dot" style="background:${g.d.color};border-radius:3px"></i><b>${H(g.d.name)}</b></div>
@@ -1132,20 +1207,20 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
         let prev = 0;
         for (let i = 0; i < t.length - 1; i++) {
           const up = Number(t[i].upTo);
-          if (!Number.isInteger(up) || up <= prev) { App.toast(`${dept(dp).short}: ช่วงจำนวนลูกค้าต้องเรียงจากน้อยไปมาก (ช่วงที่ ${i + 1})`); return; }
+          if (!Number.isInteger(up) || up <= prev) { App.toast(`${dept(dp.split(':')[0]).short}: ช่วงจำนวนต้องเรียงจากน้อยไปมาก (ช่วงที่ ${i + 1})`); return; }
           prev = up;
         }
-        if (t.some(x => !Number.isInteger(Number(x.n)) || Number(x.n) < 0)) { App.toast(`${dept(dp).short}: จำนวนพนักงานต้องเป็นจำนวนเต็ม 0 ขึ้นไป`); return; }
+        if (t.some(x => !Number.isInteger(Number(x.n)) || Number(x.n) < 0)) { App.toast(`${dept(dp.split(':')[0]).short}: จำนวนพนักงานต้องเป็นจำนวนเต็ม 0 ขึ้นไป`); return; }
         t.forEach((x, i) => { x.n = Number(x.n); x.upTo = i === t.length - 1 ? null : Number(x.upTo); });
       }
-      Store.db.settings.staffRules = JSON.parse(JSON.stringify(R)); Store.save();
+      Store.db.settings.staffRules = JSON.parse(JSON.stringify(R)); Store.db.settings.staffRulesV = RULES_V; Store.save();
       App.state.ui.rulesDraft = null; App.render(); App.toast('บันทึกเงื่อนไขแล้ว — ใช้กับแผนที่สร้างใหม่ หรือกด “ใช้เงื่อนไขกับแผนนี้” ในแต่ละงาน');
     },
     stApplyRules() {
       const q = Store.quote(App.state.ui.staffQ), p = SP(); if (!q || !p) return;
       App.confirm(`ตั้งจำนวนพนักงานที่ต้องใช้ของงาน ${q.id} (${q.pax} ท่าน) ใหม่ตามเงื่อนไข?`, () => {
         let n = 0;
-        for (const day of Object.values(p.days)) for (const [dp, shifts] of Object.entries(day)) { const k = ruleNeed(dp, q.pax); if (k != null) shifts.forEach(s => { s.need = k; n++; }); }
+        Object.keys(p.days).sort().forEach((d, i) => { for (const [dp, shifts] of Object.entries(p.days[d])) { const k = ruleNeed(dp, q, i + 1); if (k != null) shifts.forEach(s => { s.need = k; n++; }); } });
         Store.save(); App.render(); App.toast(n ? 'ปรับจำนวนที่ต้องใช้ตามเงื่อนไขแล้ว (คนที่มอบหมายไว้ยังอยู่)' : 'ยังไม่มีแผนกที่ตั้งเงื่อนไขไว้');
       }, 'ใช้เงื่อนไข');
     },
@@ -1173,7 +1248,8 @@ ${canEdit ? '' : '<div class="note" style="margin-top:14px">คุณดูร�
   const RD = el => App.state.ui.rulesDraft[el.dataset.d][Number(el.dataset.i)];
   App.CHG.ruleUp = el => { RD(el).upTo = el.value; App.render(); };
   App.CHG.ruleN = el => { RD(el).n = el.value; };
-  App.CHG.ruleOn = el => { const R = App.state.ui.rulesDraft; R[el.dataset.d] = el.checked ? (R[el.dataset.d] || [{ upTo: 50, n: 1 }, { upTo: null, n: 2 }]) : null; if (!el.checked) delete R[el.dataset.d]; App.render(); };
+  App.CHG.ruleOn = el => { const R = App.state.ui.rulesDraft, k = el.dataset.d; R[k] = el.checked ? (R[k] || JSON.parse(JSON.stringify(OWNER_RULES[k] || [{ upTo: 50, n: 1 }, { upTo: null, n: 2 }]))) : null; if (!el.checked) delete R[k];
+    if (k === 'banquet') { if (el.checked) R['banquet:party'] = R['banquet:party'] || JSON.parse(JSON.stringify(OWNER_RULES['banquet:party'])); else delete R['banquet:party']; } App.render(); };
   App.CHG.empQ = el => { App.state.ui.emps.q = el.value; App.state.ui.emps.page = 1; App.render(); };
   App.CHG.stOtShift = el => { const o = curOt(); const [dp, sid] = el.value.split('|'); o.dept = dp; o.shiftId = sid; o.staff = []; persistOt(o); App.render(); };
   App.CHG.stOtReason = el => { const o = curOt(); o.reason = el.value; persistOt(o); };
