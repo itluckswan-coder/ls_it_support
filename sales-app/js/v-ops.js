@@ -95,7 +95,7 @@
         ${list.map(({ b, q }) => `<a class="beo-item ${sel && sel.b.id === b.id ? 'on' : ''}" href="#/beo/${encodeURIComponent(b.id)}" style="color:inherit">
           <div class="between xs"><span class="mono muted">${H(b.id)}</span><span class="muted">${U.fmtRange(q.start, q.end, { year: false })}</span></div>
           <div class="b" style="margin:4px 0 0">${H(q.title)}</div><div class="small muted" style="margin-bottom:6px">${H(q.client)}</div>
-          <div class="between small"><span class="muted">${H(((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || '')} · ${q.pax} ท่าน</span>
+          <div class="between small"><span class="muted">${H((App.beoVenue(b, q).room || {}).name || '')} · ${q.pax} ท่าน</span>
           ${fnStage(b)}</div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
       </aside>`;
       if (!sel) return `<div class="split left">${left}<div class="empty">ยังไม่มีใบฟังก์ชัน — สร้างจากใบเสนอราคาที่อนุมัติจัดงานแล้ว</div></div>`;
@@ -115,7 +115,8 @@
     <section class="card facts" style="margin-bottom:16px">
       <div><div class="k">วันงาน</div><div class="v">${U.fmtRange(q.start, q.end)}</div></div>
       <div><div class="k">ยืนยันจำนวน</div><div class="v" data-act="beoEditF" data-f="confirmPax" style="cursor:pointer">${H(b.confirmPax)}</div></div>
-      <div><div class="k">ห้องจัดงาน</div><div class="v">${H(((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || '-')}${(q.items.find(i => i.sec === 'meet' && i.layout) || {}).layout ? ' · ' + D.LAYOUTS.find(l => l.id === q.items.find(i => i.sec === 'meet' && i.layout).layout).name : ''}</div></div>
+      <div><div class="k">ห้องจัดงาน${b.venue ? ' <span class="xs" style="color:var(--teal-d)">(เปลี่ยนจากใบเสนอราคา)</span>' : ''}</div>${(v => { const t = H(((v.room || {}).name) || '-') + (v.layoutName ? ' · ' + H(v.layoutName) : '');
+        return canVenue() ? `<div class="v" data-act="beoVenue" style="cursor:pointer" title="เปลี่ยนห้องหรือรูปแบบการจัดห้อง">${t} <span class="xs" aria-hidden="true">✏️</span></div>` : `<div class="v">${t}</div>`; })(App.beoVenue(b, q))}</div>
       <div><div class="k">ผู้ติดต่อลูกค้า</div><div class="v">${H(q.contact || '-')} ${q.phone ? `<a href="${App.tel(q.phone)}">${H(q.phone)}</a>` : ''}</div></div>
       <div><div class="k">ฝ่ายขาย</div><div class="v">${H(owner ? App.firstName(owner) : '-')}${owner && owner.phone ? ' · ' + H(owner.phone) : ''}</div></div>
       <div><div class="k">การชำระเงิน</div><div class="v" data-act="beoEditF" data-f="payment" style="cursor:pointer">${H(b.payment)}</div></div>
@@ -145,6 +146,8 @@
 
   /* ---------- approval ---------- */
   const fmtAt = iso => iso ? U.fmtD(iso.slice(0, 10), { year: false }) + ' ' + iso.slice(11, 16) : '';
+  // who may change the room: those who may edit a function sheet (the worker allows quotation or staff rights)
+  const canVenue = () => App.can('create_quote') || App.can('staff');
   function apprBanner(b) {
     const a = b.approval || {}, st = g.Approval.state(b), me = App.me();
     if (st === 'pending') {
@@ -294,7 +297,7 @@
     const rows = [['วัน', 'เวลา', 'รายละเอียดงาน', 'สถานที่', 'แผนก']];
     const cur = Object.entries(b.schedule).flatMap(([d, l]) => l.map(s => [Number(d), s.time, s.task, s.place, dept(s.dept).short]));
     if (cur.length) return rows.concat(cur.sort((a, c) => a[0] - c[0] || a[1].localeCompare(c[1])));
-    const room = ((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || 'ห้องประชุม';
+    const room = ((App.beoVenue(b, q).room || {}).name) || 'ห้องประชุม';
     return rows.concat([[1, '06:00', 'จัดห้อง ' + q.pax + ' ที่ + โต๊ะลงทะเบียน', room, 'จัดเลี้ยง'], [1, '07:00', 'ทดสอบเสียงและภาพ', room, 'ช่าง/AV'], [1, '10:00', 'Coffee break ' + q.pax + ' ที่', 'หน้าห้อง', 'ครัว'],
       [1, '12:00', 'อาหารกลางวัน', 'ห้องอาหาร', 'ครัว'], [1, '14:00', 'เช็กอินกรุ๊ป', 'ล็อบบี้', 'ส่วนหน้า']].concat(days.length > 1 ? [[2, '12:00', 'เช็กเอาต์กรุ๊ป', 'ล็อบบี้', 'ส่วนหน้า']] : []));
   }
@@ -432,6 +435,31 @@
       const used = Store.db.beos.filter(b => ((b.tags || {})[k] || []).includes(x.id)).length;
       App.state.ui.beo.btMsg = 'ลบ ' + x.name + ' แล้ว' + (used ? ` (ใช้อยู่ใน ${used} ใบ — ใบเหล่านั้นจะไม่แสดงตัวเลือกนี้)` : '');
       btSave(k, list.filter(o => o !== x)); App.render();
+    },
+    // change the event's room and layout on this function sheet (owner, 17 Nov 2026); the quotation and its prices stay
+    beoVenue() {
+      const b = curB(), q = Store.quote(b.quoteId); if (!b || !q || !canVenue()) return;
+      const v = App.beoVenue(b, q), pax = Number(q.pax) || 0;
+      const opt = (name, val, on, txt, sub) => `<label class="vn-opt"><input type="radio" name="${name}" value="${H(val)}" ${on ? 'checked' : ''}><span>${txt}${sub ? `<small>${sub}</small>` : ''}</span></label>`;
+      const capOf = (r, l) => (r && r.cap && r.cap[l]) || [0, 0];
+      const draw = (roomId, lay) => {
+        const r = D.MEETING_ROOMS.find(x => x.id === roomId), [lo, hi] = capOf(r, lay);
+        return `<div class="small muted" style="margin:2px 0 8px">ห้องจัดงาน</div><div class="vn-grid">${D.MEETING_ROOMS.map(x => { const c = capOf(x, lay); return opt('room', x.id, x.id === roomId, H(x.name) + (x.th && x.th !== x.name ? ` <span class="muted">${H(x.th)}</span>` : ''), c[1] ? `${c[0]}–${c[1]} คน (${H((D.LAYOUTS.find(l => l.id === lay) || {}).name || '')})` : 'จัดรูปแบบนี้ไม่ได้'); }).join('')}</div>
+          <div class="small muted" style="margin:14px 0 8px">รูปแบบการจัดห้อง</div><div class="vn-grid lay">${D.LAYOUTS.map(l => opt('layout', l.id, l.id === lay, H(l.name), capOf(r, l.id)[1] ? capOf(r, l.id)[0] + '–' + capOf(r, l.id)[1] + ' คน' : '—')).join('')}</div>
+          ${hi && pax > hi ? `<div class="note red" style="margin-top:12px">${pax} ท่าน เกินความจุของห้องนี้แบบ ${H((D.LAYOUTS.find(l => l.id === lay) || {}).name || '')} (${hi} คน)</div>` : !hi ? '<div class="note red" style="margin-top:12px">ห้องนี้จัดรูปแบบนี้ไม่ได้</div>' : ''}`;
+      };
+      App.modal(`<h2>เปลี่ยนห้องจัดงาน</h2><p class="small muted" style="margin-top:-6px">${H(b.id)} · ${pax} ท่าน — เปลี่ยนเฉพาะในใบฟังก์ชันนี้ ราคาในใบเสนอราคาไม่เปลี่ยน</p>
+        <div id="vnBody">${draw(v.roomId, v.layout || 'classroom')}</div>
+        <div class="acts">${b.venue ? '<button class="btn ghost" id="vnReset" style="margin-right:auto">ใช้ตามใบเสนอราคา</button>' : ''}<button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="ok">บันทึก</button></div>`, bg => {
+        const val = n => (bg.querySelector(`input[name="${n}"]:checked`) || {}).value;
+        bg.querySelector('#vnBody').addEventListener('change', () => { bg.querySelector('#vnBody').innerHTML = draw(val('room'), val('layout')); });
+        bg.querySelector('#ok').onclick = () => {
+          const room = val('room'), layout = val('layout'), base = App.beoVenue({}, q);
+          if (room === base.roomId && layout === base.layout) delete b.venue; else b.venue = { room, layout };
+          Store.save(); App.closeModal(); App.render(); App.toast('เปลี่ยนห้องจัดงานแล้ว' + (g.Approval.state(b) === 'pending' ? ' · รอผู้ดูแลระบบอนุมัติการแก้ไข' : ''));
+        };
+        const rs = bg.querySelector('#vnReset'); if (rs) rs.onclick = () => { delete b.venue; Store.save(); App.closeModal(); App.render(); App.toast('ใช้ห้องตามใบเสนอราคาแล้ว'); };
+      });
     },
     beoEditF(el) {
       const b = curB(), f = el.dataset.f;

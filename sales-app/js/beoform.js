@@ -35,10 +35,10 @@
   /* ---------- values taken from the quote and the function sheet ---------- */
   function auto(b, q) {
     const c = App.calc(q), meet = q.items.filter(i => i.sec === 'meet'), food = q.items.filter(i => i.sec === 'food'), rooms = q.items.filter(i => i.sec === 'room');
-    const room = D.MEETING_ROOMS.find(r => r.id === q.room) || D.MEETING_ROOMS.find(r => meet.some(i => i.ref === r.id));
+    const ven = App.beoVenue(b, q), room = ven.room || D.MEETING_ROOMS.find(r => meet.some(i => i.ref === r.id));
     const times = q.items.flatMap(i => i.sched || []).filter(s => s.start);
     const t0 = times.map(s => s.start).sort()[0], t1 = times.map(s => s.end || s.start).sort().slice(-1)[0];
-    const layout = (meet.find(i => i.layout) || {}).layout;
+    const layout = ven.layout || (meet.find(i => i.layout) || {}).layout;
     const isParty = layout === 'banquet' || layout === 'cocktail' || food.some(i => (D.FOOD.find(f => f.id === i.ref) || {}).cat === 'gala');
     const dept = id => ((b.depts || {})[id] || {}).items || [];
     const unitTxt = i => i.u1 || 'ท่าน';

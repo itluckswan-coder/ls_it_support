@@ -81,8 +81,9 @@
   function roomFor(q, day) {
     const rp = roomParam(), meets = q.items.filter(i => i.sec === 'meet' && (rp ? (meetRoomOf(i) || {}).id === rp : D.MEETING_ROOMS.some(r => r.id === i.ref)));
     const it = meets.find(i => (i.sched || []).some(s => s.day === day)) || meets[0];
-    const id = rp || (it && it.ref) || q.room;
-    return { id, room: D.MEETING_ROOMS.find(r => r.id === id), layout: (it && it.layout) || 'banquet', pax: it && Number(it.pax) || 0 };
+    const ven = !rp && curBeo() && curBeo().venue; // a room / layout chosen on the function sheet
+    const id = (ven && ven.room) || rp || (it && it.ref) || q.room;
+    return { id, room: D.MEETING_ROOMS.find(r => r.id === id), layout: (ven && ven.layout) || (it && it.layout) || 'banquet', pax: it && Number(it.pax) || 0 };
   }
 
   /* ---------- generators ---------- */

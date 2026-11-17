@@ -214,6 +214,13 @@
     /* ---------- domain helpers ---------- */
     calc(q) { return U.calc(q, Store.db.settings); },
     holding(q) { return q.status === 'tentative' || q.status === 'confirmed'; },
+    // the event's room and layout: the function sheet's own choice (b.venue), else the quotation's meeting room and layout
+    beoVenue(b, q) {
+      const meet = ((q && q.items) || []).filter(i => i.sec === 'meet'), v = (b && b.venue) || {};
+      const roomId = v.room || (q && q.room) || (meet.find(i => D.MEETING_ROOMS.some(r => r.id === i.ref)) || {}).ref || '';
+      const layout = v.layout || (meet.find(i => i.layout) || {}).layout || '';
+      return { roomId, room: D.MEETING_ROOMS.find(r => r.id === roomId) || null, layout, layoutName: (D.LAYOUTS.find(l => l.id === layout) || {}).name || '' };
+    },
     // meeting room bookings on a date (other quotes)
     /* meeting-room time slots a quote holds: [{ room, date, from, to }] — from each day's schedule, else the times in
        the line's description (e.g. "เต็มวัน 08:00–17:00", "18:00–22:00"), else a full day 08:00–17:00 */

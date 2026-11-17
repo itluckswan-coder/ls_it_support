@@ -1127,3 +1127,10 @@ input.input[type=date],input.input[type=time]{min-width:0;max-width:100%;-webkit
 .us-sig{height:34px;max-width:140px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;padding:2px 6px}
 .fnf-sig{display:block;height:52px;max-width:230px;object-fit:contain;margin:-24px auto -6px;position:relative}
 .fnf-line.has-sig{margin-top:6px}
+/* function sheet: change the event room / layout (beoVenue) */
+.vn-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}.vn-grid.lay{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.vn-opt{cursor:pointer}.vn-opt input{position:absolute;opacity:0;pointer-events:none}
+.vn-opt>span{display:block;border:1.5px solid var(--line);border-radius:12px;padding:9px 12px;line-height:1.3;background:var(--card,#fff)}
+.vn-opt>span small{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.vn-opt input:checked+span{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-d)}.vn-opt input:checked+span small{color:var(--teal-d)}
+.vn-opt input:focus-visible+span{outline:2px solid var(--teal);outline-offset:2px}
