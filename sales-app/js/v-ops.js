@@ -78,22 +78,20 @@
       const ui = App.state.ui.beo || (App.state.ui.beo = { f: 'soon', day: 1 });
       const today = U.today();
       const all = App.siteBeos().map(b => ({ b, q: Store.quote(b.quoteId) })).filter(x => x.q).sort((a, b) => a.q.start.localeCompare(b.q.start));
-      const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? b.status === 'draft' : q.end >= today && U.diffDays(today, q.start) <= 60));
+      const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? g.Approval.state(b) !== 'approved' : q.end >= today && U.diffDays(today, q.start) <= 60));
       const sel = all.find(x => x.b.id === p[0]) || list[0] || all[0];
       if (sel && !p[0]) { history.replaceState(null, '', '#/beo/' + encodeURIComponent(sel.b.id)); }
-      const ackN = b => Object.values(b.depts || {}).filter(d => d.ack).length, depN = b => Object.keys(b.depts || {}).length;
-      // the stage of a function sheet (owner, 17 Nov 2026): รออนุมัติ → (ถูกตีกลับ) → อนุมัติแล้ว · รอส่งแผนก → รอรับทราบ n → ครบทุกแผนก
-      // (before, an approved sheet not yet sent to the departments still read "ร่าง")
+      // the current approval state of a function sheet (owner, 17 Nov 2026): รออนุมัติ · ถูกตีกลับ · อนุมัติแล้ว — not the
+      // sending / acknowledging by the departments (before, an approved sheet not yet sent read "ร่าง")
       const fnStage = b => {
-        const st = g.Approval.state(b), left = depN(b) - ackN(b), badge = (c, t) => `<span class="badge st-${c}">${t}</span>`;
+        const st = g.Approval.state(b), badge = (c, t) => `<span class="badge st-${c}">${t}</span>`;
         if (st === 'pending') return badge('pending', b.rev ? 'แก้ไข · รออนุมัติ' : 'รออนุมัติ');
         if (st === 'rejected') return badge('tentative', 'ถูกตีกลับ');
-        if (b.status === 'draft') return badge('hold', 'อนุมัติแล้ว · รอส่งแผนก');
-        return !depN(b) ? badge('sent', 'ส่งแล้ว') : left > 0 ? badge('sent', 'รอรับทราบ ' + left) : badge('confirmed', 'ครบทุกแผนก');
+        return badge('confirmed', 'อนุมัติแล้ว');
       };
       const left = `<aside>
         <div class="between" style="margin-bottom:14px"><h2 style="font-size:22px">ใบฟังก์ชัน</h2><button class="btn red sm" data-act="beoNew">+ สร้างจากใบเสนอ</button></div>
-        <div class="seg" style="width:100%;margin-bottom:14px">${[['soon', 'ใกล้ถึง'], ['all', 'ทั้งหมด'], ['draft', 'ยังไม่ส่งแผนก']].map(([k, l]) => `<button style="flex:1" class="${ui.f === k ? 'on' : ''}" data-act="beoF" data-v="${k}">${l}</button>`).join('')}</div>
+        <div class="seg" style="width:100%;margin-bottom:14px">${[['soon', 'ใกล้ถึง'], ['all', 'ทั้งหมด'], ['draft', 'ยังไม่อนุมัติ']].map(([k, l]) => `<button style="flex:1" class="${ui.f === k ? 'on' : ''}" data-act="beoF" data-v="${k}">${l}</button>`).join('')}</div>
         ${list.map(({ b, q }) => `<a class="beo-item ${sel && sel.b.id === b.id ? 'on' : ''}" href="#/beo/${encodeURIComponent(b.id)}" style="color:inherit">
           <div class="between xs"><span class="mono muted">${H(b.id)}</span><span class="muted">${U.fmtRange(q.start, q.end, { year: false })}</span></div>
           <div class="b" style="margin:4px 0 0">${H(q.title)}</div><div class="small muted" style="margin-bottom:6px">${H(q.client)}</div>
