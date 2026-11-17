@@ -78,20 +78,27 @@
       const ui = App.state.ui.beo || (App.state.ui.beo = { f: 'soon', day: 1 });
       const today = U.today();
       const all = App.siteBeos().map(b => ({ b, q: Store.quote(b.quoteId) })).filter(x => x.q).sort((a, b) => a.q.start.localeCompare(b.q.start));
-      const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? b.status === 'draft' : q.end >= today && U.diffDays(today, q.start) <= 60));
+      const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? g.Approval.state(b) !== 'approved' : q.end >= today && U.diffDays(today, q.start) <= 60));
       const sel = all.find(x => x.b.id === p[0]) || list[0] || all[0];
       if (sel && !p[0]) { history.replaceState(null, '', '#/beo/' + encodeURIComponent(sel.b.id)); }
-      const ackN = b => Object.values(b.depts || {}).filter(d => d.ack).length, depN = b => Object.keys(b.depts || {}).length;
+      // the current approval state of a function sheet (owner, 17 Nov 2026): รออนุมัติ · ถูกตีกลับ · อนุมัติแล้ว — not the
+      // sending / acknowledging by the departments (before, an approved sheet not yet sent read "ร่าง")
+      const fnStage = b => {
+        const st = g.Approval.state(b), badge = (c, t) => `<span class="badge st-${c}">${t}</span>`;
+        if (st === 'pending') return badge('pending', b.rev ? 'แก้ไข · รออนุมัติ' : 'รออนุมัติ');
+        if (st === 'rejected') return badge('tentative', 'ถูกตีกลับ');
+        return badge('confirmed', 'อนุมัติแล้ว');
+      };
       const left = `<aside>
         <div class="between" style="margin-bottom:14px"><h2 style="font-size:22px">ใบฟังก์ชัน</h2><button class="btn red sm" data-act="beoNew">+ สร้างจากใบเสนอ</button></div>
-        <div class="seg" style="width:100%;margin-bottom:14px">${[['soon', 'ใกล้ถึง'], ['all', 'ทั้งหมด'], ['draft', 'ร่าง']].map(([k, l]) => `<button style="flex:1" class="${ui.f === k ? 'on' : ''}" data-act="beoF" data-v="${k}">${l}</button>`).join('')}</div>
+        <div class="seg" style="width:100%;margin-bottom:14px">${[['soon', 'ใกล้ถึง'], ['all', 'ทั้งหมด'], ['draft', 'ยังไม่อนุมัติ']].map(([k, l]) => `<button style="flex:1" class="${ui.f === k ? 'on' : ''}" data-act="beoF" data-v="${k}">${l}</button>`).join('')}</div>
         ${list.map(({ b, q }) => `<a class="beo-item ${sel && sel.b.id === b.id ? 'on' : ''}" href="#/beo/${encodeURIComponent(b.id)}" style="color:inherit">
           <div class="between xs"><span class="mono muted">${H(b.id)}</span><span class="muted">${U.fmtRange(q.start, q.end, { year: false })}</span></div>
           <div class="b" style="margin:4px 0 0">${H(q.title)}</div><div class="small muted" style="margin-bottom:6px">${H(q.client)}</div>
           <div class="between small"><span class="muted">${H(((D.MEETING_ROOMS.find(r => r.id === q.room) || {}).name) || '')} · ${q.pax} ท่าน</span>
-          ${apprBadge(b) || (b.status === 'draft' ? '<span class="badge st-draft">ร่าง</span>' : ackN(b) === depN(b) ? '<span class="badge st-confirmed">ครบทุกแผนก</span>' : `<span class="badge st-sent">รอรับทราบ ${depN(b) - ackN(b)}</span>`)}</div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
+          ${fnStage(b)}</div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
       </aside>`;
-      if (!sel) return `<div class="split left">${left}<div class="empty">ยังไม่มีใบฟังก์ชัน — สร้างจากใบเสนอราคาที่ยืนยันแล้ว</div></div>`;
+      if (!sel) return `<div class="split left">${left}<div class="empty">ยังไม่มีใบฟังก์ชัน — สร้างจากใบเสนอราคาที่อนุมัติจัดงานแล้ว</div></div>`;
       const { b, q } = sel, days = U.daysOf(q.start, q.end);
       if (ui.day > days.length) ui.day = 1;
       const schedEdit = App.salesRole(); // only the sales side changes the schedule
@@ -138,12 +145,6 @@
 
   /* ---------- approval ---------- */
   const fmtAt = iso => iso ? U.fmtD(iso.slice(0, 10), { year: false }) + ' ' + iso.slice(11, 16) : '';
-  function apprBadge(b) {
-    const st = g.Approval.state(b);
-    if (st === 'pending') return '<span class="badge st-sent">รออนุมัติ</span>';
-    if (st === 'rejected') return '<span class="badge st-tentative">ถูกตีกลับ</span>';
-    return '';
-  }
   function apprBanner(b) {
     const a = b.approval || {}, st = g.Approval.state(b), me = App.me();
     if (st === 'pending') {
