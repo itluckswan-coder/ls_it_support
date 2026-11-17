@@ -43,8 +43,8 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     for (const [f, v] of [['title', 'สัมมนาประจำปี 2027'], ['client', 'บจก. ตัวอย่าง จำกัด']]) { try { await p.fill(`[data-f=${f}]`, v); await p.dispatchEvent(`[data-f=${f}]`, 'input'); await p.dispatchEvent(`[data-f=${f}]`, 'change'); } catch (e) { errs.push('fill ' + f); } }
     await shot('wiz1');
     for (let i = 2; i <= 5; i++) { await click('[data-act=wizNext]'); await W(300); const e = await p.$('[data-act=wizSel]'); if (e && await e.isVisible()) { await e.click().catch(() => {}); await W(250); await close(); } await shot('wiz' + i); }
-    await go('#/beo'); await shot('beo-list');
-    await go('#/beo/FS-2611-018'); await shot('beo'); await click('[data-act=btFold][data-k=guests]'); await click('[data-act=btFold][data-k=kinds]'); await click('[data-act=btPick][data-k=guests][data-v=g4]'); await click('[data-act=btPick][data-k=kinds][data-v=k6]'); await p.evaluate(() => document.querySelector('.bt-grid').scrollIntoView({ block: 'center' })); await shot('beo-tags');
+    await go('#/beo'); await click('[data-act=beoF][data-v=all]'); await shot('beo-list'); await click('[data-act=beoF][data-v=soon]');
+    await go('#/beo/FS-2611-018'); await shot('beo'); await click('[data-act=beoVenue]'); await shot('beo-venue'); await close(); await click('[data-act=btFold][data-k=guests]'); await click('[data-act=btFold][data-k=kinds]'); await click('[data-act=btPick][data-k=guests][data-v=g4]'); await click('[data-act=btPick][data-k=kinds][data-v=k6]'); await p.evaluate(() => document.querySelector('.bt-grid').scrollIntoView({ block: 'center' })); await shot('beo-tags');
     await go('#/plan/FS-2611-018/1'); await click('[data-act=fpAuto]'); await shot('plan'); await click('[data-act=fpSave]');
     // a text box, selected: rotate handle and the 15 / 45 / 90 / 180 buttons
     await click('[data-act=fpAdd][data-v=text]'); await p.keyboard.type({ th: 'ทางเข้า VIP', en: 'VIP entrance', my: 'VIP ဝင်ပေါက်' }[L]); await W(700); await click('[data-act=fpRot][data-v="45"]');
@@ -65,7 +65,10 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     await p.evaluate(() => { const r = document.querySelector('.fnf-t th.st'); if (r) { const tr = r.closest('tr'); (tr.previousElementSibling || tr).scrollIntoView({ block: 'start' }); window.scrollBy(0, -20); } }); await shot('fn-front'); await click('[data-act=fnSave]'); await shot('fn-save'); await close();
     await go('#/ss/FS-2611-018'); await click('[data-act=ssTab][data-v=form]'); await shot('ss');
     await go('#/cal'); await click('[data-act=calNav][data-v="1"]'); await shot('cal-month'); await click('[data-act=calView][data-v=week]'); await shot('cal-week'); await click('[data-act=calView][data-v=pipe]'); await shot('cal-pipe');
-    await go('#/staff'); await click('[data-act=stTab][data-v=shifts]'); await shot('staff-shifts'); await click('[data-act=stAssign]'); await shot('staff-assign'); await close();
+    await go('#/staff'); await click('[data-act=stTab][data-v=shifts]');
+    // a new plan → the pop-up (auto or by hand) → filled automatically
+    await p.evaluate(() => { delete Store.db.staff[App.state.ui.staffQ]; App.state.ui.staff = null; App.render(); }); await W(300);
+    await click('[data-act=stGen]'); await shot('staff-auto'); await click('[data-act=stAutoGo]'); await close(); await shot('staff-shifts'); await click('[data-act=stAssign]'); await shot('staff-assign'); await close();
     await click('[data-act=stTab][data-v=emps]'); await shot('staff-emps'); await click('[data-act=empEdit]'); await shot('staff-empform');
     await click('#emSiteBtn'); await click('#emDeptBtn'); await click('#emPosBtn'); await shot('staff-plus', true); await close();
     await click('[data-act=empImport]'); await shot('staff-import'); await close();
