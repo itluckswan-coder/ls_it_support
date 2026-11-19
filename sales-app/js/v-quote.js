@@ -842,7 +842,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   <div class="sig">
     <div>(.................................................)<br>ผู้ยืนยันการจัดงาน/ผู้ชำระค่าบริการ<br>วันที่ ........./............./.................</div>
     <div>(.....${F('gm', S.gm)}.....)<br>ผู้จัดการทั่วไป<br>ผู้อนุมัติใบเสนอราคา ในนามบจก.ลักษวรรณ<br>วันที่ ........./............./.................</div>
-    <div>(${F('sigOwner', owner ? owner.name : '')})<br>พนักงานขายและการตลาด<br>Tel. ${F('sigTel', owner && owner.phone || S.phone)}<br>ผู้เสนอราคา ในนามบจก.ลักษวรรณ<br>${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</div>
+    <div>${owner && owner.sig ? `<img class="qd-sig" src="${H(owner.sig)}" alt="ลายเซ็น">` : ''}(${F('sigOwner', owner ? owner.name : '')})<br>พนักงานขายและการตลาด<br>Tel. ${F('sigTel', owner && owner.phone || S.phone)}<br>ผู้เสนอราคา ในนามบจก.ลักษวรรณ<br>${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</div>
   </div>
 </article>`;
     }
