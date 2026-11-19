@@ -842,12 +842,21 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
   <div class="sig">
     <div>(.................................................)<br>ผู้ยืนยันการจัดงาน/ผู้ชำระค่าบริการ<br>วันที่ ........./............./.................</div>
     <div>(.....${F('gm', S.gm)}.....)<br>ผู้จัดการทั่วไป<br>ผู้อนุมัติใบเสนอราคา ในนามบจก.ลักษวรรณ<br>วันที่ ........./............./.................</div>
-    <div>${owner && owner.sig ? `<img class="qd-sig" src="${H(owner.sig)}" alt="ลายเซ็น">` : ''}(${F('sigOwner', owner ? owner.name : '')})<br>พนักงานขายและการตลาด<br>Tel. ${F('sigTel', owner && owner.phone || S.phone)}<br>ผู้เสนอราคา ในนามบจก.ลักษวรรณ<br>${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</div>
+    <div>${(u => u && u.sig ? `<img class="qd-sig" src="${H(u.sig)}" alt="ลายเซ็น">` : '')(T.sigOwner != null ? userByName(T.sigOwner) : owner)}(${F('sigOwner', owner ? owner.name : '')})<br>พนักงานขายและการตลาด<br>Tel. ${F('sigTel', owner && owner.phone || S.phone)}<br>ผู้เสนอราคา ในนามบจก.ลักษวรรณ<br>${U.fmtD((q.updatedAt || U.today()).slice(0, 10), { long: true })}</div>
   </div>
 </article>`;
     }
   };
   const DU = () => App.state.ui.doc;
+  // the signature over ผู้เสนอราคา (owner, 19 Nov 2026): the quotation owner's; when another name is typed there, that
+  // user's (none if the name matches no user, so nobody's signature appears under someone else's name).
+  // Names are compared without titles (นาย / นาง / นางสาว / น.ส. / Mr …), nicknames in brackets, spaces and dots.
+  const nameKey = s => String(s || '').replace(/\([^)]*\)/g, ' ').trim().replace(/^(นางสาว|นาง|นาย|น\.ส\.|ด\.ช\.|ด\.ญ\.|mrs\.?|mr\.?|ms\.?|miss)\s*/i, '').replace(/[\s.]+/g, '').toLowerCase();
+  const userByName = s => {
+    const k = nameKey(s); if (k.length < 2) return null;
+    const us = Store.db.users.filter(u => u.name);
+    return us.find(u => nameKey(u.name) === k) || us.find(u => { const n = nameKey(u.name); return n.length >= 4 && k.length >= 4 && (k.includes(n) || n.includes(k)); }) || null;
+  };
   // print: a quotation that runs only a little past one A4 page (up to about 25%, e.g. just the signatures spilling over)
   // is shrunk evenly to fit one page (down to 80%); a longer one prints on several pages as before. Runs for the print button and Ctrl+P.
   const MM = 96 / 25.4, PG_W = 190, PG_H = 275; // the A4 area inside the 10 mm print margins, with a little room
