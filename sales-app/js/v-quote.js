@@ -1065,6 +1065,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     }
   });
   // after the customer confirms (sales marks it), the admin approves the event (อนุมัติจัดงาน) → function sheets can be made
+  // a button whose Thai is the same as a status name (อนุมัติจัดงาน) gets its own translation ('… (ปุ่ม)')
+  const btnT = (th, key) => (g.I18N && g.I18N.lang && g.I18N.lang !== 'th' ? g.I18N.t(key) : th);
   function eventOkBox(q) {
     const admin = App.me().role === 'admin', t = x => H((x.at || '').slice(0, 16).replace('T', ' '));
     if (q.status === 'confirmed') return q.eventOk ? `<div class="note" style="margin-top:12px;background:var(--teal-soft);color:var(--teal-d)"><b>✓ อนุมัติจัดงานแล้ว</b><div class="xs" style="margin-top:2px">โดย ${H(q.eventOk.byName)} · ${t(q.eventOk)}${q.custOk ? ' · ลูกค้ายืนยันเมื่อ ' + t(q.custOk) : ''}</div>
@@ -1073,7 +1075,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     if (!q.custOk) return admin ? `<button class="btn ghost sm" style="width:100%;margin-top:10px" data-act="qEventOk">อนุมัติจัดงาน (ลูกค้ายืนยันแล้ว)</button>` : '';
     return `<div class="note" style="margin-top:12px;background:#FFE1C2;color:#8A3F00"><b>ลูกค้ายืนยันการจองแล้ว · รอผู้ดูแลระบบอนุมัติจัดงาน</b>
       <div class="xs" style="margin-top:2px">โดย ${H(q.custOk.byName)} · ${t(q.custOk)}</div>
-      <div class="row" style="gap:12px;margin-top:6px">${admin ? '<button class="btn teal sm" data-act="qEventOk">อนุมัติจัดงาน</button>' : ''}<button class="link small" data-act="qCustUndo">ยกเลิกการยืนยันของลูกค้า</button></div></div>`;
+      <div class="row" style="gap:12px;margin-top:6px">${admin ? `<button class="btn teal sm" data-act="qEventOk">${btnT('อนุมัติจัดงาน', 'อนุมัติจัดงาน (ปุ่ม)')}</button>` : ''}<button class="link small" data-act="qCustUndo">ยกเลิกการยืนยันของลูกค้า</button></div></div>`;
   }
   Object.assign(App.ACT, {
     qCustOk() {
@@ -1090,7 +1092,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         if (!q.custOk) q.custOk = { by: me.id, byName: me.name, at: U.nowTH() };
         q.eventOk = { by: me.id, byName: me.name, at: U.nowTH() }; q.status = 'confirmed';
         App.touch(q, 'อนุมัติจัดงาน'); App.render(); App.toast('อนุมัติจัดงานแล้ว · ออกใบฟังก์ชันได้');
-      }, 'อนุมัติจัดงาน');
+      }, btnT('อนุมัติจัดงาน', 'อนุมัติจัดงาน (ปุ่ม)'));
     },
     qEventUndo() {
       const q = cur(); if (App.me().role !== 'admin' || q.status !== 'confirmed' || Store.db.beos.some(b => b.quoteId === q.id)) return;
