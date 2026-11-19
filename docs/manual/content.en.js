@@ -29,8 +29,8 @@ window.MANUAL.en = {
     "title": "Sales System User Manual",
     "subtitle": "Luck Swan Resort — quotations, meeting rooms, guest rooms, catering, function sheets, staff, work roster, leave and assignments",
     "url": "https://luckswan-sales.it-luckswan.workers.dev",
-    "version": "1.5",
-    "updated": "Nov 10, 2026",
+    "version": "1.8",
+    "updated": "Nov 19, 2026",
     "intro": "The sales system is a web app that works on computers, iPads and phones. Everyone sees the same data in real time. The menus you see depend on the role and permissions the administrator gives you. This manual covers every chapter, from signing in to each department’s work, with real screenshots for every step."
   },
   "groups": [
@@ -164,7 +164,8 @@ window.MANUAL.en = {
       "steps": [
         "Tap the bell to see your notifications, such as function sheets awaiting approval, tasks assigned to you, or leave requests waiting to be signed.",
         "Tap a notification to go straight to the related page.",
-        "Tap “View all tasks” to open the Assignment & Approve page."
+        "Tap “View all tasks” to open the Assignment & Approve page.",
+        "LINE group notifications (automatic): quotations — ⏳ approval requested · ✅ approved · ↩️ sent back (with the reason) · 🤝 customer confirmed, awaiting event approval · 🎉 event approved; function sheets — ⏳ awaiting approval · ✅ approved · ↩️ sent back · each message has the number, event name, customer, event date, guests and a link to open it."
       ],
       "shots": [
         {
@@ -172,7 +173,10 @@ window.MANUAL.en = {
           "cap": "Notifications window"
         }
       ],
-      "tips": []
+      "tips": [
+        "Messages in the LINE group have no prices, amounts, phone numbers or customer emails — use a group with staff only.",
+        "To add or remove what is notified, or move to another LINE group: the administrator changes it in n8n (see “Backups and system updates”)."
+      ]
     },
     {
       "id": "meet",
@@ -210,7 +214,7 @@ window.MANUAL.en = {
         }
       ],
       "tips": [
-        "Roles without “Create and send quotations” (such as junior sales) can see rooms, photos, capacity and prices, but not the quotation bar, provisional booking or the add / update in quotation buttons.",
+        "Roles without “Create and send quotations” (such as junior sales) can see rooms, photos, capacity and prices, but not the quotation bar, the room hold or the add / update in quotation buttons.",
         "If a booking overlaps another event, the system warns you and an administrator must approve it first.",
         "Rooms that are over capacity for the chosen layout show a warning.",
         "A new room price applies to items added to quotations from now on; existing quotations do not change."
@@ -234,7 +238,10 @@ window.MANUAL.en = {
         "Boutique: Standard 400 · Superior 500 · Deluxe 600 THB per room per night (including congee, coffee and crackers for 2). Tap − / + to set the number of rooms.",
         "Boutique: extra meals per person — Breakfast (extra) 50 / 100 / 150 THB and Dinner party 350 / 399 / 450 THB. Choose a price, then enter the number of guests (the first time you tap +, the system fills in the quotation’s number of attendees). It is multiplied by the number of nights automatically.",
         "Boutique: tap “Update quote” — the rooms on the quotation become boutique rooms (names start with “Boutique ·”) and the meals go into the Food & beverage section · When you open Guest Rooms again, it comes back to Boutique with the same quantities.",
-        "Users allowed to edit rates: tap “Room rates” to edit the rate periods (seasons), number of rooms and the With ABF / Room only price for each type — under “Boutique”, edit the 3 room prices and the 3 meal price levels, then save."
+        "Users allowed to edit rates: tap “Room rates” to edit the rate periods (seasons), number of rooms and the With ABF / Room only price for each type — under “Boutique”, edit the 3 room prices and the 3 meal price levels, then save.",
+        "Add or edit room types (people who can edit rates): on the Room rates page tap “+ Add room type”, or ✏️ in front of a room name, to change the name, bed type, zone, number of guests and details — room types you added can be deleted.",
+        "Boutique · prices by date period: tap “+ Add price period”, then set a name, start–end dates, RO (room only) / RB (with breakfast), room-count bands (e.g. up to 30 · 80 · 120 rooms) and each room’s bed, guests and price for each band — when the check-in date falls in a period, the Boutique guest-room page uses that period’s rooms and prices, choosing the price by the total rooms booked.",
+        "Room photos (people who can edit rates): tap ✏️ on a room card’s photo to add, delete or reorder photos — they are also used as the room photos on quotations."
       ],
       "shots": [
         {
@@ -255,7 +262,7 @@ window.MANUAL.en = {
         }
       ],
       "tips": [
-        "Roles without “Create and send quotations” (such as junior sales) can see rooms, photos, capacity and prices, but not the quotation bar, provisional booking or the add / update in quotation buttons.",
+        "Roles without “Create and send quotations” (such as junior sales) can see rooms, photos, capacity and prices, but not the quotation bar, the room hold or the add / update in quotation buttons.",
         "Room rates are per room per night for 2 guests (Triple: 3 guests), net prices with service charge and VAT included (worked out the same way as the quotation).",
         "A quotation holds guest rooms from one place at a time — tapping Update quote from Boutique replaces the resort rooms already on the quotation (and vice versa).",
         "Boutique does not use the resort’s 1 free room for every 20 rooms or Late check-out."
@@ -302,25 +309,27 @@ window.MANUAL.en = {
       "icon": "doc",
       "title": "Quotations: list and editing",
       "who": "Sales · Sales Manager · Accounting (view)",
-      "intro": "The Quotations menu lists every quotation. Search and filter by status: Draft · Awaiting approval · Tentative · Confirmed · Cancelled — the steps: Draft › Awaiting approval › (an administrator approves) Tentative › (the customer confirms) Confirmed › make the function sheet.",
+      "intro": "The Quotations menu lists every quotation. Search and filter by status: Draft · Awaiting approval · Awaiting booking confirmation · Event approved · Cancelled — the steps: Draft › Awaiting approval (orange) › (an administrator approves) Awaiting booking confirmation › (the customer confirms, then the administrator approves again) Event approved › make the function sheet › (the function sheet is approved) Function approved.",
       "steps": [
         "Search by customer name or quotation number, then tap a row to open it — the “Owner” column after the number shows the user who made the quotation (on phones it shows under the event name).",
         "On the quotation page, items are grouped into Meeting Rooms · Food & beverage · Guest Rooms. Edit quantities or prices right in the fields, and tap “+ Add item…” to add more.",
         "Switch between the “Table / Timeline” views at the top right to see the daily schedule.",
         "Summary box on the right: prices on the quotation are Net prices (service charge and VAT included) — subtotal before discount · discount · price before service charge and VAT · 10% service charge · total before VAT · 7% VAT · net total, plus the average per person.",
         "Discounts over 10% need the sales manager’s approval.",
-        "At the bottom, set Price valid until · Deposit (for example 30% within 7 days of confirmation) · tentative room hold until a date.",
+        "At the bottom, set Price valid until · Deposit (for example 30% within 7 days of confirmation) · meeting room held until a date.",
         "Tap “Edit customer details and terms” to change the customer name, contact person, phone and email.",
-        "When the draft is ready: in the “Status” box tap “Request approval” — the status becomes “Awaiting approval” › tap “Print quotation” and print it for an administrator to sign in the “Approved by” space · to keep editing, tap “Take back to edit” · the change history is at the end of the box.",
-        "Administrators: quotations awaiting approval show on the Home page (Follow up today) › open one and tap “Approve quotation” — it becomes “Tentative” automatically (rooms held 10 days if no date was set). The approval box turns yellow, “Waiting for the customer to confirm”, and the owner is notified.",
+        "When the draft is ready: in the “Status” box tap “Request approval” — the status becomes “Awaiting approval” (orange label and box) › tap “Print quotation” and print it for an administrator to sign in the “Approved by” space · to keep editing, tap “Take back to edit” · the change history is at the end of the box.",
+        "Administrators: quotations awaiting approval show on the Home page (Follow up today) › open one and tap “Approve quotation” — it becomes “Awaiting booking confirmation” automatically (the meeting room is held 10 days if no date was set). The approval box turns yellow, “Waiting for the customer to confirm”, and the owner is notified.",
         "Not approved: the administrator taps “Send back” and can add a reason — the quotation goes back to Draft, and the salesperson sees the reason in the status box and on the Home page; fix it, then tap “Request approval” again.",
-        "After approval the quotation can go to the customer (email · LINE · link). When the customer confirms: sales staff/the sales manager tap “Customer confirmed booking” — the status becomes “Confirmed”, the approval box turns green, and the “Function sheet” button appears.",
+        "After approval the quotation can go to the customer (email · LINE · link). When the customer confirms: sales staff/the sales manager tap “Customer confirmed booking” — an orange box shows “Customer confirmed · waiting for the admin to approve the event” (tapped by mistake? tap “Undo customer confirmation”).",
+        "Administrators: open the quotation and tap “Approve event” — the status becomes “Event approved”, the box turns green and the “Function sheet” button appears · if the customer confirmed directly with the administrator, tap “Approve event (customer confirmed)” · it can be withdrawn with “Withdraw event approval” while no function sheet has been made.",
+        "When the event’s function sheet is approved, the quotation status shows “Function approved” (dark green label) by itself.",
         "If the total changes after approval, the box says “Total changed after approval”; administrators tap “Approve again” or “Cancel approval”."
       ],
       "shots": [
         {
           "img": "quotes",
-          "cap": "Quotation list with status filters (provisional = yellow)"
+          "cap": "Quotation list with status filters (Awaiting approval = orange · Awaiting booking confirmation = yellow)"
         },
         {
           "img": "quote-edit",
@@ -328,18 +337,22 @@ window.MANUAL.en = {
         },
         {
           "img": "quote-ask",
-          "cap": "Status box: Awaiting approval — the administrator approves the quotation or sends it back"
+          "cap": "Status box: Awaiting approval (orange) — the administrator approves the quotation or sends it back"
         },
         {
           "img": "quote-approve",
-          "cap": "Status box: quotation approved, waiting for the customer to confirm"
+          "cap": "Awaiting booking confirmation: quotation approved; sales tap “Customer confirmed booking” when the customer confirms"
+        },
+        {
+          "img": "quote-event",
+          "cap": "Customer confirmed — the administrator taps “Approve event”"
         }
       ],
       "tips": [
         "The system saves automatically every time you make a change.",
-        "The “Customer confirmed booking” and “Tentative” buttons appear only after an administrator has approved · a function sheet can be made once the customer has confirmed the booking.",
-        "Older quotations that were “Sent” now show as “Awaiting approval” (or “Tentative” if an administrator had already approved them).",
-        "If a meeting room overlaps another event and the overlap is not yet approved, the quotation can be approved but its status does not change to provisional.",
+        "The “Customer confirmed booking” button appears only after an administrator has approved the quotation · only administrators can “Approve event” · a function sheet can be made once the event is approved.",
+        "Old status names: “Tentative” is now “Awaiting booking confirmation” and “Confirmed” is now “Event approved” — older quotations show the new names by themselves.",
+        "If a meeting room overlaps another event, the quotation can be approved but stays Awaiting approval with a red box — the administrator taps “Approve overlapping booking” first, then “Move to awaiting confirmation”.",
         "How the total is broken down: price before SC/VAT = net total ÷ 1.177 → service charge is 10% of that price → total before VAT → 7% VAT. For example, 1,200 = 1,019.54 + 101.95 + 78.51."
       ]
     },
@@ -398,7 +411,8 @@ window.MANUAL.en = {
         "Tap “Edit details” (sales): the text on the quotation turns into dashed boxes you can type in, such as the customer name, address, Tax ID, item names, details, quantities, terms and the signatory’s name — the ↺ button = Use the system value. Then tap “Save changes” (it applies to that quotation only).",
         "Meeting room section on the quotation: shows the room photo and price. In edit mode you can type your own room details (tap “+ Insert the room’s details from the system” to bring in the existing text), and tap the photo to upload a new one, ✕ to remove the photo, or ↺ to use the room’s photo.",
         "Room photos on the document: each room type chosen (e.g. Superior) has its photos under the room details — in edit mode tap the 📷 “Add room photo” box (several at once), ✕ to remove, ↺ to use the system photos (this quotation only).",
-        "Tap “Print / PDF” to print or save as PDF.",
+        "The “Quoted by” space at the end: shows a signature automatically (uploaded in the Users menu) — the owner’s if the name is not changed, or that of the user whose name is typed there (titles, a nickname in brackets and spaces are ignored); a name not in the system shows no signature.",
+        "Tap “Print / PDF” to print or save as PDF — a quotation just over one A4 page (for example only the signatures spill onto page 2) is shrunk to fit one page (down to 80%), a long one prints on several pages as usual, and the 3 signature spaces always stay on the same page.",
         "Before an administrator approves: email, LINE and link cannot be sent (a red box says so) — Print / PDF still works, so an administrator can sign in the “Approved by” space at the bottom of the quotation.",
         "Send by email: enter the recipient’s email, edit the message, and choose “Let the customer confirm and sign online” and “Show unit prices”.",
         "Set “Price valid until”, then tap “Send quotation”.",
@@ -436,11 +450,12 @@ window.MANUAL.en = {
       "icon": "list",
       "title": "Function Sheets (BEO)",
       "who": "Sales · Managers · Heads of Department · Accounting (view)",
-      "intro": "A function sheet is the work order for every department. It is created from a confirmed quotation, and each department acknowledges it in the system.",
+      "intro": "A function sheet is the work order for every department. It is created from a quotation at Event approved, and each department acknowledges it in the system.",
       "steps": [
-        "The list on the left is split into Upcoming · All · Draft. Labels show the status, such as “All departments” or “2 to acknowledge”.",
-        "Tap “+ Create from quote” and choose a quotation; rooms, food and guests come in automatically — only quotations an administrator has approved and the customer has confirmed are listed (or tap “Function sheet” in the quotation’s status box).",
-        "The header shows the event date, confirmed guests (+5% spare), rooms, contact person and salesperson.",
+        "The list on the left is split into Upcoming · All · Not approved yet — labels show the sheet’s current status: “Awaiting approval” (orange · a revised sheet shows “Revised · awaiting approval”) · “Sent back” (red) · “Approved” (green) · under the event name are the venue name and the number of guests.",
+        "Tap “+ Create from quote” and choose a quotation; rooms, food and guests come in automatically — only quotations at “Event approved” are listed (or tap “Function sheet” in the quotation’s status box).",
+        "The header shows the event date, confirmed guests (+5% spare), venue, contact person and salesperson.",
+        "Change the venue: tap the “Venue ✏️” box › a pop-up lets you choose the room (with its capacity) and the room layout Theatre · Classroom · U-shape · Banquet · Cocktail › “Save” — a red box warns if the guests exceed the capacity · the header shows “(changed from the quotation)”, and the list card, function details and floor plan follow · tap “Use the quotation” to go back to the original room.",
         "The “Attendees and type of event” box: tap a branch heading to open it, then tap to choose as many as you need, e.g. Secondary school students · Teachers / lecturers / Team building · Training class. The branch heading shows what you chose · ✏️ Edit / add / delete choices inside the branch (Administrator, Sales Manager, Sales Staff); other roles can only view.",
         "Daily schedule: time, details, place and responsible department (switch between “Day 1 / Day 2”). You can import it from an Excel file.",
         "Each department card (kitchen, banquet, AV, front office, housekeeping, accounting) shows its tasks and “Acknowledged / Waiting” — tap “Edit” to add the department’s tasks. The card and that department’s box in “Function details” are one list: edit either and both change.",
@@ -453,16 +468,21 @@ window.MANUAL.en = {
           "cap": "Function sheet: daily schedule and department cards"
         },
         {
+          "img": "beo-venue",
+          "cap": "Changing the venue and room layout"
+        },
+        {
           "img": "beo-tags",
           "cap": "Attendees and type of event"
         },
         {
           "img": "beo-list",
-          "cap": "Function sheet list with acknowledgement status"
+          "cap": "Function sheet list with each sheet’s status"
         }
       ],
       "tips": [
-        "A quotation that is not approved, or not yet confirmed by the customer, cannot become a function sheet; the system says “The admin must approve the quotation first” or “A function sheet can be issued once the customer confirms the booking” · existing function sheets can still be edited.",
+        "A quotation that has not reached “Event approved” cannot become a function sheet · existing function sheets can still be edited.",
+        "Changing the venue on a function sheet does not change the quotation’s prices · if sales staff change it, the sheet needs the administrator’s approval of the edit · places already typed in the schedule do not follow; edit them in the schedule.",
         "Heads of department should tap “Acknowledge” every time there is a new sheet or a change.",
         "Choosing attendees and type of event does not need a new edit approval · the choices are shared by all sheets · what you pick shows in the “Type of event” box of Function details."
       ]
@@ -525,14 +545,16 @@ window.MANUAL.en = {
       "who": "Administrator · Sales Manager · Sales Staff (edit) · Accounting · Heads of Department (view)",
       "intro": "Printable forms that match the hotel’s original paper forms. Data comes from the quotation and function sheet.",
       "steps": [
-        "Tap “Function details” — switch between “Print preview / Edit details” and enter the Function No. (numbered automatically, or type your own) — the Edit details tab, the “＋ Add details” button and numbering are only for administrators, sales managers and sales staff.",
+        "Tap “Function details” — switch between “Print preview / Edit details”. The Function No. is the next number, given automatically when the function sheet is made (you can change it) — the Edit details tab and the “＋ Add details” button are only for administrators, sales managers and sales staff.",
         "The “Accounting / Finance” section (total, cost details, billing address) is only visible to administrators, sales managers, sales staff and accounting — other roles see only the Front Office section, at full width.",
         "“For sales / For operations” buttons (administrators, sales managers, sales staff, accounting): For sales = the full sheet with the finance part · For operations = the copy the operations team sees, without the finance part — printing and saving use the copy shown.",
         "The “Room layout”, kitchen, housekeeping, AV and front office boxes come from the department cards on the function sheet — edit them in the Edit details tab and the card changes; edit the card and the sheet changes · the “Type of event” box comes from the attendees and type of event chosen.",
         "The “Front office” section: each guest-room line of the quotation gets its own block, as on the old paper form — Check-in · Check-out (n nights) · Room (type) · Number of rooms, with no lines inside a block and a line under each room · every box can be edited, e.g. “1 room (Khun Thip + Phueng)”.",
-        "Tap “Sales summary” — a summary of function revenue, food, snacks, guest rooms and tax invoice details.",
+        "“Issued by”: shows the quotation owner’s signature automatically (uploaded in the Users menu) — without a signature the space is left blank to sign by hand.",
+        "Stage sign: in the Edit details tab tap “+ Add sign picture” to attach up to 4 pictures of the sign / banner under its text — the picture frames print in full.",
+        "Tap “Sales summary” — a summary of function revenue, food, snacks, guest rooms and tax invoice details · “Complimentary” rows show their amount for reference but are “not added to the total”.",
         "Check it, then tap “Print / PDF”.",
-        "Tap “Save” (after Print / PDF) and choose PNG picture (sharp) · JPG picture (small, for LINE) · PDF (A4) — the file goes to your device, named after the sheet and the copy, e.g. function-FS-2610-003-operation.pdf."
+        "Tap “Save” (after Print / PDF) and choose PNG picture (sharp) · JPG picture (small, for LINE) · PDF (A4 landscape, split into pages if long) — the file goes to your device, named after the sheet and the copy, e.g. function-FS-2610-003-operation.pdf."
       ],
       "shots": [
         {
@@ -569,7 +591,7 @@ window.MANUAL.en = {
       "steps": [
         "Tap ‹ › to change the month, or “Today” to return to the current month.",
         "Switch between the Month · Week · Pipeline views.",
-        "Filters on the left: status (Draft · Provisional · Confirmed) with counts and totals, and room/area — colours: draft grey · provisional yellow · confirmed green.",
+        "Filters on the left: status (Draft · Awaiting booking confirmation · Event approved) with counts and totals, and room/area — colours: draft grey · awaiting booking confirmation yellow · event approved green.",
         "Tap an event name in the calendar to open its function sheet (or the quotation if there is no function sheet yet)."
       ],
       "shots": [
@@ -597,14 +619,20 @@ window.MANUAL.en = {
       "intro": "Staff › Shifts is where you put people on shifts for each event. The system works out how many staff are needed from the number of guests.",
       "steps": [
         "Choose the event at the top (tap the quotation name ▾) and choose the day.",
-        "If there is no plan yet, tap “Create plan from the quotation” — shifts are made only for departments with “Apply rules” on in Head-count rules, with people per shift by the guest count (a summary shows first, e.g. Kitchen/F&B 1 per shift) — “Apply rules to this plan” works out an existing plan again.",
+        "If there is no plan yet, tap “Create plan from the quotation” — shifts are made only for departments with “Apply rules” on in Head-count rules, with people per shift by the rules (a summary shows first, e.g. Kitchen/F&B 4 per shift) — “Apply rules to this plan” works out an existing plan again.",
+        "After the plan is made, a pop-up in the middle of the screen asks: “Auto-assign staff” = the system picks each department’s staff, from the event’s own property only, for every shift up to the number needed · “Assign myself” = shifts show in red, “Short of … people”; tap a shift or “Assign” to pick people yourself.",
+        "The “Auto-assign staff” button (green, at the top) fills the people still missing at any time — people already chosen stay; it only fills the gaps and says how many are still short.",
         "Departments without rules: add shifts yourself with “+ Add shift”.",
         "Check the summary boxes: Staff needed · Assigned · Short-staffed · Extend shift.",
-        "Department timelines: tap a shift (Morning shift/Afternoon shift) to set the number needed and the times, tick the staff, then tap “Save”.",
+        "Department timelines: tap a shift (Morning shift/Afternoon shift) to set the number needed and the times, tick the staff (only that department’s staff at the event’s property are listed), then tap “Save”.",
         "Extend shift (QT): choose +1/+2/+3 hrs or a custom time, enter a reason, choose the staff, then send it for approval.",
         "People with approval rights tap Approve / Send back on shift extension requests."
       ],
       "shots": [
+        {
+          "img": "staff-auto",
+          "cap": "After the plan is made: auto-assign or assign yourself"
+        },
         {
           "img": "staff-shifts",
           "cap": "Shifts: summary, timeline and shift extensions"
@@ -615,6 +643,8 @@ window.MANUAL.en = {
         }
       ],
       "tips": [
+        "Auto-assign skips: people off that day in the work roster (DAY OFF · EXTRA · VC · WOP · CDO) · people already on another shift that day (any event) · people who would go over 48 hrs a week — and picks those with the fewest hours first.",
+        "The system picks people from “All staff” — keep each employee’s property and department right.",
         "Hours worked this week are shown next to each name (e.g. 40 / 48 hrs) to help avoid overtime."
       ]
     },
@@ -658,20 +688,25 @@ window.MANUAL.en = {
       "icon": "sliders",
       "title": "Head-count rules",
       "who": "People who can plan staff shifts",
-      "intro": "Staff › Head-count rules sets how many staff are needed per shift for a given number of guests.",
+      "intro": "Staff › Head-count rules sets how many staff are needed per shift, starting from the hotel’s manpower plan.",
       "steps": [
         "Turn on “Apply rules” for the departments you want (off = no shifts for that department when a plan is made; add them yourself later).",
-        "Set guest ranges, for example 1–50 guests = 1 staff, 51–100 guests = 2 staff.",
-        "Tap “+ Add guest range” or 🗑 to delete a range, then save.",
+        "Kitchen / Food & beverage (the restaurant table): 1–30 guests = 1 · 31–50 = 2 · 51–100 = 3 · 101–150 = 4 · 151 and over = 5",
+        "Banquet has 2 tables: meetings (breaks / breaks and lunch) 1–50 = 1 · 51–100 = 2 · 101–150 = 3 · 151+ = 4, and parties 1–50 = 2 · 51–100 = 3 · 101–150 = 4 · 151+ = 5 — the system uses the party table by itself on days with a Gala dinner · Cocktail · wedding.",
+        "Housekeeping counts the guest rooms in the quotation: 1–16 rooms = 1 · 17–36 = 2 · 37–53 = 3 · 54–70 = 4 · 71 and over = 5",
+        "Change the numbers in the boxes yourself, tap “+ Add …range” or 🗑 to delete a range, then tap “Save rules”.",
         "The rules are used with “Create plan from the quotation” or “Apply rules to this plan”."
       ],
       "shots": [
         {
           "img": "staff-rules",
-          "cap": "Head-count rules per shift"
+          "cap": "Head-count rules per shift, from the manpower plan"
         }
       ],
-      "tips": []
+      "tips": [
+        "The numbers are people per shift — Kitchen and Banquet have a morning and an afternoon shift; for a whole-day number, enter half.",
+        "AV and Front office are still off; add their shifts yourself."
+      ]
     },
     {
       "id": "roster",
@@ -817,6 +852,7 @@ window.MANUAL.en = {
         "Tap “+ Add user”, enter the name, email (used to sign in), phone, role and department, then save. Tell the user their starting password and ask them to change it the first time they sign in.",
         "Tap a user’s name to open the panel on the right and turn each permission on or off, such as Create and send quotations · Discounts up to 10% · Approve discounts over 10% · View function sheets and the booking calendar · Manage customer data · Plan staff shifts · Manage users · Edit prices and packages · View leave request details (HR).",
         "Tap ✏️ to edit details, change the status (Active / Disabled), set up two-step verification or reset the password.",
+        "Signature: in the right-hand panel, on the “Signature” row tap “Upload” and choose a photo of the signature on white paper — the system makes the background transparent and trims it. It shows in “Issued by” on the function details and in “Quoted by” on quotations · tap “Change” or “Delete” to update it.",
         "“Properties allowed” (administrators): in the right-hand panel choose Luck Swan Resort · Luck Swan Boutique · Manee Inn (at least one), then tap “Save” — administrators can always open every property.",
         "Roles: tap “+ Add role”, enter a name, choose the visible menus and permissions, then save — saving a role updates the permissions of everyone in that role (you can also add/rename/delete roles from the org chart in Assignment ⚙)."
       ],
@@ -838,7 +874,9 @@ window.MANUAL.en = {
         "A browse-only role, such as junior sales: untick “Create and send quotations” on the role — the meeting room, room and catering pages are then for viewing only, with no buttons that add to a quotation.",
         "Accounts without set properties can open every property · users cannot see or change data of properties they are not allowed.",
         "When you change someone’s role, their permissions change to match the new role (you can fine-tune them afterwards).",
-        "Quotations already sent do not change when permissions change."
+        "Quotations already sent do not change when permissions change.",
+        "Ticking “Create and send quotations” for a user or role opens the sales menus (meeting rooms, guest rooms, catering, quotations) like sales staff.",
+        "Photograph the signature clearly, on white, without shadows — if the system cannot find the signature in the photo it asks you to take it again."
       ]
     },
     {
@@ -850,8 +888,8 @@ window.MANUAL.en = {
       "intro": "The Dashboard menu summarizes revenue by event date, by year and by month.",
       "steps": [
         "Choose the year (‹ year ›) and a month, or “Whole year”.",
-        "Summary boxes: confirmed revenue for the period · compared with last year · awaiting confirmation (Awaiting approval + Tentative) · % closed.",
-        "Monthly revenue chart (Confirmed / awaiting confirmation): point at or tap a dot to see the figures, or tap “View as table”.",
+        "Summary boxes: confirmed revenue for the period · compared with last year · awaiting confirmation (Awaiting approval + Awaiting booking confirmation) · % closed.",
+        "Monthly revenue chart (Event approved / awaiting confirmation): point at or tap a dot to see the figures, or tap “View as table”.",
         "You can export the data as a CSV file."
       ],
       "shots": [
@@ -874,11 +912,13 @@ window.MANUAL.en = {
         "Restore: use “Import backup” and choose the file you downloaded (only when really needed).",
         "Back up everything (database, photos, user accounts and code): GitHub › Actions › “Backup data” › Run workflow, then download the .7z file under Artifacts (locked with the BACKUP_PASSWORD set in GitHub) — how to restore is in RESTORE.md inside it.",
         "If no administrator can sign in: GitHub › Actions › “Reset admin account” (put the e-mail and a new password in the secrets ADMIN_RESET_EMAIL / ADMIN_RESET_PASSWORD first), then change the password again in the app.",
-        "System updates: when new features are released, the app on every device updates itself within a few minutes."
+        "System updates: when new features are released, the app on every device updates itself within a few minutes.",
+        "Test LINE notification: tap your profile picture › “Test LINE notification” — the system sends a 🔔 test message to the group and shows the result: ✅ received · ❌ 403 the secret does not match · ❌ 404 the workflow is not published or the link is wrong.",
+        "Setting up LINE notifications (n8n): see the IT guide on GitHub at docs/it/n8n/README.md — turn what is notified on/off with SEND, and change the group with GROUP_ID, in the “จัดข้อความ” box in n8n."
       ],
       "shots": [],
       "tips": [
-        "Never send passwords or API tokens by chat or email.",
+        "Never send passwords or API tokens by chat or email — including the LINE Channel access token / Channel secret and N8N_SECRET.",
         "If everyone cannot sign in at once and see “This user was not found”, the free daily database quota on Cloudflare may be used up — wait until 07:00 (Thailand) and refresh; do not save work meanwhile."
       ]
     }
@@ -898,7 +938,7 @@ window.MANUAL.en = {
       "steps": [
         "Tap “+ New quotation” › complete the 5 steps: Customer (you can enter the Tax ID) › Meeting rooms › Food › Guest rooms › Summary.",
         "Open the quotation › adjust items, discount and terms › tap Send / Print › choose Customer copy / Full quotation › you can edit details on the quotation › tap “Request approval” › print it for an administrator to sign.",
-        "Wait for an administrator to “Approve quotation” (status becomes Tentative) › email / LINE it to the customer › the customer confirms › tap “Customer confirmed booking” › Function sheets › “+ Create from quote” › choose attendees and type of event.",
+        "Wait for an administrator to “Approve quotation” (status becomes Awaiting booking confirmation) › email / LINE it to the customer › the customer confirms › tap “Customer confirmed booking” › wait for an administrator to “Approve event” › Function sheets › “+ Create from quote” › choose attendees and type of event.",
         "Fill in the daily schedule and each department’s tasks › follow up on acknowledgements.",
         "Check the calendar before taking a new event, to see free rooms · design the floor plan from the function sheet (the tables / rows panel works it out from the guests).",
         "Function details › “For operations” › “Save” as JPG/PDF and send it to the operations team on LINE."
@@ -987,7 +1027,7 @@ window.MANUAL.en = {
         "Manage customer data"
       ],
       "steps": [
-        "Review confirmed quotations: net total, deposit terms and customer details.",
+        "Review quotations at Event approved: net total, deposit terms and customer details.",
         "Function Sheets › “Sales summary”: check revenue, food, guest rooms and tax invoice details › Print / PDF.",
         "Function details › “Accounting / Finance” section: see the total and cost details.",
         "Acknowledge the “Accounting” card on the function sheet.",
@@ -1039,14 +1079,14 @@ window.MANUAL.en = {
       "menus": "All menus",
       "can": [
         "All permissions",
-        "Approve quotations",
+        "Approve quotations and approve events",
         "Sign and approve leave requests",
         "Approve edited function sheets and overlapping room bookings",
         "Edit guest room rates and menus",
         "Manage users, roles and permissions"
       ],
       "steps": [
-        "Home › quotations “Awaiting approval” › check the copy the salesperson printed for you to sign › tap “Approve quotation” (it becomes Tentative automatically) or “Send back” with a reason.",
+        "Home › quotations “Awaiting approval” › check the copy the salesperson printed for you to sign › tap “Approve quotation” (it becomes Awaiting booking confirmation automatically) or “Send back” with a reason › when sales report that the customer confirmed (🤝 in the LINE group), tap “Approve event”.",
         "Assignment & Approve › Approve tab: approve edited function sheets · ⚙ Assignment permissions (org chart / form).",
         "Leave Requests › Awaiting approval tab › open the request › Sign / Reject.",
         "Users: create accounts, set roles, permissions and allowed properties, turn users on/off.",
@@ -1104,6 +1144,21 @@ window.MANUAL.en = {
     }
   ],
   "changelog": [
+    {
+      "v": "1.8",
+      "date": "Nov 19, 2026",
+      "text": "Quotations: the “Quoted by” space shows a signature automatically — the owner’s, or that of the user whose name is typed there · the English and Myanmar manuals now match the Thai version."
+    },
+    {
+      "v": "1.7",
+      "date": "Nov 17, 2026",
+      "text": "Function sheets: list labels show each sheet’s status (Awaiting approval · Sent back · Approved), a “Not approved yet” tab, and changing the venue / room layout in a pop-up · Shifts: head-count rules from the manpower plan (banquet split into meetings / parties, housekeeping by guest rooms), a pop-up to auto-assign or assign yourself, an “Auto-assign staff” button, and only that property’s staff in the lists."
+    },
+    {
+      "v": "1.6",
+      "date": "Nov 14, 2026",
+      "text": "Quotations: new steps Draft › Awaiting approval (orange) › Awaiting booking confirmation › Event approved (the administrator approves again after the customer confirms) › Function approved · a quotation just over one page prints on one page · LINE group notifications and the “Test LINE notification” button · Function details: automatic Function No., signature in “Issued by”, stage sign pictures, landscape PDF · Sales summary: complimentary rows not added to the total · Guest rooms: add/edit room types, room photos, and boutique prices by date period · Users: signature upload, and the quotation permission opens the sales menus."
+    },
     {
       "v": "1.5",
       "date": "Nov 10, 2026",
