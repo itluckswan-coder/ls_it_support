@@ -354,6 +354,19 @@ async function putDoc(req, env, user, kind, id, ctx) {
   if (!data || typeof data !== 'object') fail(400, 'ข้อมูลไม่ถูกต้อง');
   const row = await env.DB.prepare('SELECT * FROM docs WHERE kind = ? AND id = ?').bind(kind, id).first();
   const live = row && !row.deleted;
+  // a new quotation / function sheet whose number is already used — by another property's (which this user may not
+  // see, e.g. a sales user of the boutique only), or by someone who made one at the same moment: never send that doc
+  // back (it would replace the new one on this device and show another property's data); name the next free number
+  // instead, and the app renumbers its new doc and saves it again (owner, 23 Nov 2026)
+  const nm = /^((?:QT|FS)-\d{4}-)(\d+)$/.exec(id);
+  if (live && !(Number(version) || 0) && nm && (kind === 'quote' || kind === 'beo')) {
+    const ids = (await env.DB.prepare('SELECT id FROM docs WHERE kind = ? AND id LIKE ?').bind(kind, nm[1] + '%').all()).results;
+    const max = ids.reduce((a, r) => Math.max(a, Number((/-(\d+)$/.exec(r.id) || [])[1]) || 0), 0);
+    const next = nm[1] + String(max + 1).padStart(nm[2].length, '0');
+    return json({ error: 'taken', message: 'เลขที่ ' + id + ' มีอยู่แล้ว — เปลี่ยนเป็น ' + next, next }, 409);
+  }
+  // a conflict on a doc of a property this user may not open: say so without sending its data
+  if (live && row.version !== (Number(version) || 0) && !(await docSiteOk(env, user, kind, id, JSON.parse(row.data)))) fail(403, 'คุณไม่มีสิทธิ์เข้าสถานที่นี้');
   if ((live ? row.version : 0) !== (Number(version) || 0)) {
     return json({ error: 'conflict', message: 'ข้อมูลนี้ถูกแก้ไขโดยผู้อื่น — โหลดเวอร์ชันล่าสุดแล้ว', doc: live ? { kind, id, version: row.version, data: JSON.parse(row.data) } : null }, 409);
   }
