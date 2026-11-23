@@ -226,6 +226,8 @@
           } catch (e) {
             if (e.network || e.status === 401) throw e;
             rerender = true;
+            // the number of a new quotation / function sheet is taken (e.g. by another property's): renumber, send again
+            if (e.status === 409 && e.body && e.body.next) { this.renameLocal(d, e.body.next); this.again = true; if (g.App) g.App.toast(e.message); continue; }
             if (e.status === 409 && e.body && 'doc' in e.body) {
               if (e.body.doc) this.applyDoc(e.body.doc); else this.dropLocal(d);
             } else this.revert(d);
@@ -252,6 +254,17 @@
     },
     revert(d) { if (this.snap[d.key]) this.applyDoc({ kind: d.kind, id: d.id, version: this.ver[d.key], data: JSON.parse(this.snap[d.key]) }); else this.dropLocal(d); },
     dropLocal(d) { this.applyDoc({ kind: d.kind, id: d.id, deleted: true }); },
+    // give a new, not yet saved quotation / function sheet another number, with everything that points at it
+    renameLocal(d, id) {
+      const db = Store.db, App = g.App, enc = encodeURIComponent;
+      if (d.kind === 'quote') {
+        const q = db.quotes.find(x => x.id === d.id); if (!q) return; q.id = id;
+        db.beos.forEach(b => { if (b.quoteId === d.id) b.quoteId = id; });
+        if (db.staff && db.staff[d.id]) { db.staff[id] = db.staff[d.id]; delete db.staff[d.id]; }
+        if (App) { if (App.state.ctx === d.id) App.setCtx(id); const u = App.state.ui || {}; if (u.staffQ === d.id) u.staffQ = id; if (u.doc && u.doc.id === d.id) u.doc.id = id; }
+      } else if (d.kind === 'beo') { const b = db.beos.find(x => x.id === d.id); if (!b) return; b.id = id; }
+      if (location.hash.includes('/' + enc(d.id))) location.replace(location.hash.replace('/' + enc(d.id), '/' + enc(id)));
+    },
 
     /* pull other people's changes */
     startPolling() {
