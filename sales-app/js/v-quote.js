@@ -718,7 +718,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const pending = q.approval === 'pending' && App.calc(q).pct > 10, noOk = !q.bookOk && q.status !== 'confirmed';
       const chLabel = { email: 'ส่งใบเสนอราคา', line: 'ส่งทาง LINE', link: 'คัดลอกลิงก์', pdf: 'พิมพ์ / บันทึก PDF' }[ui.ch];
       return `<div class="doc-wrap">
-  <div class="doc-area"><div class="row no-print" style="max-width:820px;margin:0 auto 14px;flex-wrap:wrap;gap:8px"><a class="link" href="#/quote/${qid(q.id)}">${ICON.back} กลับไปแก้ไข</a><span class="spacer"></span>${App.can('create_quote') ? `<div class="seg white"><button class="${ui.edit ? '' : 'on'}" data-act="qdTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${ui.edit ? 'on' : ''}" data-act="qdTab" data-v="edit">แก้ไขข้อมูล</button></div>` : ''}<button class="btn ghost sm" data-act="docPrint">พิมพ์ / PDF</button></div>
+  <div class="doc-area"><div class="row no-print" style="max-width:820px;margin:0 auto 14px;flex-wrap:wrap;gap:8px"><a class="link" href="#/quote/${qid(q.id)}">${ICON.back} กลับไปแก้ไข</a><span class="spacer"></span>${App.can('create_quote') ? `<div class="seg white"><button class="${ui.edit ? '' : 'on'}" data-act="qdTab" data-v="preview">ตัวอย่างพิมพ์</button><button class="${ui.edit ? 'on' : ''}" data-act="qdTab" data-v="edit">แก้ไขข้อมูล</button></div>` : ''}<button class="btn ghost sm" data-act="docPrint">พิมพ์ / PDF</button><button class="btn red sm" data-act="docSave">บันทึก</button></div>
     ${ui.edit ? `<div class="fnf-bar no-print" style="max-width:820px;margin:0 auto 14px"><div><b>แก้ไขข้อมูลบนใบ</b> — พิมพ์แก้ในช่องได้เลย ปุ่ม ↺ = ใช้ค่าจากระบบ · กดที่รูปเพื่อเปลี่ยนรูป<div id="qdDirty" class="${ui.dirty ? 'small red' : 'small muted'}">${ui.dirty ? 'มีการแก้ไขที่ยังไม่บันทึก' : 'ยังไม่มีการแก้ไข'}</div></div>
       <div class="row"><button class="btn ghost" data-act="qdCancel">ยกเลิก</button><button class="btn red" data-act="qdSave">บันทึกแก้ไขข้อมูล</button></div></div>` : ''}
     <div class="doc-scroll">${App.V.doc.doc(q, ui)}</div></div>
@@ -875,6 +875,28 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     docCh(el) { DU().ch = el.dataset.v; App.render(); },
     docToDel(el) { DU().to.splice(Number(el.dataset.i), 1); App.render(); },
     docPrint() { qdFit(); window.print(); },
+    // save the quotation as a file made in the browser (not the print window): on a phone the print/share sheet can snapshot
+    // only the part of the paper that is on screen, so this draws the whole paper at A4 width whatever the screen
+    docSave() {
+      const ui = DU(), q = Store.db.quotes.find(x => x.id === ui.id);
+      if (!q || !App.savePaper) return;
+      if (ui.edit && ui.dirty) { App.toast('กด “บันทึกแก้ไขข้อมูล” ก่อนบันทึกเป็นไฟล์'); return; }
+      if (ui.edit) { ui.edit = false; App.render(); }
+      App.modal(`<h2>บันทึกเป็นไฟล์</h2><p class="small muted" style="margin-top:-4px">บันทึกใบเสนอราคา ${H(q.id)} ลงเครื่องนี้</p>
+        <div class="grid g3" style="gap:8px;margin:14px 0">${[['pdf', 'PDF', 'กระดาษ A4'], ['png', 'รูปภาพ PNG', 'คมชัด'], ['jpg', 'รูปภาพ JPG', 'ไฟล์เล็ก ส่งทาง LINE']].map(([k, t, d]) => `<button class="btn ghost" style="height:auto;padding:12px;flex-direction:column;gap:2px" data-kind="${k}"><b>${t}</b><span class="xs muted">${d}</span></button>`).join('')}</div>
+        <div class="small" id="qsMsg" style="min-height:20px" role="status"></div>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ปิด</button></div>`, bg => {
+        const msg = bg.querySelector('#qsMsg');
+        bg.querySelectorAll('[data-kind]').forEach(x => x.onclick = () => {
+          const el = document.getElementById('qdPaper'); if (!el) return;
+          bg.querySelectorAll('[data-kind]').forEach(y => { y.disabled = true; });
+          msg.className = 'small muted'; msg.textContent = 'กำลังสร้างไฟล์…';
+          App.savePaper(x.dataset.kind, el, 'quotation-' + String(q.id).replace(/[^A-Za-z0-9-]/g, ''), { orient: 'portrait', width: Math.round(PG_W * MM), style: { padding: '28px 26px', fontSize: '12px' }, cuts: 'tr, table, .sig' })
+            .then(() => { App.closeModal(); App.toast('บันทึกไฟล์แล้ว'); App.touch(q, 'บันทึกไฟล์ใบเสนอราคา (' + x.dataset.kind.toUpperCase() + ')'); })
+            .catch(e => { msg.className = 'small red'; msg.textContent = 'บันทึกไม่สำเร็จ: ' + (e.message || e); bg.querySelectorAll('[data-kind]').forEach(y => { y.disabled = false; }); });
+        });
+      });
+    },
     // the customer's copy leaves out the service charge / VAT breakdown; the full copy shows it
     docVer(el) { DU().full = el.dataset.v === '1'; App.render(); },
     qdTab(el) {
