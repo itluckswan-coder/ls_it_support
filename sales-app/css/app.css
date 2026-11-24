@@ -630,7 +630,8 @@ main.bleed{padding:0;max-width:none}
   .topbar,.tabbar,.doc-side,.no-print,.dock,.toast,.page-hd .btn{display:none!important}
   main{padding:0;max-width:none}
   .doc-wrap{display:block;margin:0}
-  .doc-area{padding:0;background:#fff}
+  .doc-area{padding:0;background:#fff;overflow:visible!important}
+  .doc-scroll{overflow:visible!important}
   .doc{box-shadow:none;max-width:none;padding:0;min-width:0!important}
   .card{box-shadow:none;break-inside:avoid}
   .split{grid-template-columns:1fr!important}

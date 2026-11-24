@@ -294,32 +294,49 @@
   // the two drawing libraries ship with the app (vendor/, MIT) and load only when someone saves
   const loadJs = src => new Promise((ok, bad) => { if (document.querySelector(`script[data-src="${src}"]`)) return ok(); const t = document.createElement('script'); t.src = src; t.dataset.src = src; t.onload = ok; t.onerror = () => bad(new Error('โหลดตัวแปลงไฟล์ไม่สำเร็จ')); document.head.appendChild(t); });
   async function saveSheet(kind, b) {
+    const el = document.getElementById('fnPaper'); if (!el) throw new Error('ไม่พบใบรายละเอียดฟังก์ชัน');
+    const base = 'function-' + String(b.id).replace(/[^A-Za-z0-9-]/g, '') + '-' + (fnUi().view === 'ops' ? 'operation' : 'sales');
+    return savePaper(kind, el, base, { orient: 'landscape', cuts: 'tr, table, .fnf-sign, .fnf-foot' });
+  }
+  // any paper on screen (the function sheet, the quotation) → PNG / JPG / PDF on A4; opt.width (px) draws it at that width
+  // whatever the screen (a phone shows it narrow or scrolled sideways), opt.orient 'portrait' | 'landscape'
+  async function savePaper(kind, el, base, opt = {}) {
     await loadJs('vendor/html2canvas-1.4.1.min.js');
     if (kind === 'pdf') await loadJs('vendor/jspdf-2.5.1.umd.min.js');
-    const el = document.getElementById('fnPaper'); if (!el) throw new Error('ไม่พบใบรายละเอียดฟังก์ชัน');
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
-    const canvas = await g.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, ignoreElements: x => x.classList && x.classList.contains('no-print') });
-    const base = 'function-' + String(b.id).replace(/[^A-Za-z0-9-]/g, '') + '-' + (fnUi().view === 'ops' ? 'operation' : 'sales');
+    const old = el.getAttribute('style');
+    // the drawing is laid out at the real screen width (as the page is measured for the page breaks); opt.style sets what a
+    // phone layout would change, so the file looks the same from a phone or a computer
+    if (opt.width) Object.assign(el.style, { width: opt.width + 'px', maxWidth: 'none', minWidth: '0', zoom: '1' }, opt.style || {});
+    let canvas;
+    try {
+      canvas = await g.html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false, scrollX: 0, scrollY: 0, ignoreElements: x => x.classList && x.classList.contains('no-print') });
+      if (kind === 'pdf') await pdfOf(canvas, el, base, opt);
+    } finally { if (old == null) el.removeAttribute('style'); else el.setAttribute('style', old); }
     if (kind === 'png' || kind === 'jpg') {
       const type = kind === 'png' ? 'image/png' : 'image/jpeg';
       const blob = await new Promise(r => canvas.toBlob(r, type, 0.92));
       U.download(base + '.' + kind, blob, type); return;
     }
-    // PDF on A4 landscape (as the sheet is printed): full width; a sheet longer than a page goes on to more pages, cut between
-    // table rows (never through a line of text); one that is only a little too long is shrunk onto a single page
-    const pdf = new g.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'landscape' });
-    const PW = 297, PH = 210, m = 8, fitW = PW - 2 * m, fitH = PH - 2 * m;
+  }
+  // PDF on A4 (landscape as the function sheet is printed, portrait for a quotation): full width; a paper longer than a page goes
+  // on to more pages, cut between table rows (never through a line of text); one that is only a little too long is shrunk onto one page
+  async function pdfOf(canvas, el, base, opt) {
+    const land = opt.orient !== 'portrait';
+    const pdf = new g.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: land ? 'landscape' : 'portrait' });
+    const PW = land ? 297 : 210, PH = land ? 210 : 297, m = land ? 8 : 10, fitW = PW - 2 * m, fitH = PH - 2 * m;
     const pagePx = Math.floor(fitH / fitW * canvas.width); // canvas pixels that fill one page at full width
     if (canvas.height <= pagePx * 1.12) {
       const k = Math.min(fitW / canvas.width, fitH / canvas.height), w = canvas.width * k, h = canvas.height * k;
       pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', (PW - w) / 2, m, w, h);
     } else {
       const sc = canvas.width / el.getBoundingClientRect().width, top0 = el.getBoundingClientRect().top;
-      const cuts = [...new Set([...el.querySelectorAll('tr, table, .fnf-sign, .fnf-foot')].map(x => Math.round((x.getBoundingClientRect().bottom - top0) * sc)))].filter(y => y > 0 && y < canvas.height).sort((x, y) => x - y);
+      const cuts = [...new Set([...el.querySelectorAll(opt.cuts || 'tr, table')].map(x => Math.round((x.getBoundingClientRect().bottom - top0) * sc)))].filter(y => y > 0 && y < canvas.height).sort((x, y) => x - y);
       // every line of text on the sheet (canvas pixels): a page may also end between two lines when no line, in any column, crosses there
       const lines = [], tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
       for (let n; (n = tw.nextNode());) { const r = document.createRange(); r.selectNodeContents(n); for (const q of r.getClientRects()) if (q.height) lines.push([(q.top - top0) * sc, (q.bottom - top0) * sc]); }
       for (const im of el.querySelectorAll('img')) { const q = im.getBoundingClientRect(); lines.push([(q.top - top0) * sc, (q.bottom - top0) * sc]); }
+      // a page never ends through a picture or a line of text
       const clear = y => !lines.some(([t, b]) => t < y - 1 && b > y + 1);
       const gaps = [...new Set(lines.map(([, b]) => Math.ceil(b) + 2))].filter(clear).sort((x, y) => x - y);
       // pages for a page height (in canvas pixels): each ends at the last row that fits; a row taller than a page ends between two lines
@@ -327,7 +344,7 @@
         const out = [];
         for (let start = 0; start < canvas.height - 2;) {
           const limit = start + ph; if (canvas.height <= limit) { out.push([start, canvas.height]); break; }
-          const fit = cuts.filter(c => c > start && c <= limit); let end = fit.length ? fit[fit.length - 1] : limit;
+          const fit = cuts.filter(c => c > start && c <= limit && clear(c)); let end = fit.length ? fit[fit.length - 1] : limit;
           if (end - start < ph * 0.35) { const g2 = gaps.filter(c => c > start + ph * 0.35 && c <= limit); end = g2.length ? g2[g2.length - 1] : limit; }
           out.push([start, end]); start = end;
         }
@@ -346,6 +363,8 @@
     }
     U.download(base + '.pdf', pdf.output('blob'), 'application/pdf');
   }
+
+  App.savePaper = savePaper;
 
   /* ---------- the page ---------- */
   const moneyRole = () => { const me = App.me(); return !!App.salesRole() || (!!me && me.role === 'acc' && !(App.roleOf && App.roleOf(me).custom)); };
