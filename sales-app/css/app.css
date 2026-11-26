@@ -132,6 +132,8 @@ main{padding:28px 32px 48px;max-width:1440px;margin:0 auto}
 .seg.white{background:#fff;border:1px solid var(--line)}
 .seg button{height:32px;padding:0 14px;border-radius:999px;font-size:13px;color:var(--ink2);white-space:nowrap}
 .seg button.on{background:var(--ink);color:#fff}
+.seg.fn-tabs button{padding:0 4px;font-size:12.5px;min-width:0}
+.badge.fn-ended{background:#ECEAE3;color:#5f5c55}
 .badge{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
 .st-draft{background:var(--gray-soft);color:var(--ink2)}
 .st-sent{background:var(--yellow-soft);color:#7a5c00}

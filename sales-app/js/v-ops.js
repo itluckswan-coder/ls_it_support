@@ -78,7 +78,10 @@
       const ui = App.state.ui.beo || (App.state.ui.beo = { f: 'soon', day: 1 });
       const today = U.today();
       const all = App.siteBeos().map(b => ({ b, q: Store.quote(b.quoteId) })).filter(x => x.q).sort((a, b) => a.q.start.localeCompare(b.q.start));
-      const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? g.Approval.state(b) !== 'approved' : q.end >= today && U.diffDays(today, q.start) <= 60));
+      // tabs (owner, 26 Nov 2026): ยังไม่อนุมัติ · ใกล้ถึง · งานจบแล้ว (the event's last day has passed, latest first) · ทั้งหมด
+      const ended = q => q.end < today;
+      const list = all.filter(({ b, q }) => ui.f === 'all' || (ui.f === 'draft' ? g.Approval.state(b) !== 'approved' : ui.f === 'done' ? ended(q) : !ended(q) && U.diffDays(today, q.start) <= 60));
+      if (ui.f === 'done') list.sort((a, b) => b.q.end.localeCompare(a.q.end) || b.q.start.localeCompare(a.q.start));
       const sel = all.find(x => x.b.id === p[0]) || list[0] || all[0];
       if (sel && !p[0]) { history.replaceState(null, '', '#/beo/' + encodeURIComponent(sel.b.id)); }
       // the current approval state of a function sheet (owner, 17 Nov 2026): รออนุมัติ · ถูกตีกลับ · อนุมัติแล้ว — not the
@@ -91,12 +94,12 @@
       };
       const left = `<aside>
         <div class="between" style="margin-bottom:14px"><h2 style="font-size:22px">ใบฟังก์ชัน</h2><button class="btn red sm" data-act="beoNew">+ สร้างจากใบเสนอ</button></div>
-        <div class="seg" style="width:100%;margin-bottom:14px">${[['soon', 'ใกล้ถึง'], ['all', 'ทั้งหมด'], ['draft', 'ยังไม่อนุมัติ']].map(([k, l]) => `<button style="flex:1" class="${ui.f === k ? 'on' : ''}" data-act="beoF" data-v="${k}">${l}</button>`).join('')}</div>
+        <div class="seg fn-tabs" style="width:100%;margin-bottom:14px">${[['draft', 'ยังไม่อนุมัติ'], ['soon', 'ใกล้ถึง'], ['done', 'งานจบแล้ว'], ['all', 'ทั้งหมด']].map(([k, l]) => `<button style="flex:1" class="${ui.f === k ? 'on' : ''}" data-act="beoF" data-v="${k}">${l}</button>`).join('')}</div>
         ${list.map(({ b, q }) => `<a class="beo-item ${sel && sel.b.id === b.id ? 'on' : ''}" href="#/beo/${encodeURIComponent(b.id)}" style="color:inherit">
           <div class="between xs"><span class="mono muted">${H(b.id)}</span><span class="muted">${U.fmtRange(q.start, q.end, { year: false })}</span></div>
           <div class="b" style="margin:4px 0 0">${H(q.title)}</div><div class="small muted" style="margin-bottom:6px">${H(q.client)}</div>
           <div class="between small"><span class="muted">${H((App.beoVenue(b, q).room || {}).name || '')} · ${q.pax} ท่าน</span>
-          ${fnStage(b)}</div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
+          <span class="row" style="gap:4px">${ui.f !== 'done' && ended(q) ? '<span class="badge fn-ended">งานจบแล้ว</span>' : ''}${fnStage(b)}</span></div></a>`).join('') || '<div class="empty small">ไม่มีใบฟังก์ชัน</div>'}
       </aside>`;
       if (!sel) return `<div class="split left">${left}<div class="empty">ยังไม่มีใบฟังก์ชัน — สร้างจากใบเสนอราคาที่อนุมัติจัดงานแล้ว</div></div>`;
       const { b, q } = sel, days = U.daysOf(q.start, q.end);
