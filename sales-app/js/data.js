@@ -233,7 +233,16 @@
     { id: 'wd-gold', cat: 'wedding', name: 'Wedding Gold', price: 1290, unit: 'ท่าน', tags: [], feat: ['บุฟเฟต์ 14 รายการ', 'ดอกไม้เวที'] },
     { id: 'wd-chinese', cat: 'wedding', name: 'Wedding Chinese Table', price: 9900, unit: 'โต๊ะ', tags: [], feat: ['โต๊ะจีน 9 รายการ'] },
     { id: 'wd-morning', cat: 'wedding', name: 'พิธีเช้า (ไทย)', price: 35000, unit: 'งาน', tags: [], feat: ['จัดสถานที่พิธีหมั้น/รดน้ำ'] },
-    { id: 'wd-cocktail', cat: 'wedding', name: 'Wedding Cocktail', price: 790, unit: 'ท่าน', tags: [], feat: ['คานาเป้ + เครื่องดื่ม'] }
+    { id: 'wd-cocktail', cat: 'wedding', name: 'Wedding Cocktail', price: 790, unit: 'ท่าน', tags: [], feat: ['คานาเป้ + เครื่องดื่ม'] },
+
+    // the resort's lunch / set-table menus (owner, 26 Nov 2026): priced by the table of 8 (price 1 until the owner sets it), +50 a
+    // guest past 8, at most 10 a table; the customer picks dishes (one per group for now; the menu editor changes it)
+    { id: 'lt-set1', cat: 'lunch', name: 'Lunch Menu ชุดที่ 1', sub: 'เสิร์ฟแบบโต๊ะ (Set Table)', price: 1, unit: 'โต๊ะ', tags: [], tbl: { base: 8, max: 10, ex: 50 }, photos: [],
+      groups: [{n: 'ประเภทแกง หรือ ซุป', pick: 1, d: ['แกงเขียวหวานไก่', 'แกงไก่หน่อไม้เส้น', 'ต้มแซ่บซี่โครงหมู', 'ไก่ตุ๋นฟักมะนาวดอง', 'ต้มแซ่บหมูเด้ง', 'แกงจืดลูกรอกหมูสับ', 'แกงจืดเต้าหู้หมูสับ', 'แกงจืดมะระตุ๋นซี่โครงหมู']}, {n: 'ประเภทผัด', pick: 1, d: ['ผัดผักรวมมิตร', 'ผัดผักสี่สหาย', 'ผัดหน่อไม้ทรงเครื่อง', 'ผัดผักคะน้าหมูน้ำมันหอย', 'ไก่ทอดกระเทียม', 'เต้าหู้ทรงเครื่อง', 'ไก่ผัดพริกเผา/พริกแกง', 'วุ้นเส้นผัดไข่ทรงเครื่อง', 'ผัดเปรี้ยวหวานไก่', 'พะแนงไก่', 'ไก่กรอบซอสมะนาว']}, {n: 'ประเภทไข่', pick: 1, d: ['ไข่พะโล้', 'ไข่เจียวหมูสับ', 'ยำไข่ดาว', 'ไข่ลูกเขย', 'ไข่ตุ๋นทรงเครื่อง', 'ยำไข่ต้มทรงเครื่อง']}, {n: 'ประเภทน้ำพริก (เสิร์ฟพร้อมผักลวก/ผักสด/ผักทอด)', pick: 1, d: ['น้ำพริกอ่อง', 'น้ำพริกกะปิ', 'น้ำพริกลงเรือ', 'น้ำพริกหนุ่ม']}, {n: 'ประเภทยำ หรือ ลาบ', pick: 1, d: ['ยำวุ้นเส้นหมูยอ', 'ยำวุ้นเส้นโบราณ', 'ผักบุ้งกรอบ+น้ำยำ', 'ยำรวมมิตร', 'ยำไส้กรอก', 'ยำหมูย่าง']}, {n: 'ประเภทของหวาน', pick: 1, d: ['เฉาก๊วยน้ำตาลทรายแดง', 'ผลไม้ตามฤดูกาล']}] },
+    { id: 'lt-set2', cat: 'lunch', name: 'Lunch / Set Table Menu ชุดที่ 2', sub: 'เสิร์ฟแบบโต๊ะ (Set Table)', price: 1, unit: 'โต๊ะ', tags: [], tbl: { base: 8, max: 10, ex: 50 }, photos: [],
+      groups: [{n: 'ประเภทแกง หรือ ซุป', pick: 1, d: ['แกงเขียวหวานไก่', 'แกงไก่หน่อไม้เส้น', 'ไก่ตุ๋นฟักมะนาวดอง', 'ต้มแซ่บซี่โครงหมู', 'ต้มแซ่บหมูเด้ง', 'แกงจืดเต้าหู้หมูสับ', 'แกงจืดมะระซี่โครงหมู', 'แกงจืดลูกรอกหมูสับ', 'แกงจืดผักกาดขาวหมูสับลูกชิ้น']}, {n: 'ประเภทผัด', pick: 1, d: ['ผัดผักรวมมิตร', 'ผัดผักสี่สหาย', 'ไก่ผัดน้ำมันหอย', 'ผัดผักคะน้าหมูน้ำมันหอย', 'ไก่ผัดพริกแกง', 'ไก่ทอดกระเทียม', 'เต้าหู้ทรงเครื่อง', 'ไก่ผัดพริกเผา', 'วุ้นเส้นผัดไข่ทรงเครื่อง', 'ไก่กรอบซอสมะนาว', 'ผัดหน่อไม้ทรงเครื่อง', 'ผัดเปรี้ยวหวานหมู/ไก่']}, {n: 'ประเภทไข่', pick: 1, d: ['ไข่เจียวหมูสับ', 'ไข่พะโล้', 'ยำไข่ดาว', 'ไข่ตุ๋นทรงเครื่อง', 'ไข่ลูกเขย', 'ยำไข่ต้มทรงเครื่อง']}, {n: 'ประเภทน้ำพริก (เสิร์ฟพร้อมผักลวก/ผักสด/ผักทอด)', pick: 1, d: ['น้ำพริกอ่อง', 'น้ำพริกกะปิ', 'น้ำพริกลงเรือ', 'น้ำพริกหนุ่ม']}, {n: 'ประเภทยำ หรือ ลาบ', pick: 1, d: ['ยำวุ้นเส้นหมูยอ', 'ยำวุ้นเส้นโบราณ', 'ยำรวมมิตร', 'ผักบุ้งกรอบ+น้ำยำ', 'เห็ดเข็มทองทอด+น้ำยำ', 'ยำไส้กรอก', 'ยำหมูย่าง']}, {n: 'ประเภทของหวาน', pick: 1, d: ['เฉาก๊วยน้ำตาลทรายแดง', 'สาคูเปียกข้าวโพด', 'ผลไม้ตามฤดูกาล', 'ลอดช่อง', 'แกงบวดฟักทอง']}] },
+    { id: 'lt-set3', cat: 'lunch', name: 'Lunch / Set Table Menu ชุดที่ 3', sub: 'เสิร์ฟแบบโต๊ะ (Set Table)', price: 1, unit: 'โต๊ะ', tags: [], tbl: { base: 8, max: 10, ex: 50 }, photos: [],
+      groups: [{n: 'ประเภทแกง หรือ ซุป', pick: 1, d: ['ต้มข่าไก่', 'ต้มยำโป๊ะแตก', 'ต้มยำปลานิลน้ำใส', 'ต้มแซ่บซี่โครงหมู', 'ต้มแซ่บหมูเด้ง', 'แกงแคไก่', 'แกงป่าไก่', 'แกงเขียวหวานไก่', 'แกงไก่หน่อไม้เส้น', 'แกงเลียงใส่กุ้ง', 'แกงจืดเต้าหู้หมูสับ', 'แกงจืดมะระยัดไส้หมูสับ', 'แกงจืดแตงกวายัดไส้หมูสับ', 'แกงส้มชะอมใส่กุ้ง', 'แกงส้มเมืองปลานิล', 'แกงส้มผักรวมปลาทอด']}, {n: 'ประเภทผัด', pick: 1, d: ['ผัดผักรวมมิตร', 'ผัดผักสี่สหาย', 'ผัดผักคะน้าหมูน้ำมันหอย', 'ไก่ผัดพริกเผา', 'วุ้นเส้นผัดไข่ทรงเครื่อง', 'เต้าหู้ทรงเครื่อง', 'ผัดเปรี้ยวหวานหมู/ไก่', 'พะแนงหมู/ไก่', 'ผัดฉ่าปลา', 'ไก่ผัดเม็ดมะม่วง', 'ไก่กรอบซอสมะนาว']}, {n: 'ประเภทน้ำพริก (เสิร์ฟพร้อมผักลวก/ผักสด/ผักทอด)', pick: 1, d: ['น้ำพริกอ่อง', 'น้ำพริกกะปิ', 'น้ำพริกลงเรือ', 'น้ำพริกหนุ่ม', 'หลนเต้าเจี้ยว']}, {n: 'ประเภทยำ หรือ ลาบ หรือ ทอด', pick: 1, d: ['ยำรวมมิตร', 'ผักบุ้งทอดกรอบ+น้ำยำ', 'หมูมะนาว', 'ยำมะระกุ้งสด', 'ยำหมูย่าง', 'ลาบหมูทอด', 'ลาบหมูคั่ว', 'ลาบอีสาน', 'ยำปลาดุกฟู', 'ไก่ผัดพริกเกลือ', 'ไก่ทอดเกลือ', 'ไก่ทอดตะไคร้', 'ไก่ห่อใบเตย', 'ไก่ย่าง+น้ำจิ้มแจ่ว', 'ไก่ทอดสมุนไพร']}, {n: 'ประเภทปลา', pick: 1, d: ['ปลาทอดกระเทียม', 'ปลาทอดสมุนไพร', 'ปลาทอด+ราดน้ำยำ', 'ปลาทอดซอสมะขาม', 'ปลาราดพริกสามรส', 'ปลาผัดเปรี้ยวหวาน', 'ปลาผัดฉ่า', 'ปลานึ่งมะนาว', 'ปลาทอดลุยสวน']}, {n: 'ประเภทของหวาน', pick: 1, d: ['เฉาก๊วยน้ำตาลทรายแดง', 'รวมมิตรน้ำกะทิ', 'ผลไม้ตามฤดูกาล', 'ลอดช่องน้ำกะทิ', 'สาคูเปียกข้าวโพด', 'กล้วยบวชชี', 'ซ่าหริ่มน้ำกะทิ', 'แกงบวดฟักทอง']}] },
   ];
 
   const SERVICES = [
@@ -300,7 +309,19 @@
 
   /* ---------------- catalog helpers (menus can be edited in the app) ---------------- */
   const itemText = x => [x.name, x.qty !== '' && x.qty != null ? x.qty + (x.unit ? ' ' + x.unit : '') : '', x.detail].filter(v => v !== '' && v != null).join(' ').trim();
+  // dishes the customer chooses from (groups of { n: name, pick: how many, d: [dishes] }) and the price by the table
+  const shortGroup = n => String(n || '').replace(/^ประเภท/, '').replace(/\s*\(.*\)\s*$/, '').trim();
+  const groupSummary = f => {
+    const gs = f.groups || [], dishes = gs.reduce((a, g) => a + g.d.length, 0), pick = gs.reduce((a, g) => a + g.pick, 0);
+    const out = [`เลือก ${pick} รายการ จาก ${dishes} จาน`, gs.map(g => shortGroup(g.n)).join(' · ')];
+    if (f.tbl) out.push(`โต๊ะละ ${f.tbl.base} ท่าน · ท่านที่เพิ่ม +${f.tbl.ex} บาท (ไม่เกิน ${f.tbl.max} ท่าน/โต๊ะ)`);
+    return out;
+  };
   function normFood(f) {
+    if (Array.isArray(f.groups)) f.groups = f.groups.filter(g => g && g.n).map(g => ({ n: String(g.n), pick: Math.max(1, Number(g.pick) || 1), d: (Array.isArray(g.d) ? g.d : []).map(String).filter(Boolean) })).filter(g => g.d.length);
+    if (f.groups && !f.groups.length) delete f.groups;
+    if (f.tbl) { const t = f.tbl; f.tbl = { base: Number(t.base) || 8, max: Math.max(Number(t.base) || 8, Number(t.max) || 10), ex: Number(t.ex) || 0 }; }
+    if (!Array.isArray(f.items) && !f.feat && f.groups) f.items = groupSummary(f).map(t => it(t));
     if (!Array.isArray(f.items)) f.items = (f.feat || []).map(t => it(t));
     if (!Array.isArray(f.photos)) f.photos = f.img ? [f.img] : [];
     f.tags = f.tags || [];
@@ -321,6 +342,8 @@
     let src = Array.isArray(list) && list.length ? list : FOOD_DEFAULT;
     // a saved menu from before the buffet/break sets existed gets them added once (after that, the saved menu decides)
     if (src !== FOOD_DEFAULT && !src.some(f => f && f.rc)) src = src.concat(FOOD_DEFAULT.filter(f => f.rc && !src.some(x => x && x.id === f.id)));
+    // … and the resort's lunch / set-table menus (26 Nov 2026), once: a saved menu without any of them gets all three
+    if (src !== FOOD_DEFAULT && !src.some(f => f && /^lt-/.test(f.id || ''))) src = src.concat(FOOD_DEFAULT.filter(f => /^lt-/.test(f.id)));
     FOOD.length = 0;
     for (const f of JSON.parse(JSON.stringify(src))) FOOD.push(normFood(f));
   }
@@ -338,10 +361,16 @@
   };
   const foodItem = (fid, pax, times, desc, sched) => {
     const f = FOOD.find(x => x.id === fid) || FOOD_DEFAULT.find(x => x.id === fid) || { id: fid, cat: 'lunch', name: fid, price: 0, unit: 'ท่าน' };
-    const per = /โต๊ะ|งาน/.test(f.unit);
-    return { id: U.uid('i'), sec: 'food', ref: fid, name: (f.cat === 'coffee' ? 'Coffee break · ' : '') + f.name, desc: desc || f.place || '', price: f.price,
-      q1: pax, u1: per ? f.unit : 'ท่าน', q2: per || times == null ? null : times, u2: per || times == null ? '' : (f.cat === 'coffee' ? 'รอบ' : 'มื้อ'), sched: sched || [] };
+    const per = /โต๊ะ|งาน/.test(f.unit) && !f.tbl;
+    const o = { id: U.uid('i'), sec: 'food', ref: fid, name: (f.cat === 'coffee' ? 'Coffee break · ' : '') + f.name, desc: desc || f.place || '', price: f.price,
+      q1: pax, u1: f.tbl ? 'โต๊ะ' : per ? f.unit : 'ท่าน', q2: per || times == null ? null : times, u2: per || times == null ? '' : (f.cat === 'coffee' ? 'รอบ' : 'มื้อ'), sched: sched || [] };
+    if (f.tbl) o.tbl = Object.assign({ pax: (Number(pax) || 0) * f.tbl.base }, f.tbl);
+    return o;
   };
+  // a table-priced line for this many guests: tables enough for at most tbl.max a table
+  const tblFit = (it, pax) => { if (!it.tbl) return it; it.tbl.pax = Math.max(1, Number(pax) || 1); it.q1 = Math.max(1, Math.ceil(it.tbl.pax / (it.tbl.max || 10))); return it; };
+  // the dishes chosen on a line (it.pick: [[group, [dishes]]], it.pickNote): one text line per group, then the note
+  const pickLines = it => (it.pick || []).filter(x => x && x[1] && x[1].length).map(([g, d]) => shortGroup(g) + ': ' + d.join(', ')).concat(it.pickNote ? ['หมายเหตุ: ' + it.pickNote] : []);
   const roomItem = (name, rooms, nights, price, desc, ref, extra = {}) =>
     Object.assign({ id: U.uid('i'), sec: 'room', ref: ref || '', name, desc: desc || '', price, q1: rooms, u1: 'ห้อง', q2: nights, u2: 'คืน', sched: [] }, extra);
 
@@ -602,7 +631,7 @@
   }
 
   g.DATA = { bqPeriod, bqTier, ROOM_ZONES, fixQuote, FOOD_CATS_DEFAULT, applyFoodCats, LAYOUTS, MEETING_ROOMS, MEETING_ROOMS_DEFAULT, applyMeetRooms, ROOM_TYPES, ROOM_DEF, ROOM_RATES_DEFAULT, BOUTIQUE, BOUTIQUE_DEFAULT, applyRoomRates, seasonOf, roomPrice, roomStay, seasons: () => SEASONS, FOOD_CATS, FOOD, SERVICES, DEPTS, DEPTS_DEFAULT, applyDepts, ROLES, PERMS, ROLE_PERMS, STATUS, meetItem, svcItem, foodItem, roomItem, DEFAULT_PW: 'luckswan',
-    itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT };
+    itemText, foodFeat, foodSlides, normFood, applyCatalog, FOOD_DEFAULT, tblFit, pickLines, shortGroup, groupSummary };
   g.Store = Store;
   g.hashPw = hash;
 })(window);

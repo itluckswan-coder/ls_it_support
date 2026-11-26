@@ -88,7 +88,10 @@
     },
 
     // Quote math. items: {price,q1,q2}
-    lineTotal(it) { return (Number(it.price) || 0) * (Number(it.q1) || 0) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1); },
+    // a menu priced by the table (owner, 26 Nov 2026): price is one table of tbl.base guests (8); every guest past base × tables
+    // adds tbl.ex (50 baht) — e.g. 18 guests at 2 tables = 2 × price + 2 × 50
+    tblExtra(it) { const t = it && it.tbl; return t ? Math.max(0, (Number(t.pax) || 0) - (Number(t.base) || 8) * (Number(it.q1) || 0)) : 0; },
+    lineTotal(it) { return ((Number(it.price) || 0) * (Number(it.q1) || 0) + (it.tbl ? U.tblExtra(it) * (Number(it.tbl.ex) || 0) : 0)) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1); },
     calc(q, settings) {
       const S = settings || { service: 0.10, vat: 0.07 };
       const D = g.DATA, items = q.items || [];

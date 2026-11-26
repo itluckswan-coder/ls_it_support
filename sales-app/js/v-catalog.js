@@ -98,7 +98,7 @@
   }
   function addFood(q, fid) {
     const f = D.FOOD.find(x => x.id === fid), days = U.daysOf(q.start, q.end).length;
-    const times = f.cat === 'coffee' ? days * 2 : f.cat === 'lunch' ? days : (f.cat === 'package' || f.cat === 'wedding' || /โต๊ะ|งาน/.test(f.unit)) ? null : 1;
+    const times = f.cat === 'coffee' ? days * 2 : f.cat === 'lunch' ? days : (f.cat === 'package' || f.cat === 'wedding' || (/โต๊ะ|งาน/.test(f.unit) && !f.tbl)) ? null : 1;
     const sched = [];
     if (f.cat === 'coffee') for (let d = 1; d <= days; d++) sched.push({ day: d, start: '10:00', end: '10:30' }, { day: d, start: '14:30', end: '15:00' });
     if (f.cat === 'lunch') for (let d = 1; d <= days; d++) sched.push({ day: d, start: '12:00', end: '13:00' });
@@ -107,6 +107,7 @@
     const qty = /โต๊ะ/.test(f.unit) ? Math.ceil(q.pax / 10) : /งาน/.test(f.unit) ? 1 : q.pax;
     const it = D.foodItem(fid, qty, times, f.cat === 'coffee' ? 'เช้า–บ่าย วันละ 2 รอบ' : f.place || f.sub || '', sched);
     if (f.cat === 'package') { it.name = f.name + ' (' + f.sub + ')'; it.desc = D.foodFeat(f).slice(0, 2).join(' · '); }
+    if (it.tbl) { D.tblFit(it, q.pax); it.desc = ''; }
     q.items.push(it); App.touch(q, 'เพิ่ม ' + f.name);
   }
   /* catering categories: add / rename / remove (price editors only); a category that still has menus cannot be removed */

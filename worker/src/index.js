@@ -219,7 +219,9 @@ async function canAssignTo(env, user, to) {
   const rule = (tp.rules || {})[key] || {};
   return to.type === 'dept' ? (rule.depts || []).includes(to.dept) : (rule.roles || []).includes(target.slice(5));
 }
-const lineTotal = it => (Number(it.price) || 0) * (Number(it.q1) || 0) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1);
+// a menu priced by the table also charges each guest past tbl.base per table (as U.lineTotal in the app)
+const tblExtra = it => { const t = it && it.tbl; return t ? Math.max(0, (Number(t.pax) || 0) - (Number(t.base) || 8) * (Number(it.q1) || 0)) : 0; };
+const lineTotal = it => ((Number(it.price) || 0) * (Number(it.q1) || 0) + (it.tbl ? tblExtra(it) * (Number(it.tbl.ex) || 0) : 0)) * (it.q2 == null || it.q2 === '' ? 1 : Number(it.q2) || 0) * (it.free ? 0 : 1);
 
 async function applyRules(env, user, kind, id, data, prev) {
   if (kind === 'quote') {
