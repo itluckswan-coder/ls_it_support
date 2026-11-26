@@ -274,6 +274,7 @@
       return { total, used, left: total - used };
     },
     qtyLabel(it) {
+      if (it.tbl) return `${U.n(it.q1)} โต๊ะ (${U.n(it.tbl.pax)} ท่าน)${it.q2 != null && it.q2 !== '' ? ' × ' + U.n(it.q2) + ' ' + (it.u2 || 'มื้อ') : ''}`;
       if (it.q2 == null || it.q2 === '') return `${U.n(it.q1)} ${it.u1 || ''}`.trim();
       return `${U.n(it.q1)}${it.u1 && it.sec !== 'food' ? ' ' + it.u1 : ''} × ${U.n(it.q2)} ${it.u2 || ''}`.trim();
     },

@@ -83,6 +83,14 @@
         <datalist id="ceItemUnits">${ITEM_UNITS.map(u => `<option>${u}</option>`).join('')}</datalist>
         <button type="button" class="add-row" style="padding:12px 0" data-ce="add">+ เพิ่มรายการ</button>
 
+        <div class="between" style="margin:20px 0 8px"><h3>ให้ลูกค้าเลือกอาหาร</h3><button type="button" class="chip ${draft.groups ? 'on' : ''}" data-ce="grpOn">${draft.groups ? 'เปิดอยู่' : 'ปิดอยู่'}</button></div>
+        ${draft.groups ? `<p class="xs muted" style="margin:-4px 0 8px">แต่ละหมวด: ชื่อหมวด · เลือกได้กี่จาน · รายชื่ออาหารบรรทัดละ 1 จาน</p>
+        <div class="ce-grps">${draft.groups.map((g, i) => `<div class="ce-grp"><div class="row" style="gap:6px"><input class="input sm" style="flex:1;min-width:0" data-grp="${i}" data-f="n" value="${H(g.n)}" placeholder="เช่น ประเภทผัด" aria-label="ชื่อหมวด"><label class="xs muted row" style="gap:4px">เลือก<input class="input sm" style="width:52px" data-grp="${i}" data-f="pick" inputmode="numeric" value="${H(g.pick)}" aria-label="เลือกได้กี่จาน"></label><button type="button" class="icon-btn" data-ce="grpDel" data-i="${i}" aria-label="ลบหมวด">${ICON.trash || '✕'}</button></div>
+          <textarea class="input" rows="4" style="height:auto;margin-top:6px;padding:8px 10px" data-grp="${i}" data-f="d" placeholder="แกงเขียวหวานไก่&#10;ต้มข่าไก่" aria-label="รายชื่ออาหาร">${H((g.d || []).join('\n'))}</textarea></div>`).join('')}</div>
+        <button type="button" class="add-row" style="padding:12px 0" data-ce="grpAdd">+ เพิ่มหมวด</button>` : ''}
+        <div class="between" style="margin:16px 0 8px"><h3>คิดราคาแบบโต๊ะ</h3><button type="button" class="chip ${draft.tbl ? 'on' : ''}" data-ce="tblOn">${draft.tbl ? 'เปิดอยู่' : 'ปิดอยู่'}</button></div>
+        ${draft.tbl ? `<div class="grid g3"><div><label class="f">ราคาแพ็กเกจรวม (ท่าน/โต๊ะ)</label><input class="input" data-tbl="base" inputmode="numeric" value="${H(draft.tbl.base)}"></div><div><label class="f">ท่านที่เพิ่ม (บาท/ท่าน)</label><input class="input" data-tbl="ex" inputmode="decimal" value="${H(draft.tbl.ex)}"></div><div><label class="f">ไม่เกิน (ท่าน/โต๊ะ)</label><input class="input" data-tbl="max" inputmode="numeric" value="${H(draft.tbl.max)}"></div></div>` : ''}
+
         <div class="small red" style="min-height:20px;margin-top:6px" role="alert">${H(err)}</div>
         ${busy ? `<div class="small teal">กำลังอัปโหลดรูป ${busy} รูป…</div>` : ''}
         <div class="acts" style="flex-wrap:wrap">${orig ? '<button type="button" class="btn ghost" data-ce="remove" style="color:var(--red);margin-right:auto">ลบเมนูนี้</button>' : ''}<button type="button" class="btn ghost" data-act="closeModal">ยกเลิก</button><button type="button" class="btn red" data-ce="save" ${busy ? 'disabled' : ''}>บันทึก</button></div>`;
@@ -104,6 +112,11 @@
       if (t.dataset.top) {
         draft[t.dataset.top] = t.value;
         if (t.dataset.top === 'cat') draw();
+      } else if (t.dataset.grp != null) {
+        const g = draft.groups[Number(t.dataset.grp)], f = t.dataset.f;
+        g[f] = f === 'd' ? t.value.split('\n').map(x => x.trim()).filter(Boolean) : f === 'pick' ? Math.max(1, parseInt(t.value, 10) || 1) : t.value;
+      } else if (t.dataset.tbl != null) {
+        draft.tbl[t.dataset.tbl] = t.value;
       } else if (t.dataset.item != null) {
         const x = draft.items[Number(t.dataset.item)];
         x[t.dataset.f] = t.dataset.f === 'qty' ? (t.value.trim() === '' ? '' : Math.max(0, parseInt(t.value, 10) || 0)) : t.value;
@@ -115,6 +128,10 @@
       const i = Number(b.dataset.i), act = b.dataset.ce;
       if (act === 'best') { draft.best = !draft.best; draw(); }
       if (act === 'rc') { draft.rc = !draft.rc; draw(); }
+      if (act === 'grpOn') { if (draft.groups) { delete draft.groups; } else draft.groups = [{ n: '', pick: 1, d: [] }]; draw(); }
+      if (act === 'grpAdd') { draft.groups.push({ n: '', pick: 1, d: [] }); draw(); }
+      if (act === 'grpDel') { draft.groups.splice(i, 1); if (!draft.groups.length) delete draft.groups; draw(); }
+      if (act === 'tblOn') { if (draft.tbl) delete draft.tbl; else { draft.tbl = { base: 8, max: 10, ex: 50 }; if (!/โต๊ะ/.test(draft.unit || '')) draft.unit = 'โต๊ะ'; } draw(); }
       if (act === 'tag') { const k = b.dataset.v, j = draft.tags.indexOf(k); if (j >= 0) draft.tags.splice(j, 1); else draft.tags.push(k); draw(); }
       if (act === 'add') { draft.items.push({ name: '', qty: '', unit: '', detail: '', img: null }); draw(); const ins = modal.querySelectorAll('.ce-name'); ins[ins.length - 1].focus(); }
       if (act === 'del') { draft.items.splice(i, 1); draw(); }
@@ -141,6 +158,8 @@
         if (!['lunch', 'coffee'].includes(draft.cat)) delete draft.rc; else if (!draft.rc) delete draft.rc;
         draft.unit = String(draft.unit || '').trim() || 'ท่าน';
         draft.min = draft.min === '' || draft.min == null ? '' : Math.max(0, parseInt(draft.min, 10) || 0) || '';
+        if (draft.groups) { draft.groups = draft.groups.map(g => ({ n: String(g.n || '').trim(), pick: Math.max(1, parseInt(g.pick, 10) || 1), d: (g.d || []).map(x => String(x).trim()).filter(Boolean) })).filter(g => g.n && g.d.length); if (!draft.groups.length) delete draft.groups; }
+        if (draft.tbl) { const t = draft.tbl, base = parseInt(t.base, 10) || 0, max = parseInt(t.max, 10) || 0, ex = parseFloat(String(t.ex).replace(/,/g, '')); if (!(base > 0) || !(max >= base) || !(ex >= 0)) { err = 'คิดราคาแบบโต๊ะ: ใส่จำนวนท่านต่อโต๊ะ และ “ไม่เกิน” ต้องไม่น้อยกว่าจำนวนท่านต่อโต๊ะ'; draw(); return; } draft.tbl = { base, max, ex }; }
         draft.items = draft.items.map(x => Object.assign(x, { name: String(x.name || '').trim(), unit: String(x.unit || '').trim(), detail: String(x.detail || '').trim() })).filter(x => x.name || x.detail || x.img);
         if (orig) Object.keys(orig).forEach(k => delete orig[k]);
         const target = orig || {};

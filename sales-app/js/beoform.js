@@ -45,10 +45,12 @@
     // menu: one block per food line, titled by its serving time
     const menu = food.map(i => {
       const f = D.FOOD.find(x => x.id === i.ref), s = (i.sched || [])[0];
-      const dishes = f && Array.isArray(f.items) ? f.items.map(D.itemText).filter(Boolean) : [];
+      // a menu the customer picked dishes from lists what was picked (and the note to the kitchen), not the menu's summary
+      const dishes = i.pick || i.pickNote ? D.pickLines(i) : f && Array.isArray(f.items) ? f.items.map(D.itemText).filter(Boolean) : [];
+      if (i.tbl) dishes.unshift(`${i.tbl.pax} ท่าน · ${i.q1} โต๊ะ`);
       return { time: s ? s.start + (s.end ? ' - ' + s.end : '') + 'น.' : '', title: i.name, items: dishes.join('\n') };
     });
-    const cost = q.items.filter(i => U.lineTotal(i)).map(i => `${i.name} ${money(i.price)} × ${i.q1}${i.q2 != null && i.q2 !== '' ? ' × ' + i.q2 : ''} = ${money(U.lineTotal(i))} บาท`);
+    const cost = q.items.filter(i => U.lineTotal(i)).map(i => `${i.name} ${money(i.price)} × ${i.q1}${i.tbl ? ' โต๊ะ' + (U.tblExtra(i) ? ' + ' + U.tblExtra(i) + ' ท่าน × ' + money(i.tbl.ex) : '') : ''}${i.q2 != null && i.q2 !== '' ? ' × ' + i.q2 : ''} = ${money(U.lineTotal(i))} บาท`);
     if (c.credit) cost.push(`หักค่าห้องประชุมด้วยค่าอาหาร −${money(c.credit)} บาท${c.roomFree ? ' (ห้องประชุมฟรี)' : ''}`);
     if (c.disc) cost.push(`ส่วนลด −${money(c.disc)} บาท`);
     if (c.svc) cost.push(`ค่าบริการ 10% ${money(c.svc)} บาท`);

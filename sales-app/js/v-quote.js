@@ -94,8 +94,8 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       const items = q.items.filter(i => i.sec === s.id);
       return `<section class="card sec"><div class="sec-hd"><span class="sq" style="background:${s.color}"></span><h3>${s.name}</h3><b class="num" style="font:600 16px var(--fh)">${U.n(c.by[s.id] || 0)}</b></div>
       ${items.map(it => `<div class="li">
-        <div style="min-width:0;cursor:pointer" data-act="itemEdit" data-id="${it.id}"><div class="name">${H(it.name)}${it.free ? ' <span class="badge st-confirmed">ฟรี</span>' : ''}</div><div class="desc">${H(it.desc || '')}</div></div>
-        <div class="qcol"><span class="qty-chip"><input inputmode="numeric" data-change="itemF" data-id="${it.id}" data-f="q1" value="${H(it.q1)}" style="width:${String(it.q1).length + 1.5}ch" aria-label="จำนวน">${it.u1 && (it.q2 == null || it.sec !== 'food') ? ' ' + H(it.u1) : ''}${it.q2 != null ? ` × <input inputmode="numeric" data-change="itemF" data-id="${it.id}" data-f="q2" value="${H(it.q2)}" style="width:${String(it.q2).length + 1.5}ch" aria-label="จำนวนครั้ง"> ${H(it.u2 || '')}` : ''}</span></div>
+        <div style="min-width:0"><div style="cursor:pointer" data-act="itemEdit" data-id="${it.id}"><div class="name">${H(it.name)}${it.free ? ' <span class="badge st-confirmed">ฟรี</span>' : ''}</div><div class="desc" style="white-space:pre-line">${H(it.desc || '')}</div></div>${dishTools(it)}</div>
+        <div class="qcol"><span class="qty-chip"><input inputmode="numeric" data-change="itemF" data-id="${it.id}" data-f="q1" value="${H(it.q1)}" style="width:${String(it.q1).length + 1.5}ch" aria-label="จำนวน">${it.u1 && (it.q2 == null || it.sec !== 'food' || it.tbl) ? ' ' + H(it.u1) : ''}${it.q2 != null ? ` × <input inputmode="numeric" data-change="itemF" data-id="${it.id}" data-f="q2" value="${H(it.q2)}" style="width:${String(it.q2).length + 1.5}ch" aria-label="จำนวนครั้ง"> ${H(it.u2 || '')}` : ''}</span></div>
         <div class="pcol"><input class="price-in num" inputmode="decimal" data-change="itemF" data-id="${it.id}" data-f="price" value="${U.n(it.price)}" aria-label="ราคาต่อหน่วย"></div>
         <div class="tcol num b" style="text-align:right">${it.free ? 'แถม' : U.n(U.lineTotal(it))}${c.roomFree && it.sec === 'meet' && D.MEETING_ROOMS.some(r => r.id === it.ref) && !['banquet', 'cocktail'].includes(it.layout) ? '<div class="xs teal" style="font-weight:600">ฟรี · ไม่นำมาคิด</div>' : ''}</div>
         <button class="del" data-act="itemDel" data-id="${it.id}" aria-label="ลบรายการ">${ICON.trash}</button>
@@ -263,7 +263,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
       if (it.sec === 'food' && it.q2 != null) it.q2 = it.sched.length;
       if (it.sec === 'meet') it.q1 = new Set(it.sched.map(x => x.day)).size;
     } else {
-      if (k === 'food') { const f = D.FOOD.find(x => x.id === id); it = D.foodItem(id, /โต๊ะ/.test(f.unit) ? Math.ceil(q.pax / 10) : q.pax, /โต๊ะ|งาน/.test(f.unit) ? null : 1, f.place || '', [s]); }
+      if (k === 'food') { const f = D.FOOD.find(x => x.id === id); it = D.tblFit(D.foodItem(id, /โต๊ะ/.test(f.unit) ? Math.ceil(q.pax / 10) : q.pax, /โต๊ะ|งาน/.test(f.unit) && !f.tbl ? null : 1, f.place || '', [s]), q.pax); }
       else if (k === 'meet') { it = D.meetItem(id, 1, 'classroom', { pax: q.pax, desc: start + '–' + end, sched: [s] }); }
       else { it = D.svcItem(id, 1, [s]); }
       q.items.push(it);
@@ -361,6 +361,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     qDetails() { detailsModal(cur()); },
     itemDel(el) { const q = cur(); const it = q.items.find(i => i.id === el.dataset.id); q.items = q.items.filter(i => i !== it); App.touch(q); App.render(); App.toast('ลบ ' + it.name + ' แล้ว'); },
     itemEdit(el) { itemModal(cur(), cur().items.find(i => i.id === el.dataset.id)); },
+    dishPick(el) { const q = cur(), it = q.items.find(i => i.id === el.dataset.id); if (it) dishModal(q, it); },
     itemAdd(el) { addItemModal(cur(), el.dataset.sec); }
   });
   Object.assign(App.CHG, {
@@ -428,6 +429,65 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
     });
   }
 
+  /* ---------- a menu the customer picks dishes from, priced by the table (owner, 26 Nov 2026) ---------- */
+  // the line's button and what it shows: guests and tables, how many dishes are chosen, and a warning when a table is over or under
+  const tblWarn = it => {
+    const t = it.tbl; if (!t) return null;
+    const P = Number(t.pax) || 0, T = Number(it.q1) || 0;
+    if (T && P > t.max * T) return { k: 'over', t: `เกิน ${t.max} ท่านต่อโต๊ะ (${P} ท่าน / ${T} โต๊ะ)` };
+    if (T && P < t.base * T) return { k: 'under', t: `ไม่ถึง ${t.base} ท่านต่อโต๊ะ (${P} ท่าน / ${T} โต๊ะ) · คิดราคาเต็มโต๊ะ` };
+    return null;
+  };
+  function dishTools(it) {
+    const f = it.sec === 'food' && D.FOOD.find(x => x.id === it.ref);
+    if (!f || !(f.groups || it.tbl)) return '';
+    const need = (f.groups || []).reduce((a, g) => a + g.pick, 0), got = (it.pick || []).reduce((a, x) => a + ((x && x[1]) || []).length, 0);
+    const w = tblWarn(it), bits = [];
+    if (it.tbl) bits.push(`${U.n(it.tbl.pax)} ท่าน · ${U.n(it.q1)} โต๊ะ${U.tblExtra(it) ? ` · เพิ่ม ${U.tblExtra(it)} ท่าน × ${U.n(it.tbl.ex)}` : ''}`);
+    if (f.groups) bits.push(got >= need ? `เลือกอาหารครบ ${got} รายการ` : `เลือกอาหารแล้ว ${got}/${need}`);
+    return `<div class="row wrap" style="gap:6px;margin-top:6px"><button class="btn ghost sm" data-act="dishPick" data-id="${it.id}">🍽 ${f.groups ? 'เลือกอาหาร' : ''}${f.groups && it.tbl ? ' · ' : ''}${it.tbl ? 'จัดโต๊ะ' : ''}</button><span class="xs ${f.groups && got < need ? 'red' : 'muted'}">${H(bits.join(' · '))}</span></div>${w ? `<div class="xs" style="color:#9A5B00;margin-top:4px">⚠ ${H(w.t)}</div>` : ''}`;
+  }
+  function dishModal(q, it) {
+    const f = D.FOOD.find(x => x.id === it.ref) || {};
+    const groups = f.groups || [];
+    const st = { pax: it.tbl ? Number(it.tbl.pax) || q.pax : 0, T: Number(it.q1) || 1, note: it.pickNote || '',
+      pick: groups.map(g => { const old = (it.pick || []).find(x => x && x[0] === g.n); return old ? old[1].filter(d => g.d.includes(d)) : []; }) };
+    const bg = App.modal('<div id="dpBody"></div>');
+    const modal = bg.querySelector('.modal'); modal.style.maxWidth = '860px';
+    const tb = it.tbl;
+    function body() {
+      const P = st.pax, T = st.T, extra = tb ? Math.max(0, P - tb.base * T) : 0;
+      let warn = '';
+      if (tb && P > tb.max * T) warn = `<div class="dp-warn">⚠ เกิน ${tb.max} ท่านต่อโต๊ะ (${P} ท่าน / ${T} โต๊ะ)<div class="row wrap" style="gap:6px;margin-top:6px"><button type="button" class="btn sm dark" data-dp="tables" data-v="${Math.ceil(P / tb.max)}">เพิ่มเป็น ${Math.ceil(P / tb.max)} โต๊ะ</button><span class="xs">หรือคงไว้ ${T} โต๊ะ คิดเป็น ${tb.base}+${P - tb.base * T} ท่าน</span></div></div>`;
+      else if (tb && P < tb.base * T) warn = `<div class="dp-warn">⚠ มีไม่ถึง ${tb.base} ท่านต่อโต๊ะ (${P} ท่าน / ${T} โต๊ะ) · ตอนนี้คิดราคาเต็ม ${T} โต๊ะ ไม่มีค่าท่านที่เพิ่ม${T > 1 ? `<div class="row wrap" style="gap:6px;margin-top:6px"><button type="button" class="btn sm dark" data-dp="tables" data-v="${T - 1}">ลดเป็น ${T - 1} โต๊ะ (คิด ${tb.base}+${Math.max(0, P - tb.base * (T - 1))} ท่าน)</button><span class="xs">หรือคงไว้ คิดเต็มโต๊ะ</span></div>` : ''}</div>`;
+      const left = groups.map((g, i) => st.pick[i].length < g.pick ? D.shortGroup(g.n) + ' อีก ' + (g.pick - st.pick[i].length) : '').filter(Boolean);
+      return `<h2>${groups.length ? 'เลือกอาหาร' : ''}${groups.length && tb ? ' · ' : ''}${tb ? 'จัดโต๊ะ' : ''}</h2><p class="small muted" style="margin:-2px 0 12px">${H(it.name)}</p>
+        ${tb ? `<div class="dp-tbl"><label class="f">จำนวนท่าน<input class="input" id="dpPax" inputmode="numeric" value="${P}"></label>
+          <div><div class="f">จำนวนโต๊ะ</div><div class="row" style="gap:6px"><button type="button" class="btn ghost sm" data-dp="tables" data-v="${Math.max(1, T - 1)}" aria-label="ลดโต๊ะ">−</button><b class="num" style="min-width:2ch;text-align:center">${T}</b><button type="button" class="btn ghost sm" data-dp="tables" data-v="${T + 1}" aria-label="เพิ่มโต๊ะ">+</button></div></div>
+          <div class="dp-sum num">${T} โต๊ะ × ${U.n(it.price)} (${tb.base} ท่าน)${extra ? ` + ${extra} ท่าน × ${U.n(tb.ex)}` : ''} = <b>${U.n(T * it.price + extra * tb.ex)}</b> บาท${it.q2 != null && it.q2 !== '' && Number(it.q2) !== 1 ? ` /มื้อ × ${it.q2} มื้อ` : ''}<div class="xs muted">โต๊ะละ ${tb.base} ท่าน · ท่านที่เพิ่ม +${U.n(tb.ex)} บาท · ไม่เกิน ${tb.max} ท่าน/โต๊ะ</div></div></div>${warn}` : ''}
+        ${groups.length ? `<div class="dp-groups">${groups.map((g, i) => { const n = st.pick[i].length; return `<div class="dp-grp"><div class="between" style="gap:8px;margin-bottom:4px"><b class="small">${H(g.n)}</b><span class="badge ${n >= g.pick ? 'st-confirmed' : ''}">${n}/${g.pick}</span></div>${g.d.map(d => { const on = st.pick[i].includes(d), off = !on && n >= g.pick; return `<label class="dp-dish${off ? ' off' : ''}"><input type="checkbox" data-g="${i}" value="${H(d)}"${on ? ' checked' : ''}${off ? ' disabled' : ''}> ${H(d)}</label>`; }).join('')}</div>`; }).join('')}</div>
+        <p class="small" role="status" style="margin:8px 0 0;color:${left.length ? '#9A5B00' : 'var(--teal-d)'}">${left.length ? 'ยังเลือกไม่ครบ: ' + H(left.join(' · ')) : '✓ เลือกครบทุกหมวดแล้ว'}</p>` : ''}
+        <label class="f" style="margin-top:12px">เพิ่มเติม / คำขอพิเศษ / จานนอกเมนู</label><textarea class="input" id="dpNote" rows="2" style="height:auto;min-height:64px;padding:10px 12px" placeholder="เช่น ไม่เผ็ด 1 โต๊ะ · เปลี่ยนไก่เป็นหมู">${H(st.note)}</textarea>
+        <div class="acts"><button class="btn ghost" data-act="closeModal">ยกเลิก</button><button class="btn red" id="dpSave">บันทึก</button></div>`;
+    }
+    const draw = () => { const y = modal.scrollTop; modal.querySelector('#dpBody').innerHTML = body(); modal.scrollTop = y; };
+    draw();
+    modal.addEventListener('click', e => { const b = e.target.closest('[data-dp="tables"]'); if (b) { st.T = Math.max(1, Number(b.dataset.v) || 1); draw(); } });
+    modal.addEventListener('change', e => {
+      const c = e.target;
+      if (c.matches('input[type=checkbox][data-g]')) { const a = st.pick[Number(c.dataset.g)], g = groups[Number(c.dataset.g)]; if (c.checked) { if (!a.includes(c.value)) a.push(c.value); } else a.splice(a.indexOf(c.value), 1); a.sort((x, y) => g.d.indexOf(x) - g.d.indexOf(y)); draw(); }
+      if (c.id === 'dpPax') { st.pax = Math.max(1, Math.round(Number(String(c.value).replace(/[^\d]/g, '')) || 1)); draw(); }
+    });
+    modal.addEventListener('input', e => { if (e.target.id === 'dpNote') st.note = e.target.value; });
+    modal.addEventListener('click', e => {
+      if (e.target.id !== 'dpSave') return;
+      if (tb) { it.tbl.pax = st.pax; it.q1 = st.T; }
+      if (groups.length) it.pick = groups.map((g, i) => [g.n, st.pick[i].slice()]);
+      it.pickNote = st.note.trim(); if (!it.pickNote) delete it.pickNote;
+      const lines = D.pickLines(it); if (groups.length || it.pickNote) it.desc = lines.join('\n');
+      App.closeModal(); App.touch(q, 'เลือกอาหาร / จัดโต๊ะ ' + it.name); App.render();
+    });
+  }
   function itemModal(q, it) {
     App.modal(`<h2>แก้ไขรายการ</h2>
       <div class="field"><label class="f">ชื่อรายการ</label><input class="input" name="name" value="${H(it.name)}"></div>
@@ -474,6 +534,7 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
           const f = D.FOOD.find(x => x.id === id);
           const times = f.cat === 'coffee' ? days * 2 : f.cat === 'lunch' ? days : f.cat === 'package' || f.cat === 'wedding' ? null : 1;
           it = D.foodItem(id, /โต๊ะ/.test(f.unit) ? Math.ceil(q.pax / 10) : /งาน/.test(f.unit) ? 1 : q.pax, times);
+          D.tblFit(it, q.pax);
         } else { const t = D.ROOM_TYPES.find(x => x.id === id), lines = App.roomLines(t, Math.ceil(q.pax / t.pax), q.start, nights, true, 'เช็กอิน ' + U.fmtD(q.start, { year: false })); it = lines[0]; q.items.push(...lines.slice(1)); }
         q.items.push(it); App.closeModal(); App.touch(q); App.render(); App.toast('เพิ่ม ' + it.name);
       });
@@ -759,8 +820,10 @@ ${qs.map(q => `<tr class="click" data-act="openQuote" data-id="${H(q.id)}"><td c
         return U.fmtRange(q.start, q.end);
       };
       const unitTxt = it => it.sec === 'room' ? 'บาท/ห้อง' : it.sec === 'meet' ? 'บาท' : it.q2 != null ? 'บาท/ท่าน/' + (it.u2 || 'มื้อ') : 'บาท/' + (it.u1 || 'ท่าน');
-      const qtyTxt = it => it.sec === 'room' ? it.q1 + ' ห้อง' : it.sec === 'meet' ? '' : U.n(it.q1) + ' ' + (it.u1 || 'ท่าน');
-      const priceTxt = it => it.sec === 'meet' ? U.n(it.price) + ' บาท × ' + it.q1 + ' ' + (it.u1 || 'วัน') : U.n(it.price) + ' ' + unitTxt(it);
+      const qtyTxt = it => it.sec === 'room' ? it.q1 + ' ห้อง' : it.sec === 'meet' ? '' : it.tbl ? U.n(it.q1) + ' โต๊ะ\n(' + U.n(it.tbl.pax) + ' ท่าน)' : U.n(it.q1) + ' ' + (it.u1 || 'ท่าน');
+      // a table-priced menu: the table price, then the guests past 8 a table (and the meals when more than one)
+      const tblTxt = it => { const x = U.tblExtra(it), m = it.q2 != null && it.q2 !== '' && Number(it.q2) !== 1 ? '\n× ' + it.q2 + ' ' + (it.u2 || 'มื้อ') : ''; return U.n(it.price) + ' บาท/โต๊ะ (' + it.tbl.base + ' ท่าน)' + (x ? '\n+ ' + x + ' ท่าน × ' + U.n(it.tbl.ex) + ' บาท' : '') + m; };
+      const priceTxt = it => it.sec === 'meet' ? U.n(it.price) + ' บาท × ' + it.q1 + ' ' + (it.u1 || 'วัน') : it.tbl ? tblTxt(it) : U.n(it.price) + ' ' + unitTxt(it);
       const row = it => { const k = ik(it), desc = T[k + '.desc'] != null ? T[k + '.desc'] : it.desc || ''; return `<tr><td>- ${F(k + '.name', it.name, 'ชื่อรายการ')}${desc || ed ? `<br><span style="color:#666">${F(k + '.desc', it.desc || '', 'รายละเอียด')}</span>` : ''}</td><td class="c">${F(k + '.period', period(it))}</td><td class="c">${F(k + '.qty', qtyTxt(it))}</td>
         <td class="c">${unit ? F(k + '.unit', priceTxt(it)) : ''}</td><td class="r"><b>${it.free ? '<span style="color:#c00">แถม</span>' : U.n(U.lineTotal(it)) + ' บาท'}</b></td></tr>`; };
       // the meeting-room block: its photo (the room's cover unless one was uploaded or removed) and a note the sales person writes;
